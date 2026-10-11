@@ -264,13 +264,19 @@ A controller describes each axis as X, Y, Z, Rx, Ry, Rz, Slider or Dial. The fir
 calls `Joy_UAxis` and `Joy_VAxis` the slider axes, from source notes rather than a test. Bind a controller's
 slider in the game (the VIRPIL Alpha Prime grip's brake, where it reports as a Slider) and read which token
 `.binds` writes. Do the same for a second slider, or a Dial, if one is to hand.
-→ [Device Editor](../02-features/bindforge/alias-designer.md#device-editor)
+*A8b built on Wine's answer (2026-10-10), read from its source, not measured:* Slider, Dial and Simulation
+Throttle are all sliders, and the first two in the order the controller describes them take U, then V. A test
+with two sliders says whether the order is right; the rule is in one place, `AxisSlots`, if it is not.
+→ [Which axes and hats a controller has](../02-features/bindforge/alias-designer.md#which-axes-and-hats-a-controller-has--2026-10-10-alan)
 
 **18. Does Proton name the axes as Windows does?** *Added 2026-10-10.* On Linux the game sees a controller
 through Wine, which presents it as a DirectInput device by its own translation. Read a controller's axes from
 Linux (`/sys/class/input/…/capabilities/abs`), bind each in the game under Proton, and check that the token
 `.binds` writes is the one the Windows reading predicts — sliders especially.
-→ [Device Editor](../02-features/bindforge/alias-designer.md#device-editor)
+*Since A8b (2026-10-10)* Elite-Intel's log names each controller's axes as it connects (`Device '…': axes …`),
+read on Linux from the HID descriptor under `/sys`. Wine sees the same descriptor only where Proton hands the
+game the raw HID device; where it builds one from evdev instead, the order can differ — this test finds out.
+→ [Which axes and hats a controller has](../02-features/bindforge/alias-designer.md#which-axes-and-hats-a-controller-has--2026-10-10-alan)
 
 **19. Does the game show a `.buttonMap` label for a half axis?** *Added 2026-10-10.* `.binds` uses
 `Pos_Joy_…` and `Neg_Joy_…` tokens for a button-type control bound to one direction of an axis (they are in
@@ -287,6 +293,25 @@ whether that is enough.
 at once, and the Device Editor gives a hat four label boxes. Set a stick's hat to report as a true hat (not as
 buttons), bind a diagonal in the game, and read what `.binds` writes.
 → [Device Editor](../02-features/bindforge/alias-designer.md#device-editor)
+
+**21. Does SDL's axis k match the axis A8b names?** *Added 2026-10-10, A8b — Alan can run this one.* SDL
+numbers a stick's axes without gaps; A8b matches its numbering to the HID description by a rule read from SDL's
+source (Windows: DirectInput slot order; Linux: the kernel's axis-code order). The two VIRPIL sticks put their
+twist on Z and on RZ, which is exactly the gap case. With each stick connected, check Elite-Intel's log reads
+`Device '…': axes [X, Y, Z]` for one and `[X, Y, RZ]` for the other, with `SDL numbering matched`; then twist
+each in the Device Editor (A9) and see the right box light.
+→ [Which axes and hats a controller has](../02-features/bindforge/alias-designer.md#which-axes-and-hats-a-controller-has--2026-10-10-alan)
+
+**22. What does the game make of more than eight axes?** *Added 2026-10-10, A8b — needs hardware nobody here
+has.* A8b gives the game's eight slots to the first axis of each kind and the first two sliders, and counts the
+rest as axes the game cannot see — DirectInput's rule as Wine implements it. A controller with a third slider,
+or two axes of one kind (two X), shows whether Windows agrees. Bind each extra axis in the game and read `.binds`.
+→ [Which axes and hats a controller has](../02-features/bindforge/alias-designer.md#which-axes-and-hats-a-controller-has--2026-10-10-alan)
+
+**23. Is the game's `Joy_POV1` SDL's hat 0?** *Added 2026-10-10, A8b.* SDL lists a controller's hats in
+DirectInput's order on Windows, which is presumably the game's `POV1`, `POV2`. On a controller with two true
+hats, bind each in the game and check that `.binds` names the one A8b's generated labels call `Hat 1`.
+→ [Which axes and hats a controller has](../02-features/bindforge/alias-designer.md#which-axes-and-hats-a-controller-has--2026-10-10-alan)
 
 ## Core Platform
 

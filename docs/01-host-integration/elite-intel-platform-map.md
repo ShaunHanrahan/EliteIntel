@@ -126,6 +126,10 @@ From `elite.intel.devices.PACKAGE.md`:
   `DeviceIdentities` does it, confirmed against four real controllers — see
   [the device list](../02-features/bindforge/alias-designer.md#my-devices).
 - `model/ButtonInputMapper` translates SDL3 indices to `.binds` tokens (`Joy_N`, `Joy_XAxis` … `Joy_RZAxis`).
+- **Which axes and hats a controller has — added 2026-10-10 (A8b).** `DeviceService.description(deviceId)`
+  names each controller's axes by the game slot they take, read from its HID description, and its hat count —
+  what SDL's counts alone cannot say. See
+  [the Alias Designer spec](../02-features/bindforge/alias-designer.md#which-axes-and-hats-a-controller-has--2026-10-10-alan).
 - Duplicate VID/PID devices are detected and warned about, with `usbPath` available to tell two identical
   units apart — which is precisely the open question the StellarCore conflict notes raised.
 - Explicitly read-only: the package never writes to the game or to `.binds`.

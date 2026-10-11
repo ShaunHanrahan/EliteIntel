@@ -3,6 +3,7 @@ package elite.intel.bindforge.devicefiles;
 import elite.intel.bindforge.devicefiles.DeviceFilesPush.MasterDevice;
 import elite.intel.bindforge.devicefiles.DeviceFilesPush.Target;
 import elite.intel.bindforge.install.GameInstallation;
+import elite.intel.devices.model.DeviceDescription;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.w3c.dom.Element;
@@ -50,8 +51,13 @@ public final class ButtonMapGeneration {
     private static final String GAME_PAD = "GamePad";
     private static final String SUPPORTS_ICONS = "SupportsIcons";
 
-    /** A connected controller, as far as generation needs it. */
-    public record Controller(String vid, String pid, int buttonCount, int axisCount) {
+    /**
+     * A connected controller, as far as generation needs it.
+     *
+     * @param axisCount   how many axes SDL reports - all eight are labelled when the description disagrees with it
+     * @param description which axes and hats it has
+     */
+    public record Controller(String vid, String pid, int buttonCount, int axisCount, DeviceDescription description) {
     }
 
     public enum Outcome {
@@ -65,7 +71,7 @@ public final class ButtonMapGeneration {
         MASTER_HAS_LABELS,
         /** The game draws this device's inputs itself - {@code <SupportsIcons>}, or {@code <GamePad>}. */
         GAME_DRAWS_IT,
-        /** The controller reports no buttons and no axes, so there is nothing to label. */
+        /** The controller has no buttons, no axis the game can see and no hats, so there is nothing to label. */
         NOTHING_TO_LABEL,
         /** The installation's folder is not there. */
         SKIPPED_MISSING,
@@ -150,7 +156,8 @@ public final class ButtonMapGeneration {
         }
         if (Files.exists(file)) return new Result(target, deviceName, file, Outcome.ALREADY_THERE, null);
 
-        Map<String, String> labels = ButtonMapLabels.generate(controller.buttonCount(), controller.axisCount());
+        Map<String, String> labels =
+                ButtonMapLabels.generate(controller.buttonCount(), controller.axisCount(), controller.description());
         if (labels.isEmpty()) return new Result(target, deviceName, file, Outcome.NOTHING_TO_LABEL, null);
         try {
             boolean created = CreateOnlyFiles.createNew(file, ButtonMapWriter.write(labels));

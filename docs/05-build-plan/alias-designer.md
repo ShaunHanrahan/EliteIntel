@@ -26,7 +26,8 @@ data; most of what the spec describes is still ahead.
 | Frontier's shipped list | `bindforge.devicefiles.FrontierStockDevices`, resource `bindforge/FrontierStock-DeviceMappings.xml` |
 | First setup (A1) | `bindforge.devicefiles.FirstSetup` (read, then backup → master → push), `FirstSetupPlan` (the four cases and the answers, pure), `FirstSetupReader`, `DeviceFilesSnapshot` (the labelled backup), `FrontierStockButtonMaps` (resources `FrontierStock-VPC*.buttonMap.xml`); `BindForgeDeviceDraftManager.establish`; `ui.screen.bindings.FirstSetupDialog`, opened by **SET UP** on `AliasDesignerPanel` while the master is empty |
 | `.buttonMap` label merge (A2) | `bindforge.devicefiles.LabelMerge` (pure: the disagreeing inputs, answers per input, the whole-file route, the merged labels; sides keyed by name); `ui.screen.bindings.LabelMergeDialog`, opened by **Compare N inputs** on a *Button labels disagree* row in `FirstSetupDialog` |
-| Startup `.buttonMap` (A8) | `bindforge.devicefiles.ButtonMapGeneration` (per installation, create-only), `ButtonMapLabels` (the generated labels); `bindforge.devices.ButtonMapStartup` runs it on every connect, started as `BUTTON_MAP_STARTUP` in `AppController` |
+| Startup `.buttonMap` (A8) | `bindforge.devicefiles.ButtonMapGeneration` (per installation, create-only), `ButtonMapLabels` (the generated labels: buttons, the axes the controller has — all eight when unknown — and four per hat); `bindforge.devices.ButtonMapStartup` runs it on every connect, started as `BUTTON_MAP_STARTUP` in `AppController` |
+| Which axes and hats (A8b) | `elite.intel.devices.model.DeviceDescription` (axes by game slot, `axesWithoutSlot`, SDL's numbering via `axisAt`, hat count) and `GameAxis`; `devices.hid.DeviceDescriber` reads it at connect — `WindowsHidUsages` (`hid.dll`), `LinuxHidUsages` + `HidReportDescriptor` (`/sys`), `AxisSlots` (pure rules); `DeviceService.description(deviceId)` |
 | Divergence list (A3) | `DeviceDivergence.againstMaster` (pure; each installation against the master, from `DeviceFilesCheck`), `DeviceDivergenceScanner.scanAgainstMaster` (adds orphans and `.binds`), `BindsDeviceReferences`, `ButtonMapAudit`. Before first setup, `DeviceDivergence.rank` still compares installations with each other |
 | Ways out per row (A3b) | `bindforge.devicefiles.DivergenceWaysOut` (which ways a row gets, pure), `DeviceFilesAdopt.adopt(installId, deviceName)` (one device) and `adoptLabels` (the re-merge), `LabelReMerge` (master plus installations as `LabelMerge` sides); buttons beneath the list in `AliasDesignerPanel`, each confirmed. Revert is `DeviceFilesPush.push(installId)` |
 | What each installation holds | `InstallationDeviceScanner`, run on every refresh; rows in `bindforge_device_installs` |
@@ -65,9 +66,10 @@ installations with each other before then. Once the master exists, each row offe
 - **`ButtonInputMapper.axisToBindsToken` throws for axis index 6 and above.** A8 went around it (`ButtonMapLabels`
   labels all eight tokens); the class is shared with V1.1, so the fix — add U and V — is Krondor's, and the
   Bind Editor's capture needs it.
-- **SDL numbers axes without gaps**, so anything mapping an SDL axis index to a game token is wrong for a stick
-  reporting X, Y and RZ. A8 sidesteps it by labelling all eight. Recorded under [the startup `.buttonMap`](../02-features/bindforge/alias-designer.md#at-elite-intel-startup-a-buttonmap-for-every-connected-named-controller);
-  it will bite the Device Editor's live highlighting and the capture dialog too.
+- **SDL numbers axes without gaps**, so anything mapping an SDL axis index to a game token by position is wrong
+  for a stick reporting X, Y and RZ. *Answered by A8b (2026-10-10):* use `DeviceService.description(id).axisAt(i)`,
+  which is empty when the numbering could not be matched — never `ButtonInputMapper.axisToBindsToken`. The
+  capture dialog must do the same. [Spec](../02-features/bindforge/alias-designer.md#which-axes-and-hats-a-controller-has--2026-10-10-alan)
 - **Still open from the first code review:**
   - **#7 — paths are stored as typed**, so `E:\SteamLibrary\…` and `e:\steamlibrary\…\` become two rows for one
     installation. Discussed 2026-09-30 and leaning towards deleting **relocate** altogether, since Remove then
@@ -97,8 +99,8 @@ installations with each other before then. Once the master exists, each row offe
 | A6b | **Onboarding: the dialog and its writes** — name the controllers `needingName` returns, then write the entry and a generated `.buttonMap` straight away. A controller `.binds` names by hex waits for Apply, with a `.binds` rewrite | A6, A8 | waiting — the hex case is `bindforge.io`, so it is blocked until the question in the README is answered |
 | A7 | **Automatic registration and hot-plug** — `DeviceBus` connect and disconnect | A6b | waiting |
 | A8 | **`.buttonMap` generation at Elite-Intel startup** — connected, named, none on disk | Core C1 (done) | **done 2026-10-06** |
-| A8b | **Which axes and hats a controller has** — read each axis's identity (X, Y, Z, Rx, Ry, Rz, Slider, Dial) from the controller's HID description, on Windows and Linux, and the number of hats it reports, in the shared `elite.intel.devices`, built on this branch (Alan, 2026-10-10). SDL gives only an axis count, two Virpil sticks put the twist on Z and RZ, and the Device Service reads no hats today. The Device Editor is built from what this reports: a tab only for a kind of input the controller has. **A8's generated `.buttonMap` gains hat labels** in the form `Hat 1 Up`, `Hat 1 Down`, `Hat 1 Left`, `Hat 1 Right`, beside its existing `Button N` and `X Axis` (Alan, 2026-10-10). Design questions not yet asked | — | **next** |
-| A9 | **Device Editor** — a dialog opened from a gear on every My Devices row: DEVICE (name, VID/PID, install strip), AXES, BUTTONS (groups of 32), HATS, each only where the controller has them; default labels; live highlighting; **SAVE** to the draft and BACK's Save / Discard / Keep editing; the footer's middle place (GAP 7), with CLEAR's button laid out for A10. [Spec](../02-features/bindforge/alias-designer.md#a-dialog-opened-from-the-row--2026-10-10-alan) | C2 (done), A8b | waiting — A8b |
+| A8b | **Which axes and hats a controller has** — read each axis's identity (X, Y, Z, Rx, Ry, Rz, Slider, Dial) from the controller's HID description, on Windows and Linux, and the number of hats it reports, in the shared `elite.intel.devices`, built on this branch (Alan, 2026-10-10). SDL gives only an axis count, two Virpil sticks put the twist on Z and RZ, and the Device Service reads no hats today. The Device Editor is built from what this reports: a tab only for a kind of input the controller has. **A8's generated `.buttonMap` gains hat labels** in the form `Hat 1 Up`, `Hat 1 Right`, `Hat 1 Down`, `Hat 1 Left` (the spec's order), beside its existing `Button N` and `X Axis` (Alan, 2026-10-10). [Spec](../02-features/bindforge/alias-designer.md#which-axes-and-hats-a-controller-has--2026-10-10-alan) | — | **done 2026-10-10** |
+| A9 | **Device Editor** — a dialog opened from a gear on every My Devices row: DEVICE (name, VID/PID, install strip), AXES, BUTTONS (groups of 32), HATS, each only where the controller has them; default labels; live highlighting; **SAVE** to the draft and BACK's Save / Discard / Keep editing; the footer's middle place (GAP 7), with CLEAR's button laid out for A10. [Spec](../02-features/bindforge/alias-designer.md#a-dialog-opened-from-the-row--2026-10-10-alan) | C2 (done), A8b (done) | **next** |
 | A10 | **Actions** — DISCARD of the whole draft (if any), CLEAR, RESET LABELS, APPLY, reported per installation. *SAVE moved to A9 (2026-10-10).* Unlocks [Core C6](core.md#slices), the exit prompt, which needs an editor holding unsaved edits. **RESET LABELS must delete the `.buttonMap` in every installation**, or A8 never regenerates it | A9 | waiting |
 | A11 | **Rename** — every installation first, `.binds` last, all or nothing | A10 | waiting |
 | A12 | **When hardware changes** — a missing device, the identity question, retarget, one missing device at a time | A11 | waiting |
@@ -111,6 +113,24 @@ progress.
 
 *Newest first. Two or three lines each: what was decided and where it is recorded, what was found, what the
 next slice needs.*
+
+- **2026-10-10 — A8b review fixes** (`code-integrity-review.md`, Alan). Recorded under *After review* in
+  [which axes and hats a controller has](../02-features/bindforge/alias-designer.md#which-axes-and-hats-a-controller-has--2026-10-10-alan):
+  labels fall back to all eight when the description's count disagrees with SDL's (`agreesWith` — **A9's AXES tab
+  should use it too**); the Windows path check ignores case; the Linux parser follows the kernel on usage counts
+  and delimiters; `DeviceDescription` keeps axes sorted and unique. **Tell Krondor** that `DeviceService.onDeviceAdded`
+  gained a block, before his next `master` merge, so a conflict there is resolved knowingly.
+
+- **2026-10-10 — A8b built** (Alan chose six design answers, one at a time). Recorded in [which axes and hats a
+  controller has](../02-features/bindforge/alias-designer.md#which-axes-and-hats-a-controller-has--2026-10-10-alan):
+  SDL3 stays for live input and HID is read once at connect (`hid.dll` / `/sys`, not DirectInput's COM — a JNA
+  mistake there crashes the app); axes are named by game slot by Wine's DirectInput rule; SDL's numbering is
+  matched only when certain; hats from SDL; `Device` untouched, a separate `DeviceDescription`. **Found** in source:
+  SDL sorts DirectInput axes by slot, evdev by kernel code (Slider before Dial); Wine also makes Throttle a slider,
+  Wheel Z, Rudder Rz. Testing items 21–23 added — **21 Alan can run** with the two VIRPILs, reading the new
+  `Device '…': axes …` log line. **A9 needs:** hat *movement* is not polled — add it to `DeviceService`'s loop;
+  decide what AXES shows when `axesKnown` is false; offer *"N more axes the game cannot use"* from
+  `axesWithoutSlot`; light axes through `axisAt`, never by position.
 
 - **2026-10-10 — A9 redesigned before building; A8b added** (Alan, no code). The Device Editor is a **dialog**
   opened from a gear, not an inline expansion — recorded in [the Device Editor](../02-features/bindforge/alias-designer.md#a-dialog-opened-from-the-row--2026-10-10-alan),

@@ -3,14 +3,18 @@ package elite.intel.bindforge.devices;
 import elite.intel.bindforge.devicefiles.ButtonMapGeneration.Controller;
 import elite.intel.devices.events.DeviceConnectedEvent;
 import elite.intel.devices.model.Device;
+import elite.intel.devices.model.DeviceDescription;
+import elite.intel.devices.model.GameAxis;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.IntFunction;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -26,6 +30,12 @@ class ButtonMapStartupTest {
             new Device(7, "VIRPIL Controls 20220720", 3, 30, "", "03002cec44330000f483000000000000");
     private static final Device NO_GUID = new Device(8, "Mystery Stick", 2, 10, "", "");
 
+    /** LVWAP as its HID description reads: X, Y and its twist on RZ, and one hat. */
+    private static final DeviceDescription LVWAP_DESCRIPTION = new DeviceDescription(true,
+            List.of(GameAxis.X, GameAxis.Y, GameAxis.RZ), 0, List.of(GameAxis.X, GameAxis.Y, GameAxis.RZ), 1);
+    private static final IntFunction<Optional<DeviceDescription>> DESCRIBED =
+            id -> Optional.of(id == LVWAP.id() ? LVWAP_DESCRIPTION : DeviceDescription.axesUnknown(0));
+
     private ButtonMapStartup startup;
 
     @AfterEach
@@ -37,18 +47,34 @@ class ButtonMapStartupTest {
     void controllersAlreadyConnectedAtStartAreHandled() throws InterruptedException {
         List<Controller> seen = new CopyOnWriteArrayList<>();
         CountDownLatch done = new CountDownLatch(1);
-        startup = new ButtonMapStartup(recording(seen, done), () -> List.of(LVWAP));
+        startup = new ButtonMapStartup(recording(seen, done), () -> List.of(LVWAP), DESCRIBED);
 
         startup.start();
 
         assertTrue(done.await(5, TimeUnit.SECONDS));
-        assertEquals(List.of(new Controller("3344", "83F4", 30, 3)), seen);
+        assertEquals(List.of(new Controller("3344", "83F4", 30, 3, LVWAP_DESCRIPTION)), seen);
+    }
+
+    /** A controller gone before it is handled has no description, and its next connect is handled then. */
+    @Test
+    void aControllerAlreadyGoneIsSkipped() throws InterruptedException {
+        List<Controller> seen = new CopyOnWriteArrayList<>();
+        CountDownLatch done = new CountDownLatch(1);
+        IntFunction<Optional<DeviceDescription>> onlyLvwap =
+                id -> id == LVWAP.id() ? Optional.of(LVWAP_DESCRIPTION) : Optional.empty();
+        Device gone = new Device(9, "Gone", 1, 12, "", "03002cec44330000f583000000000000");
+        startup = new ButtonMapStartup(recording(seen, done), () -> List.of(gone, LVWAP), onlyLvwap);
+
+        startup.start();
+
+        assertTrue(done.await(5, TimeUnit.SECONDS));
+        assertEquals(List.of(new Controller("3344", "83F4", 30, 3, LVWAP_DESCRIPTION)), seen);
     }
 
     @Test
     void aConnectAfterStopDoesNothing() {
         List<Controller> seen = new CopyOnWriteArrayList<>();
-        startup = new ButtonMapStartup(recording(seen, new CountDownLatch(1)), List::of);
+        startup = new ButtonMapStartup(recording(seen, new CountDownLatch(1)), List::of, DESCRIBED);
         startup.start();
         startup.stop();
 
@@ -73,7 +99,7 @@ class ButtonMapStartupTest {
             }
         };
         Device other = new Device(9, "Other", 1, 12, "", "03002cec44330000f583000000000000");
-        startup = new ButtonMapStartup(generation, () -> List.of(LVWAP, other));
+        startup = new ButtonMapStartup(generation, () -> List.of(LVWAP, other), DESCRIBED);
         startup.start();
         assertTrue(busy.await(5, TimeUnit.SECONDS));
 
@@ -92,7 +118,7 @@ class ButtonMapStartupTest {
             second.countDown();
         };
         Device other = new Device(9, "Other", 1, 12, "", "03002cec44330000f583000000000000");
-        startup = new ButtonMapStartup(generation, () -> List.of(LVWAP, other));
+        startup = new ButtonMapStartup(generation, () -> List.of(LVWAP, other), DESCRIBED);
 
         startup.start();
 
@@ -104,7 +130,7 @@ class ButtonMapStartupTest {
     void aControllerWithNoGuidIsSkipped() throws InterruptedException {
         List<Controller> seen = new CopyOnWriteArrayList<>();
         CountDownLatch done = new CountDownLatch(1);
-        startup = new ButtonMapStartup(recording(seen, done), () -> List.of(NO_GUID, LVWAP));
+        startup = new ButtonMapStartup(recording(seen, done), () -> List.of(NO_GUID, LVWAP), DESCRIBED);
 
         startup.start();
 

@@ -1,53 +1,63 @@
 package elite.intel.bindforge.devicefiles;
 
+import elite.intel.devices.model.DeviceDescription;
+import elite.intel.devices.model.GameAxis;
+
+import java.util.Arrays;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
  * The labels a generated {@code .buttonMap} carries: {@code Button 1}...{@code Button N}, sized to what the
- * controller reports, and {@code X Axis} through {@code V Axis}.
+ * controller reports, then its axes ({@code X Axis}), then its hats ({@code Hat 1 Up}).
  * <p>
  * <strong>Every label names its own token</strong>, so none is ever false - the point is that the capture dialog
  * and the game show a word rather than {@code Joy_14}. The user renames them in the Device Editor.
  * <p>
- * <strong>A controller with any axis gets all eight axis labels</strong> (Alan, 2026-10-06, after review). SDL
- * numbers a controller's axes without gaps, while the game names them by which axis they are: a stick reporting
- * X, Y and RZ is axes 0, 1 and 2 to SDL, and nothing in the report says which is which. Labelling by position
- * would label Z and leave the twist raw. A label for an axis the device lacks is never shown, so all eight cost a
- * few unused lines and miss nothing. The game names no axis past V.
+ * <strong>Only the axes the controller has</strong> (Alan, 2026-10-10, A8b), read from its HID description: an X,
+ * Y and RZ stick gets those three, so an unplugged stick's saved labels name the axes it really has. <strong>When
+ * the description could not be read, or counts other than SDL does, a controller with any axis gets all
+ * eight</strong> (Alan, 2026-10-06; the count after review, 2026-10-10) - a missing label leaves a raw token, an
+ * unused one is never shown. SDL
+ * numbers axes without gaps, so its count cannot say which they are, and a label for an axis the device lacks is
+ * never shown. An axis the game cannot see gets no label - no token could name it.
  * <p>
- * <strong>No hat labels.</strong> {@code DeviceService} reads no hats, and in Elite Dangerous a hat mostly
- * reports as buttons anyway, which get {@code Button N} like any other.
+ * <strong>Four labels per hat</strong> (Alan, 2026-10-10, A8b), in the spec's order: up, right, down, left. A hat
+ * the firmware reports as buttons is buttons, and gets {@code Button N}.
  * <p>
  * The labels are English and fixed: they are file content the game displays, not Elite-Intel's interface text.
  */
 public final class ButtonMapLabels {
 
-    /**
-     * Every joystick axis token the game has. Kept here rather than in {@code ButtonInputMapper}, whose list stops
-     * at RZ: that class is shared with V1.1, and this list is only ever used to name labels.
-     */
-    private static final String[][] AXES = {
-            {"Joy_XAxis", "X Axis"}, {"Joy_YAxis", "Y Axis"}, {"Joy_ZAxis", "Z Axis"},
-            {"Joy_RXAxis", "RX Axis"}, {"Joy_RYAxis", "RY Axis"}, {"Joy_RZAxis", "RZ Axis"},
-            {"Joy_UAxis", "U Axis"}, {"Joy_VAxis", "V Axis"}
-    };
+    private static final String[] HAT_DIRECTIONS = {"Up", "Right", "Down", "Left"};
 
     private ButtonMapLabels() {
     }
 
     /**
-     * @return label by token, buttons first and then axes, as Frontier's own maps are laid out; every axis token
-     *         when the controller reports any axis; empty for a controller reporting neither
+     * @param axisCount how many axes SDL reports - checked against the description, and all eight axes are labelled
+     *                  when the two disagree
+     * @return label by token, buttons first, then axes, then hats; empty for a controller reporting none of them
      */
-    public static Map<String, String> generate(int buttonCount, int axisCount) {
+    public static Map<String, String> generate(int buttonCount, int axisCount, DeviceDescription description) {
         Map<String, String> labels = new LinkedHashMap<>();
         for (int button = 1; button <= buttonCount; button++) {
             labels.put("Joy_" + button, "Button " + button);
         }
-        if (axisCount > 0) {
-            for (String[] axis : AXES) labels.put(axis[0], axis[1]);
+        for (GameAxis axis : axesToLabel(axisCount, description)) {
+            labels.put(axis.token(), axis.name() + " Axis");
+        }
+        for (int hat = 1; hat <= description.hatCount(); hat++) {
+            for (String direction : HAT_DIRECTIONS) {
+                labels.put("Joy_POV" + hat + direction, "Hat " + hat + " " + direction);
+            }
         }
         return labels;
+    }
+
+    private static List<GameAxis> axesToLabel(int axisCount, DeviceDescription description) {
+        if (description.agreesWith(axisCount)) return description.axes();
+        return axisCount > 0 ? Arrays.asList(GameAxis.values()) : List.of();
     }
 }

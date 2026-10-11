@@ -846,24 +846,82 @@ the capture dialog is used. **Startup never names anything:** a controller with 
   link, which refuses atomically when the file exists, on Windows and Linux alike; where a volume refuses hard
   links, a move that does not replace is used instead. A file that appears meanwhile is kept. Nothing is
   replaced, so nothing goes to Edit History.
-- **A controller with any axis gets all eight axis labels, `X Axis` through `V Axis`** *(after review; replaces
-  labelling by position)*. SDL numbers a controller's axes without gaps, while the game names them by which axis
-  they are: a stick reporting X, Y and RZ is axes 0, 1 and 2, and nothing says which is which, so labelling by
-  position would label Z and leave the twist raw. A label for an axis the device lacks is never shown, so all
-  eight miss nothing. *"Sized to what the device reports"* above holds for buttons only.
-- **No hat labels.** The Device Service reads no hats, and in Elite Dangerous a hat mostly reports as buttons,
-  which get `Button N` like any other — so the `Hat 1 Up` labels [onboarding](#what-it-asks-just-a-name) mentions
-  are not generated. *To change with [A8b](../../05-build-plan/alias-designer.md#slices) (Alan, 2026-10-10):
-  "mostly" is not "always" — a stick can be set to report a true hat — so once the Device Service reads hats, a
-  generated map labels each one `Hat 1 Up`, `Hat 1 Right`, `Hat 1 Down`, `Hat 1 Left`. The axis labels stay
-  all eight until A8b says which axes a controller has; whether generation then labels only those is A8b's to
-  decide.*
+- **Only the axes the controller has — 2026-10-10 (Alan, A8b).** An X, Y and RZ stick gets `X Axis`, `Y Axis`
+  and `RZ Axis`, read from [what the controller has](#which-axes-and-hats-a-controller-has--2026-10-10-alan), so
+  an unplugged stick's saved labels name the axes it really has. An axis the game cannot see gets no label. Maps
+  already on disk keep their eight, since generation never replaces.
+  ~~**A controller with any axis gets all eight axis labels, `X Axis` through `V Axis`** *(after review; replaces
+  labelling by position)*.~~ *Kept for a controller whose HID description cannot be read, or counts other than
+  SDL does (after review, 2026-10-10):* SDL numbers a
+  controller's axes without gaps, while the game names them by which axis they are: a stick reporting X, Y and RZ
+  is axes 0, 1 and 2, and nothing says which is which, so labelling by position would label Z and leave the twist
+  raw. A label for an axis the device lacks is never shown, so all eight miss nothing. *"Sized to what the device
+  reports"* above holds for buttons only.
+- **Four labels per hat — 2026-10-10 (Alan, A8b):** `Hat 1 Up`, `Hat 1 Right`, `Hat 1 Down`, `Hat 1 Left`, after
+  the buttons and axes, for each hat SDL reports. A hat the firmware reports as buttons is buttons, and gets
+  `Button N`. ~~**No hat labels.** The Device Service reads no hats, and in Elite Dangerous a hat mostly reports
+  as buttons, which get `Button N` like any other.~~ *"Mostly" is not "always" — a stick can be set to report a
+  true hat.*
 - **Labels are English and fixed** — file content the game displays, not Elite-Intel's interface text.
 - **Started as a service**, `BUTTON_MAP_STARTUP` in `AppController.buildServices`, after `DEVICE`. Diagnostics
   mode stubs it, as it does the other services touching game files.
 - **After RESET LABELS it regenerates only if the file is gone.** Generation never replaces, so RESET LABELS
   (the [Actions](#actions-and-what-each-one-reaches) slice) must delete the `.buttonMap` in every installation
   for the line above about a fresh file to hold.
+
+### Which axes and hats a controller has — 2026-10-10 (Alan)
+
+Built in A8b as `elite.intel.devices.model.DeviceDescription`, read by `elite.intel.devices.hid.DeviceDescriber`
+as each controller connects and held by `DeviceService.description(deviceId)`. SDL gives an axis count and
+numbers the axes without gaps; it cannot say which axis is which. The Device Editor, live highlighting and the
+generated labels all need to.
+
+- **SDL3 for what the controller is doing, HID for what it is.** SDL keeps live input, hot-plug and push-to-talk.
+  The HID description is read once, at connect, for one fact SDL lacks. Reading live input through HID instead
+  would rebuild all of SDL, and on Linux `/dev/hidraw` needs a udev rule a user would have to install.
+- **Read from the HID description on both platforms** — `hid.dll` on Windows (opened by the device path SDL's
+  DirectInput backend gives), `report_descriptor` under `/sys` on Linux, which every user can read. DirectInput
+  itself was the more correct source on Windows but is COM, called by hand through JNA, where one wrong offset
+  crashes the whole app, push-to-talk with it. A failed HID read is a status code.
+- **An axis is named by the game slot it takes** — X, Y, Z, RX, RY, RZ, U, V, `Joy_XAxis` to `Joy_VAxis`, which
+  are DirectInput's eight slots — not by its HID name. DirectInput fills them by kind: each of X…Rz takes the
+  first axis of its kind, and U and V the first two slider-kind axes, in the order the description lists them.
+  The kinds are Wine's (`dlls/dinput/joystick_hid.c`, read 2026-10-10), which Proton runs and which models
+  Windows: **Slider, Dial and Simulation Throttle are sliders**, Wheel is Z, Steering X, Accelerator Y, Rudder and
+  Brake Rz. *Not measured — [testing items 17, 18 and 22](../../00-overview/testing-required.md#bindforge).*
+- **The game sees at most eight.** An axis whose slot another took, or past the second slider, is counted as one
+  the game cannot see: no label, and the Device Editor can say *"2 more axes the game cannot use"* rather than
+  seem to have missed them.
+- **SDL's axis k is the k-th axis in SDL's order, and only when nothing is in doubt.** SDL's DirectInput backend
+  sorts axes by slot (`SDL_dinputjoystick.c`, `SortDevObjects`); its evdev backend lists them by the kernel's code,
+  where Slider is `ABS_THROTTLE` and Dial `ABS_RUDDER` whatever the description's order (`hid-input.c`). The
+  numbering is matched only when every axis has a slot, no two share a kernel code, and SDL counts exactly those
+  axes; otherwise it is left unmatched and no axis is lit by identity. *All four of the user's controllers come
+  through SDL's DirectInput backend — their GUIDs end in its zero signature —
+  [testing item 21](../../00-overview/testing-required.md#bindforge).*
+- **When the description cannot be read, nothing is guessed.** The axes are *unknown*, and every consumer does
+  what it did before A8b — generation labels all eight.
+- **Hats come from SDL**, `SDL_GetNumJoystickHats`, the same source that will report their movement, so count and
+  movement cannot disagree. On Windows SDL lists them in DirectInput's order, the game's `POV1`, `POV2` —
+  [testing item 23](../../00-overview/testing-required.md#bindforge).
+- **`Device` and its events are unchanged.** The description is a separate record looked up by device id, so
+  `DeviceService` — which V1.1 also changes — gains one short block and nothing else.
+- **Not built here: hat movement.** Lighting a hat needs `DeviceService` to poll hat state, which is
+  [A9's](../../05-build-plan/alias-designer.md#slices) to add when it lights one.
+
+*After review — 2026-10-10 (Alan):*
+
+- **A description that counts other than SDL is not trusted for labels** (`DeviceDescription.agreesWith`): one
+  finding no axis where SDL counts three has missed something, such as a vendor-defined usage, and leaving those
+  axes unlabelled costs more than labelling all eight. A9's AXES tab should ask the same question.
+- **The Windows path is matched ignoring case.** SDL upper-cases it (`QueryDevicePath` in `SDL_dinputjoystick.c`),
+  but Windows itself often gives them in lower case, and a mismatch would silently leave every controller unknown.
+- **The Linux descriptor is read as the kernel reads it** (`hid-core.c`): an Input gives as many fields as the
+  larger of its report count and its usages, and of delimited alternative usages only the first set is kept —
+  since what the kernel makes of it is what SDL then counts.
+- **A description's axes are held in the game's order, each once**, whoever builds it.
+- **Reading the description runs on the device thread at connect**, before the connect is published — which is what
+  makes `description()` race-free. It is a few system calls; nothing may add per-poll HID work there.
 
 
 ## Device Editor
@@ -888,9 +946,10 @@ still to come.*
 - **As large as its content needs.** Dialogs in the app are not one size.
 - **Tabs: DEVICE, AXES, BUTTONS, HATS — each only when the controller has that kind of input.** The dialog is
   built from what the controller reports, not from a fixed layout: a pedal set with three axes and no buttons
-  shows DEVICE and AXES. The axes and hats a controller has are read by
-  [A8b](../../05-build-plan/alias-designer.md#slices); SDL alone gives only an axis count, and two VIRPIL sticks
-  put their twist on Z and on RZ.
+  shows DEVICE and AXES. The axes and hats a controller has are
+  [read as it connects](#which-axes-and-hats-a-controller-has--2026-10-10-alan) (A8b); SDL alone gives only an
+  axis count, and two VIRPIL sticks put their twist on Z and on RZ. Where the axes cannot be read, the AXES tab
+  needs A9 to decide what to show.
 - **DEVICE** holds the name, VID and PID, the Windows name, whether it is attached, and the
   [install strip](#the-install-strip--a-readout-not-a-switch).
 - **AXES** has one label box per axis the controller reports, named by the axis it is (`Joy_XAxis`,

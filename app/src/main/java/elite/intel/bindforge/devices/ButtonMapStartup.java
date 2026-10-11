@@ -6,16 +6,19 @@ import elite.intel.bindforge.devicefiles.ButtonMapGeneration.Controller;
 import elite.intel.devices.DeviceService;
 import elite.intel.devices.events.DeviceConnectedEvent;
 import elite.intel.devices.model.Device;
+import elite.intel.devices.model.DeviceDescription;
 import elite.intel.eventbus.DeviceBus;
 import elite.intel.ui.controller.ManagedService;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
+import java.util.function.IntFunction;
 import java.util.function.Supplier;
 
 /**
@@ -39,15 +42,19 @@ public final class ButtonMapStartup implements ManagedService {
 
     private final Consumer<Controller> generation;
     private final Supplier<List<Device>> alreadyConnected;
+    private final IntFunction<Optional<DeviceDescription>> descriptions;
     private ExecutorService worker;
 
     public ButtonMapStartup() {
-        this(new ButtonMapGeneration()::generateFor, DeviceService.getInstance()::getConnectedDevices);
+        this(new ButtonMapGeneration()::generateFor, DeviceService.getInstance()::getConnectedDevices,
+                DeviceService.getInstance()::description);
     }
 
-    ButtonMapStartup(Consumer<Controller> generation, Supplier<List<Device>> alreadyConnected) {
+    ButtonMapStartup(Consumer<Controller> generation, Supplier<List<Device>> alreadyConnected,
+                     IntFunction<Optional<DeviceDescription>> descriptions) {
         this.generation = generation;
         this.alreadyConnected = alreadyConnected;
+        this.descriptions = descriptions;
     }
 
     /**
@@ -92,15 +99,25 @@ public final class ButtonMapStartup implements ManagedService {
         submit(event.device());
     }
 
+    /**
+     * The description is taken now, on the caller's thread: {@code DeviceService} holds it before it publishes the
+     * connect, and drops it at disconnect. A controller already gone has none, and gets nothing - its next connect
+     * is handled then.
+     */
     private synchronized void submit(Device device) {
         if (worker == null) return;
-        worker.execute(() -> generate(device));
+        Optional<DeviceDescription> description = descriptions.apply(device.id());
+        if (description.isEmpty()) {
+            log.debug("'{}' disconnected before its .buttonMap was considered", device.name());
+            return;
+        }
+        worker.execute(() -> generate(device, description.get()));
     }
 
-    private void generate(Device device) {
+    private void generate(Device device, DeviceDescription description) {
         try {
-            DeviceIdentities.of(device).ifPresent(identity -> generation.accept(
-                    new Controller(identity.vid(), identity.pid(), device.buttonCount(), device.axisCount())));
+            DeviceIdentities.of(device).ifPresent(identity -> generation.accept(new Controller(identity.vid(),
+                    identity.pid(), device.buttonCount(), device.axisCount(), description)));
         } catch (RuntimeException e) {
             log.error("Generating a .buttonMap for '{}' failed", device.name(), e);
         }

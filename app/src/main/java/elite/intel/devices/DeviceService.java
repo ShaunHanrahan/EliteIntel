@@ -1,7 +1,9 @@
 package elite.intel.devices;
 
 import elite.intel.devices.events.*;
+import elite.intel.devices.hid.DeviceDescriber;
 import elite.intel.devices.model.Device;
+import elite.intel.devices.model.DeviceDescription;
 import elite.intel.eventbus.DeviceBus;
 import org.lwjgl.sdl.*;
 import org.lwjgl.system.MemoryStack;
@@ -17,6 +19,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -85,6 +88,8 @@ public class DeviceService {
 
     // Written only from the poll thread; readable from any thread via CopyOnWriteArrayList.
     private final CopyOnWriteArrayList<Device> connectedDevices = new CopyOnWriteArrayList<>();
+    // Written only from the poll thread, before the connect is published; readable from any thread.
+    private final Map<Integer, DeviceDescription> descriptions = new ConcurrentHashMap<>();
 
     // Open joystick handles - keyed by SDL JoystickID. Accessed only from pollThread.
     private final Map<Integer, Long> openHandles = new LinkedHashMap<>();
@@ -120,6 +125,14 @@ public class DeviceService {
      */
     public List<Device> getConnectedDevices() {
         return Collections.unmodifiableList(new ArrayList<>(connectedDevices));
+    }
+
+    /**
+     * Which axes and hats a connected controller has - safe to call from any thread, and already there when its
+     * {@link DeviceConnectedEvent} is published. Empty for an id that is not connected.
+     */
+    public Optional<DeviceDescription> description(int deviceId) {
+        return Optional.ofNullable(descriptions.get(deviceId));
     }
 
     // -------------------------------------------------------------------------
@@ -326,6 +339,8 @@ public class DeviceService {
         prevButtons.put(id, new boolean[Math.max(0, buttons)]);
 
         Device device = new Device(id, name, axes, buttons, usbPath, guid);
+        int hats = Math.max(0, SDLJoystick.SDL_GetNumJoystickHats(handle));
+        descriptions.put(id, DeviceDescriber.describe(name, usbPath, axes, hats));
         connectedDevices.add(device);
         log.info("Device connected: {} (id={}, axes={}, buttons={})", name, id, axes, buttons);
         DeviceBus.publish(new DeviceConnectedEvent(device));
@@ -340,6 +355,7 @@ public class DeviceService {
         prevButtons.remove(id);
         vidPidByDevice.remove(id);
         connectedDevices.removeIf(d -> d.id() == id);
+        descriptions.remove(id);
         log.info("Device disconnected: id={}", id);
         DeviceBus.publish(new DeviceDisconnectedEvent(id));
     }
@@ -374,6 +390,7 @@ public class DeviceService {
         prevButtons.clear();
         vidPidByDevice.clear();
         connectedDevices.clear();
+        descriptions.clear();
     }
 
     // -------------------------------------------------------------------------

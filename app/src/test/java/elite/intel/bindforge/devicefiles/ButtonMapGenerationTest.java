@@ -4,6 +4,7 @@ import elite.intel.bindforge.devicefiles.ButtonMapGeneration.Controller;
 import elite.intel.bindforge.devicefiles.ButtonMapGeneration.Outcome;
 import elite.intel.bindforge.devicefiles.ButtonMapGeneration.Result;
 import elite.intel.bindforge.devicefiles.DeviceFilesPush.Target;
+import elite.intel.devices.model.DeviceDescription;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledOnOs;
 import org.junit.jupiter.api.condition.OS;
@@ -46,7 +47,8 @@ class ButtonMapGenerationTest {
             </Root>
             """;
 
-    private static final Controller T_RUDDER = new Controller("044F", "B679", 0, 3);
+    private static final DeviceDescription AXES_UNKNOWN = DeviceDescription.axesUnknown(0);
+    private static final Controller T_RUDDER = new Controller("044F", "B679", 0, 3, AXES_UNKNOWN);
 
     @TempDir
     Path temp;
@@ -74,7 +76,7 @@ class ButtonMapGenerationTest {
         Files.createDirectories(frontiers.getParent());
         Files.writeString(frontiers, "<Root><Joy_UAxis>A1</Joy_UAxis></Root>");
 
-        List<Result> results = generate(List.of(steam), Set.of(), new Controller("3344", "0259", 41, 2));
+        List<Result> results = generate(List.of(steam), Set.of(), new Controller("3344", "0259", 41, 2, AXES_UNKNOWN));
 
         assertEquals(Outcome.ALREADY_THERE, results.getFirst().outcome());
         assertEquals("<Root><Joy_UAxis>A1</Joy_UAxis></Root>", read(frontiers));
@@ -85,7 +87,7 @@ class ButtonMapGenerationTest {
     void aControllerWithNoEntryGetsNothing() throws IOException {
         Target steam = installation(1, "STEAM", DEVICE_MAPPINGS);
 
-        List<Result> results = generate(List.of(steam), Set.of(), new Controller("1234", "5678", 12, 2));
+        List<Result> results = generate(List.of(steam), Set.of(), new Controller("1234", "5678", 12, 2, AXES_UNKNOWN));
 
         assertEquals(Outcome.NOT_NAMED, results.getFirst().outcome());
         assertFalse(Files.exists(steam.controlSchemes().resolve("DeviceButtonMaps")));
@@ -96,7 +98,7 @@ class ButtonMapGenerationTest {
     void anAlternativePairNamesTheController() throws IOException {
         Target steam = installation(1, "STEAM", DEVICE_MAPPINGS);
 
-        List<Result> results = generate(List.of(steam), Set.of(), new Controller("3344", "43f4", 24, 3));
+        List<Result> results = generate(List.of(steam), Set.of(), new Controller("3344", "43f4", 24, 3, AXES_UNKNOWN));
 
         assertEquals("RVWAP", results.getFirst().deviceName());
         assertTrue(Files.isRegularFile(buttonMap(steam, "RVWAP")));
@@ -107,7 +109,7 @@ class ButtonMapGenerationTest {
     void aDeviceWithSupportsIconsGetsNothingEvenThroughAnAlternative() throws IOException {
         Target steam = installation(1, "STEAM", DEVICE_MAPPINGS);
 
-        List<Result> results = generate(List.of(steam), Set.of(), new Controller("06A3", "0255", 30, 7));
+        List<Result> results = generate(List.of(steam), Set.of(), new Controller("06A3", "0255", 30, 7, AXES_UNKNOWN));
 
         assertEquals(Outcome.GAME_DRAWS_IT, results.getFirst().outcome());
         assertFalse(Files.exists(buttonMap(steam, "SaitekX52")));
@@ -118,7 +120,7 @@ class ButtonMapGenerationTest {
     void aGamePadGetsNothing() throws IOException {
         Target steam = installation(1, "STEAM", DEVICE_MAPPINGS);
 
-        List<Result> results = generate(List.of(steam), Set.of(), new Controller("045e", "02ff", 10, 6));
+        List<Result> results = generate(List.of(steam), Set.of(), new Controller("045e", "02ff", 10, 6, AXES_UNKNOWN));
 
         assertEquals(Outcome.GAME_DRAWS_IT, results.getFirst().outcome());
         assertEquals("GamePad", results.getFirst().deviceName());
@@ -144,7 +146,7 @@ class ButtonMapGenerationTest {
         Target steam = installation(1, "STEAM", DEVICE_MAPPINGS);
         Target epic = installation(2, "EPIC", DEVICE_MAPPINGS.replace("LVWAP", "LeftStick"));
 
-        generate(List.of(steam, epic), Set.of(), new Controller("3344", "83F4", 30, 3));
+        generate(List.of(steam, epic), Set.of(), new Controller("3344", "83F4", 30, 3, AXES_UNKNOWN));
 
         assertTrue(Files.isRegularFile(buttonMap(steam, "LVWAP")));
         assertTrue(Files.isRegularFile(buttonMap(epic, "LeftStick")));
@@ -155,7 +157,7 @@ class ButtonMapGenerationTest {
     void aDeviceTheMasterLabelsIsLeftToApply() throws IOException {
         Target steam = installation(1, "STEAM", DEVICE_MAPPINGS);
 
-        List<Result> results = generate(List.of(steam), Set.of("lvwap"), new Controller("3344", "83F4", 30, 3));
+        List<Result> results = generate(List.of(steam), Set.of("lvwap"), new Controller("3344", "83F4", 30, 3, AXES_UNKNOWN));
 
         assertEquals(Outcome.MASTER_HAS_LABELS, results.getFirst().outcome());
         assertEquals(buttonMap(steam, "LVWAP"), results.getFirst().file());
@@ -188,7 +190,7 @@ class ButtonMapGenerationTest {
     void aControllerReportingNothingGetsNoFile() throws IOException {
         Target steam = installation(1, "STEAM", DEVICE_MAPPINGS);
 
-        List<Result> results = generate(List.of(steam), Set.of(), new Controller("044F", "B679", 0, 0));
+        List<Result> results = generate(List.of(steam), Set.of(), new Controller("044F", "B679", 0, 0, AXES_UNKNOWN));
 
         assertEquals(Outcome.NOTHING_TO_LABEL, results.getFirst().outcome());
         assertFalse(Files.exists(buttonMap(steam, "T-Rudder")));

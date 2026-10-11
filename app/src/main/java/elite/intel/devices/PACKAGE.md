@@ -255,6 +255,40 @@ Elite Dangerous uses 1-based `Joy_N` tokens; SDL3 uses 0-based indices.
 | 5 | `Joy_RZAxis` |
 
 `axisToBindsToken(idx)` throws `IllegalArgumentException` for index ≥ 6 (no standard `.binds` name beyond RZ).
+It also maps by position, which is wrong for a stick with a gap - SDL numbers X, Y and RZ as 0, 1 and 2. Where
+the controller's description has matched SDL's numbering, `DeviceDescription.axisAt(idx)` names the real axis.
+
+---
+
+## 8. Which Axes and Hats a Controller Has (`hid/`)
+
+SDL gives an axis count and numbers the axes without gaps; it cannot say which axis is which. As each controller
+connects, `onDeviceAdded` asks `hid/DeviceDescriber` for a `model/DeviceDescription` and stores it **before**
+publishing the `DeviceConnectedEvent`, so a subscriber can call `DeviceService.description(deviceId)` straight
+away. It is dropped at disconnect. `Device` and the events are unchanged.
+
+```
+onDeviceAdded
+    ├─ SDL_GetNumJoystickHats()                      → hatCount
+    └─ DeviceDescriber.describe(name, usbPath, axes, hats)
+          ├─ Windows: WindowsHidUsages  - hid.dll, opened by SDL's DirectInput device path
+          ├─ Linux:   LinuxHidUsages    - /sys/class/input/eventN/device/device/report_descriptor
+          │                                read by HidReportDescriptor
+          └─ AxisSlots                  - each axis's game slot, and SDL's numbering where it is certain
+```
+
+- **Axes are named by game slot** (`model/GameAxis`: X, Y, Z, RX, RY, RZ, U, V - `Joy_XAxis` to `Joy_VAxis`), by
+  DirectInput's rule as Wine implements it: each of X…Rz takes the first axis of its kind, U and V the first two
+  slider-kind axes (Slider, Dial, Simulation Throttle). An axis left over is counted in `axesWithoutSlot`.
+- **`agreesWith(sdlAxisCount)`** says whether the description counts the axes SDL does; a consumer that disagrees
+  treats the axes as unknown, as `.buttonMap` generation does.
+- **`sdlAxes` is SDL's numbering**, filled only when every axis has a slot and SDL counts exactly those; Windows
+  orders by slot (SDL's DirectInput backend), Linux by the kernel's `ABS_` code (SDL's evdev backend).
+- **Nothing here throws onto the poll thread.** A description that cannot be read - an XInput pad, a non-HID
+  stick, a sandbox hiding `/sys`, `hid.dll` failing to load - is `axesKnown = false`, and a consumer falls back to
+  what it did without one.
+- The full rationale, and what is not measured, is in the
+  [Alias Designer spec](../../../../../../../docs/02-features/bindforge/alias-designer.md#which-axes-and-hats-a-controller-has--2026-10-10-alan).
 
 ---
 
@@ -266,6 +300,12 @@ Elite Dangerous uses 1-based `Joy_N` tokens; SDL3 uses 0-based indices.
 | `model/Device` | Immutable record for a connected device (id, name, axes, buttons, usbPath, guid) |
 | `model/DeviceIdentity` | Resolved VID/PID + bindsHexId for `.binds` correlation |
 | `model/ButtonInputMapper` | SDL3 index ↔ Elite `.binds` token translation |
+| `model/DeviceDescription` | Which game axes and hats a connected controller has; `DeviceService.description(id)` |
+| `model/GameAxis` | The game's eight axis slots, X…V, and their tokens |
+| `hid/DeviceDescriber` | Reads a controller's description at connect; never throws |
+| `hid/AxisSlots` | Pure: HID axes → game slots, and SDL's axis numbering |
+| `hid/HidReportDescriptor` | Pure: a raw HID report descriptor → its inputs (Linux) |
+| `hid/WindowsHidUsages`, `hid/LinuxHidUsages` | Read the HID description on each platform |
 | `events/DeviceServiceStateEvent` | SDL3 init result (available + optional error) |
 | `events/DeviceConnectedEvent` | New device detected |
 | `events/DeviceDisconnectedEvent` | Device removed |
