@@ -258,6 +258,36 @@ gave opposite results from this one difference. Full method:
 **Still open:** the save path — whether committing a change on the Controls screen in that state writes the
 fallback into the shared `StartPreset.#.start`, which would carry the loss to every install on the machine.
 
+**17. Which game axis is a slider?** *Added 2026-10-10, for [A8b](../05-build-plan/alias-designer.md#slices).*
+A controller describes each axis as X, Y, Z, Rx, Ry, Rz, Slider or Dial. The first six match the game's
+`Joy_XAxis`…`Joy_RZAxis` by name; the [format reference](../02-features/bindforge/domain-knowledge/EliteDangerous-BindsFileFormat.md#51-full-axis-codes)
+calls `Joy_UAxis` and `Joy_VAxis` the slider axes, from source notes rather than a test. Bind a controller's
+slider in the game (the VIRPIL Alpha Prime grip's brake, where it reports as a Slider) and read which token
+`.binds` writes. Do the same for a second slider, or a Dial, if one is to hand.
+→ [Device Editor](../02-features/bindforge/alias-designer.md#device-editor)
+
+**18. Does Proton name the axes as Windows does?** *Added 2026-10-10.* On Linux the game sees a controller
+through Wine, which presents it as a DirectInput device by its own translation. Read a controller's axes from
+Linux (`/sys/class/input/…/capabilities/abs`), bind each in the game under Proton, and check that the token
+`.binds` writes is the one the Windows reading predicts — sliders especially.
+→ [Device Editor](../02-features/bindforge/alias-designer.md#device-editor)
+
+**19. Does the game show a `.buttonMap` label for a half axis?** *Added 2026-10-10.* `.binds` uses
+`Pos_Joy_…` and `Neg_Joy_…` tokens for a button-type control bound to one direction of an axis (they are in
+the user's own `DualVirpilDawnTreader` specimens), and the
+[format reference](../02-features/bindforge/domain-knowledge/EliteDangerous-DeviceMappings-ButtonMap.md#23-input-codes-supported)
+lists them as `.buttonMap` tokens, but neither of Frontier's shipped maps uses one. Add a `Neg_Joy_YAxis`
+label to a `.buttonMap`, bind that half axis, and see whether the Controls screen shows the label. The Device
+Editor offers one box per whole axis and keeps a saved half-axis label without showing it; this decides
+whether that is enough.
+→ [Device Editor](../02-features/bindforge/alias-designer.md#device-editor)
+
+**20. How does the game name an 8-way hat's diagonals?** *Added 2026-10-10.* The game's hat tokens are
+`Joy_POV1Up`, `Joy_POV1Right`, `Joy_POV1Down` and `Joy_POV1Left`, so a diagonal is assumed to be two of them
+at once, and the Device Editor gives a hat four label boxes. Set a stick's hat to report as a true hat (not as
+buttons), bind a diagonal in the game, and read what `.binds` writes.
+→ [Device Editor](../02-features/bindforge/alias-designer.md#device-editor)
+
 ## Core Platform
 
 **8. Linux/Proton path resolution — Krondor's, not a BindForge testing item.** *Reassigned 2026-09-06.* Not a one-time check but ongoing, given how much Linux path resolution varies by distro and by how an individual user has their Steam library configured — which is exactly why it is owned by the person running it. BindForge builds and tests Windows storefront detection; Krondor makes the edits his platform needs. Listed here so the dependency stays visible, not as work waiting on Alan. The journal path is confirmed against independent precedent (EDMarketConnector); the bindings-folder path is inferred from the same structure but not independently confirmed.

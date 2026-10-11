@@ -4,7 +4,10 @@
 
 ## Structure
 
-A single flat section with no sub-tabs: a device list, with the editor expanding inline beneath whichever device is open.
+A single flat section: a device list, and the [Device Editor](#device-editor) opened as a dialog from a gear at
+the end of each device's row. ~~A single flat section with no sub-tabs: a device list, with the editor expanding
+inline beneath whichever device is open.~~ *Changed 2026-10-10 (Alan): Swing has no row that opens beneath
+itself, and a dialog has room for tabs — see [the Device Editor](#a-dialog-opened-from-the-row--2026-10-10-alan).*
 
 Earlier drafts moved per-installation control into a separate "Installation Mirroring" screen, first inside Alias Designer and later inside [File Manager](file-manager.md). **All of it is gone** — both screens, and the per-installation control itself, which [standardisation removed](overview.md#every-install-gets-the-same-files--settled-2026-09-23). What survives is the *reporting*: whether each installation matches the master for a device is a property of that device, so it sits on the device's own row rather than on a screen the user has to go and find. See [One record, and where it lands](#one-record-and-where-it-lands--reworked-2026-09-26).
 
@@ -32,6 +35,7 @@ Columns, and why only these:
 | **Status** | `ATTACHED` or `MISSING` — whether the hardware is present right now |
 | **Alias** | the name in the master, or *not added* |
 | **Installations** | one read-only marker per *detected* installation |
+| *(gear)* | opens the [Device Editor](#device-editor) for this device — on every row, last, after the Installations columns *(added 2026-10-10)* |
 
 The first three describe the hardware and are true no matter how many installations exist. **The alias is now
 a column**, because there is one of them: the master's. *Under the original design there was no alias column,
@@ -43,7 +47,7 @@ honest cell is the master's name.*
 shows **M** when that installation matches the master for this device, *not added* when it holds no entry, or
 the [divergence colour](#divergence-between-installs--one-list-ranked-by-consequence) when it differs. The
 markers are a readout — clicking one does not open a per-installation editor, because there is no such thing;
-opening the row opens [the one record](#one-record-and-where-it-lands--reworked-2026-09-26).
+the row's gear opens [the one record](#one-record-and-where-it-lands--reworked-2026-09-26).
 
 #### The Installations markers — 2026-10-08 (Alan)
 
@@ -172,7 +176,7 @@ a reset everywhere.
 |---|---|---|
 | Name | editable, as the [rename transaction](#renaming-a-device) | ~~locked~~ renamed or shadowed, when the controller is attached — the entry then becomes the user's (2026-10-04, above) |
 | VID / PID | read-only | read-only |
-| Button and axis labels | editable once the name is confirmed | editable straight away |
+| Button and axis labels | editable once the device has a name — ~~once the name is confirmed~~ (2026-10-10, [no confirm step](#fields-and-rules)) | editable straight away |
 | Undo (reaches every install) | **CLEAR** — the entry and `.buttonMap` | **RESET LABELS** — only a `.buttonMap` BindForge or the user made |
 | [Onboarding](#onboarding--every-controller-gets-a-name-and-a-buttonmap--settled-2026-09-13) | asked for a name | never asked |
 | What APPLY writes | the entry and its `.buttonMap` | the `.buttonMap` only |
@@ -688,7 +692,7 @@ Three gaps were found while working the design through. **Two were settled by on
   controller reporting a clashing name gets a number — `T-Rudder` from an unrelated device becomes
   `TRudder2`. See [the default-name rule](#the-default-name-rule).
 - **What reaches the game's file.** Registration only touches the draft, so nothing lands in a real install
-  until **Apply to Game Installs** runs. **Settled 2026-09-06: applying pushes only what changed**, never the
+  until **Apply** runs. **Settled 2026-09-06: applying pushes only what changed**, never the
   whole set. Pushing everything accumulates entries for hardware plugged in once, years ago, and rewrites
   rows no one touched, and an entry for a device the player never named carries no benefit — no binding
   depends on it. *(This used to say "since both files are purely cosmetic"; the decision stands, but that
@@ -849,7 +853,11 @@ the capture dialog is used. **Startup never names anything:** a controller with 
   eight miss nothing. *"Sized to what the device reports"* above holds for buttons only.
 - **No hat labels.** The Device Service reads no hats, and in Elite Dangerous a hat mostly reports as buttons,
   which get `Button N` like any other — so the `Hat 1 Up` labels [onboarding](#what-it-asks-just-a-name) mentions
-  are not generated.
+  are not generated. *To change with [A8b](../../05-build-plan/alias-designer.md#slices) (Alan, 2026-10-10):
+  "mostly" is not "always" — a stick can be set to report a true hat — so once the Device Service reads hats, a
+  generated map labels each one `Hat 1 Up`, `Hat 1 Right`, `Hat 1 Down`, `Hat 1 Left`. The axis labels stay
+  all eight until A8b says which axes a controller has; whether generation then labels only those is A8b's to
+  decide.*
 - **Labels are English and fixed** — file content the game displays, not Elite-Intel's interface text.
 - **Started as a service**, `BUTTON_MAP_STARTUP` in `AppController.buildServices`, after `DEVICE`. Diagnostics
   mode stubs it, as it does the other services touching game files.
@@ -860,9 +868,50 @@ the capture dialog is used. **Startup never names anything:** a controller with 
 
 ## Device Editor
 
-The editor **expands inline beneath the device's row**, one device open at a time. Opening another closes the
+~~The editor **expands inline beneath the device's row**, one device open at a time. Opening another closes the
 first; clicking the open row closes it. There is no separate editor panel and no "no device selected" state —
-a collapsed list is the resting state.
+a collapsed list is the resting state.~~ *Replaced 2026-10-10 — see below.*
+
+### A dialog, opened from the row — 2026-10-10 (Alan)
+
+**The editor is a dialog**, opened by the **gear** at the end of a My Devices row — the gear the fleet list uses
+to open a ship's settings, so the two lists open their editors the same way. *The inline expansion was dropped
+because a Swing table row cannot host a panel beneath itself, and a dialog has room for tabs and for features
+still to come.*
+
+- **The gear is on every row**, a device not added included. Where the dialog cannot do something yet it says
+  so rather than the gear being missing: a device with **no name yet** opens with its input tabs disabled and a
+  line saying it needs a name, which [onboarding](#onboarding--every-controller-gets-a-name-and-a-buttonmap--settled-2026-09-13)
+  gives it.
+- **Modal to Elite-Intel only**, as every Elite-Intel dialog is: the main window waits, Windows does not. The
+  game and every other program carry on.
+- **As large as its content needs.** Dialogs in the app are not one size.
+- **Tabs: DEVICE, AXES, BUTTONS, HATS — each only when the controller has that kind of input.** The dialog is
+  built from what the controller reports, not from a fixed layout: a pedal set with three axes and no buttons
+  shows DEVICE and AXES. The axes and hats a controller has are read by
+  [A8b](../../05-build-plan/alias-designer.md#slices); SDL alone gives only an axis count, and two VIRPIL sticks
+  put their twist on Z and on RZ.
+- **DEVICE** holds the name, VID and PID, the Windows name, whether it is attached, and the
+  [install strip](#the-install-strip--a-readout-not-a-switch).
+- **AXES** has one label box per axis the controller reports, named by the axis it is (`Joy_XAxis`,
+  `Joy_RZAxis`), six to a column and a second column when there are more.
+- **BUTTONS** has one label box per button, in groups of **32** on sub-tabs numbered as the game numbers them —
+  `1–32`, `33–64` — when there are more than 32.
+- **HATS** has four label boxes per hat — `Joy_POV1Up`, `Joy_POV1Right`, `Joy_POV1Down`, `Joy_POV1Left`. A hat a
+  controller reports as buttons is buttons, and needs no tab. *An 8-way hat's diagonal is assumed to be two
+  directions at once — [testing item 20](../../00-overview/testing-required.md#bindforge).*
+- **A controller that is not attached** cannot report its inputs, so its tabs show the inputs its saved labels
+  name, with a line: *"plug it in to see every input."*
+- **Half-axis labels are not shown.** `Pos_Joy_…` and `Neg_Joy_…` label one direction of an axis; the AXES tab
+  offers one box per whole axis. A half-axis label already saved is kept and written out unchanged —
+  [testing item 19](../../00-overview/testing-required.md#bindforge) asks whether the game shows one at all.
+- **The buttons along the bottom: BACK on the left, CLEAR in the middle, SAVE on the right.** CLEAR is in the
+  middle so it is not hit by reaching for either of the others; on a built-in, RESET LABELS takes its place. The
+  dialog footer has no middle place today, so one is added to the shared dialog scaffold (`HudModalSpec`) —
+  see the [UI component map](ui-component-map.md#alias-designer).
+- **BACK is DISCARD.** Leaving with unsaved edits — BACK, the close glyph or Esc — asks **Save**, **Discard** or
+  **Keep editing**. *That is the [exit prompt](#exit-prompt) narrowed to one device, with a way back in.*
+- **APPLY is not in the dialog.** It is the screen's button, beneath the list, and reaches every installation.
 
 ### One record, and where it lands — reworked 2026-09-26
 
@@ -880,14 +929,20 @@ per-device switch.*
 
 #### The install strip — a readout, not a switch
 
-The strip along the top of the expansion stays, and it is **read-only**. It no longer selects which
-installation you are editing; it shows **which installations the user has, and whether each one matches the
-master for this device**:
+The strip ~~along the top of the expansion~~ on the dialog's **DEVICE** tab *(2026-10-10)* stays, and it is
+**read-only**. It no longer selects which installation you are editing; it shows **which installations the user
+has, and whether each one matches the master for this device** — one line per installation, then one sentence:
 
 ```
- Steam  M     Epic  M     Frontier  •
-        └─ matches the master        └─ does not
+ STEAM     M         E:\SteamLibrary\steamapps\common\Elite Dangerous\
+ EPIC      M         C:\Program Files\Epic\EliteDangerous\
+ FRONTIER  differs   D:\Games\Frontier\EDLaunch\
+ 2 of 3 installations match.
 ```
+
+*The marker's words and colours are the [Installations column's](#the-installations-markers--2026-10-08-alan) —
+**M**, *differs*, *not added*, *not found* — so the strip and the row say the same thing. The sketch used `•`
+before that column was built (2026-10-10).*
 
 - **Each installation is named, with its folder path**, as before. The path is what makes a failed push
   comprehensible: when Apply reports *"updated 2 of 3"*, the user can see which one and where it lives.
@@ -919,7 +974,8 @@ with the master, that is drift to be resolved, not a configuration to be preserv
 ### Fields and rules
 
 - **VID/PID are always read-only**, always derived from the physical hardware — the game attaches a device by
-  VID/PID, so hand-editing this would break the association. They are device-level, identical on every tab.
+  VID/PID, so hand-editing this would break the association. They are device-level ~~, identical on every
+  tab~~ — there are no per-installation tabs any more (2026-10-10).
 - **Edit Mode** activates the moment any field changes. A persistent label reminds the user this saves to the
   working copy only.
 - **Alias name validation — tightened 2026-09-13.** 3–50 characters; **must start with a letter**; then
@@ -928,29 +984,57 @@ with the master, that is drift to be resolved, not a configuration to be preserv
   rule allowed spaces and a wider set of punctuation. But the alias becomes an XML element tag and a
   filename stem, and a space is valid in neither — so that rule would have accepted a name the game
   cannot read.*
-- **The alias must be confirmed or changed before button/axis naming unlocks.** [Onboarding](#onboarding--every-controller-gets-a-name-and-a-buttonmap--settled-2026-09-13)
+- ~~**The alias must be confirmed or changed before button/axis naming unlocks.** [Onboarding](#onboarding--every-controller-gets-a-name-and-a-buttonmap--settled-2026-09-13)
   is where that happens. Confirming the offered name, typing another, or skipping — which accepts the
   default — all count, because in each case the user has been shown the name. A device is never fully
   configured under a name nobody looked at. A later rename is the [multi-file transaction](#renaming-a-device).
   **A built-in has no name to confirm:** its labels unlock straight away, and its name stays
-  [Frontier's](#built-in-controllers-in-my-devices--settled-2026-09-13).
-- **Button and axis names** are edited in Axis/Buttons sub-tabs. The UI sizes dynamically to the device's real
-  axis and button count — never hardcoded; a device with three axes shows three. A hard 18-character limit
+  [Frontier's](#built-in-controllers-in-my-devices--settled-2026-09-13).~~
+- **No confirm step — 2026-10-10 (Alan).** The confirm was the gate for a name nobody had looked at, from when
+  registration named controllers silently. [Onboarding moved that gate earlier](#it-is-the-alias-confirm-gate-moved-earlier),
+  and every other way a device gets a name — first setup, adopting an installation's entry — shows the name
+  too, so every named device has been seen. The editor has **no CONFIRM button and no lock**. Its labels are
+  editable once the device has a name; a device with none has its input tabs disabled until onboarding names
+  it. A built-in's name is Frontier's, so its labels are editable straight away. *`alias_confirmed` stays on the
+  master and the draft; every path writes it `true`, and nothing reads it now.*
+- **The name field is read-only until [Rename](#renaming-a-device) is built** (slice A11), with a line saying
+  so. A changed name is a rename — every installation, then `.binds` — not a field edit.
+- **Button and axis names** ~~are edited in Axis/Buttons sub-tabs~~ are edited on the dialog's input tabs
+  *(2026-10-10)*. The UI sizes dynamically to the device's real inputs — never hardcoded; a device with three
+  axes shows three, **and shows the three it has**: an X, Y and RZ stick shows `Joy_XAxis`, `Joy_YAxis` and
+  `Joy_RZAxis`, read by [A8b](../../05-build-plan/alias-designer.md#slices), never the first three by position. A hard 18-character limit
   applies to every button/axis friendly name, confirmed by direct in-game testing. The alias field has its own
   rule (3–50 characters) and no in-game display slot, so truncation is not a concern there.
+- **Every input gets a label — 2026-10-10 (Alan).** A box is never empty: one with no saved label shows the
+  default, and clearing a box puts the default back. The defaults are [the generated ones](#at-elite-intel-startup-a-buttonmap-for-every-connected-named-controller)
+  — `Button 14`, `X Axis` — so the dialog and the generated files agree, and hats get `Hat 1 Up`,
+  `Hat 1 Right`, `Hat 1 Down`, `Hat 1 Left`. Spaces at either end of a label are trimmed.
 - **Live highlighting:** pressing a button or moving an axis on the open device highlights the corresponding
-  row, letting the user identify raw input codes by feel. With the device list itself being the selection, there
-  is no separate "which controller am I pressing" step to get wrong.
+  ~~row~~ box, letting the user identify raw input codes by feel. ~~With the device list itself being the
+  selection, there is no separate "which controller am I pressing" step to get wrong.~~ The dialog is opened for
+  one device, so only that device's input is shown. *Settled 2026-10-10 (Alan):*
+  - **A box is lit only while its input is active**, with nothing lingering after: a button while it is held, a
+    hat direction while it is pushed, an axis while it is **more than 5% of its travel** from where it rests —
+    so jitter never shows.
+  - **The dialog never changes tab for an input.** Most buttons are momentary, and a light on another tab shows
+    nothing; a box lights only where the user is looking.
+  - Axes are lit by which axis they are, so axis highlighting needs [A8b](../../05-build-plan/alias-designer.md#slices)
+    — SDL numbers a controller's axes without gaps, and its axis 2 may be Z or RZ.
 
 ### Actions, and what each one reaches
 
 | Action | Scope | Touches a game installation? |
 |---|---|---|
-| **SAVE** | the device's record in the draft | **No** — draft only |
-| **DISCARD** | the draft — whether one device or all of it is for the Actions slice to settle, see below | No |
-| **CLEAR** | the device's entry and its `.buttonMap` — not offered on a built-in | No — see below |
-| **RESET LABELS** | a built-in's `.buttonMap` labels | No — draft only; see [built-ins](#built-in-controllers-in-my-devices--settled-2026-09-13) |
-| **APPLY TO GAME INSTALLS** | **every installation**, and reports per installation | **Yes** |
+| **SAVE** | the device's record in the draft — the dialog's right-hand button | **No** — draft only |
+| **DISCARD** | ~~the draft — whether one device or all of it is for the Actions slice to settle, see below~~ the dialog's unsaved edits — it is **BACK**, which asks first when there are any (2026-10-10) | No |
+| **CLEAR** | the device's entry and its `.buttonMap` — not offered on a built-in. The dialog's middle button | No — see below |
+| **RESET LABELS** | a built-in's `.buttonMap` labels. In CLEAR's place on a built-in | No — draft only; see [built-ins](#built-in-controllers-in-my-devices--settled-2026-09-13) |
+| **APPLY** ~~TO GAME INSTALLS~~ | **every installation**, and reports per installation. The screen's button, not the dialog's — renamed 2026-10-10 (Alan), since there is no choosing which installations | **Yes** |
+
+*Where each button is — 2026-10-10 (Alan).* SAVE, CLEAR (or RESET LABELS) and BACK are the
+[dialog's](#a-dialog-opened-from-the-row--2026-10-10-alan), because they act on one device: CLEAR on the main
+screen would sit beside the whole list. APPLY stays on the screen, because it carries everything saved to every
+installation at once. *Built:* SAVE comes with the dialog, in slice A9; CLEAR, RESET LABELS and APPLY in A10.
 
 *The **MIRROR** action is gone, along with the per-installation scoping that qualified CLEAR and RESET LABELS.
 There is one record, so every action reaches it and Apply carries it everywhere.*
@@ -973,6 +1057,8 @@ removes the files (CLEAR) works from that list. **A rename does not:** its old `
 `previous_name`, which Apply carries into the master. **Master ids change on every Apply**, because the
 master is emptied and refilled, so a device is identified by name across one.
 
+*Half settled 2026-10-10: the dialog's DISCARD is the first of the two below — BACK throws away the edits made
+since the dialog opened. Whether anything puts the whole draft back to the master is still the Actions slice's.*
 **DISCARD is still two things in this spec**, and which the button does is the Actions slice's to settle:
 throwing away edits not yet saved ([Unsaved Work on Exit](overview.md#unsaved-work-on-exit)), or putting the
 draft back to the master (*"Discard puts everything back"* under
@@ -1140,6 +1226,12 @@ indefinitely.
 If the user navigates away from BindForge (or exits Elite-Intel) with unsaved Alias Designer changes, the
 same two-option dialog described in [Overview — Unsaved Work on Exit](overview.md#unsaved-work-on-exit)
 interrupts: **Save** or **Discard**. Neither touches a game installation.
+
+**Inside the Device Editor — 2026-10-10 (Alan).** Closing the [dialog](#a-dialog-opened-from-the-row--2026-10-10-alan)
+with unsaved edits — BACK, its close glyph or Esc — asks **Save**, **Discard** or **Keep editing**. The third
+answer exists because the user is still on the screen and may only have pressed BACK by mistake. The dialog is
+modal, so it cannot be left open while the user navigates away; the prompt above covers what is left after it
+closes.
 
 ## Deferred
 

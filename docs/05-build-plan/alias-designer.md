@@ -97,8 +97,9 @@ installations with each other before then. Once the master exists, each row offe
 | A6b | **Onboarding: the dialog and its writes** — name the controllers `needingName` returns, then write the entry and a generated `.buttonMap` straight away. A controller `.binds` names by hex waits for Apply, with a `.binds` rewrite | A6, A8 | waiting — the hex case is `bindforge.io`, so it is blocked until the question in the README is answered |
 | A7 | **Automatic registration and hot-plug** — `DeviceBus` connect and disconnect | A6b | waiting |
 | A8 | **`.buttonMap` generation at Elite-Intel startup** — connected, named, none on disk | Core C1 (done) | **done 2026-10-06** |
-| A9 | **Device Editor** — inline expansion, install strip, labels, live highlighting | C2 (done) | **next** |
-| A10 | **Actions** — SAVE, DISCARD, CLEAR, RESET LABELS, APPLY, reported per installation. Unlocks [Core C6](core.md#slices), the exit prompt, which needs an editor holding unsaved edits. **RESET LABELS must delete the `.buttonMap` in every installation**, or A8 never regenerates it | A9 | waiting |
+| A8b | **Which axes and hats a controller has** — read each axis's identity (X, Y, Z, Rx, Ry, Rz, Slider, Dial) from the controller's HID description, on Windows and Linux, and the number of hats it reports, in the shared `elite.intel.devices`, built on this branch (Alan, 2026-10-10). SDL gives only an axis count, two Virpil sticks put the twist on Z and RZ, and the Device Service reads no hats today. The Device Editor is built from what this reports: a tab only for a kind of input the controller has. **A8's generated `.buttonMap` gains hat labels** in the form `Hat 1 Up`, `Hat 1 Down`, `Hat 1 Left`, `Hat 1 Right`, beside its existing `Button N` and `X Axis` (Alan, 2026-10-10). Design questions not yet asked | — | **next** |
+| A9 | **Device Editor** — a dialog opened from a gear on every My Devices row: DEVICE (name, VID/PID, install strip), AXES, BUTTONS (groups of 32), HATS, each only where the controller has them; default labels; live highlighting; **SAVE** to the draft and BACK's Save / Discard / Keep editing; the footer's middle place (GAP 7), with CLEAR's button laid out for A10. [Spec](../02-features/bindforge/alias-designer.md#a-dialog-opened-from-the-row--2026-10-10-alan) | C2 (done), A8b | waiting — A8b |
+| A10 | **Actions** — DISCARD of the whole draft (if any), CLEAR, RESET LABELS, APPLY, reported per installation. *SAVE moved to A9 (2026-10-10).* Unlocks [Core C6](core.md#slices), the exit prompt, which needs an editor holding unsaved edits. **RESET LABELS must delete the `.buttonMap` in every installation**, or A8 never regenerates it | A9 | waiting |
 | A11 | **Rename** — every installation first, `.binds` last, all or nothing | A10 | waiting |
 | A12 | **When hardware changes** — a missing device, the identity question, retarget, one missing device at a time | A11 | waiting |
 | A13 | **The missing-controller warning**, once per run | — | ready |
@@ -110,6 +111,16 @@ progress.
 
 *Newest first. Two or three lines each: what was decided and where it is recorded, what was found, what the
 next slice needs.*
+
+- **2026-10-10 — A9 redesigned before building; A8b added** (Alan, no code). The Device Editor is a **dialog**
+  opened from a gear, not an inline expansion — recorded in [the Device Editor](../02-features/bindforge/alias-designer.md#a-dialog-opened-from-the-row--2026-10-10-alan),
+  with the confirm step dropped, default labels, highlighting rules and the button layout; the
+  [UI component map](../02-features/bindforge/ui-component-map.md#alias-designer) and the mockup follow it; testing
+  items 17–20 added. **Found:** SDL cannot say which axis is which, so **A8b** reads axes and hats from the
+  controller, in the shared `elite.intel.devices` on this branch — `CLAUDE.md`'s shared-code rule names
+  `elite.intel.io`, `bindforge.io` and `.rules`, not the devices package. **A8b's design is not decided**: start it
+  by asking its questions one at a time. **The gear is copied** from `CommanderTabPanel`, a shared gear column
+  later. Alan asks for **one question at a time** in design discussion.
 
 - **2026-10-08 — A5 review fixes** (`code-integrity-review.md`, Alan). Recorded under *After review* in
   [Built as the stock reference](../02-features/bindforge/alias-designer.md#built-as-the-stock-reference--2026-10-08-alan):
