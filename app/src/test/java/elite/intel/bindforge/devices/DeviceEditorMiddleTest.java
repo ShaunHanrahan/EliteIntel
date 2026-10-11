@@ -5,6 +5,7 @@ import elite.intel.bindforge.devices.DeviceEditorMiddle.Why;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
+import java.util.OptionalInt;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -87,6 +88,17 @@ class DeviceEditorMiddleTest {
 
         assertFalse(middle.enabled());
         assertEquals(Why.NO_NAME, middle.why());
+    }
+
+    /** Bindings that cannot be read refuse CLEAR rather than guess; a reset needs nothing from them (review). */
+    @Test
+    void unreadableBindingsRefuseClearButNotReset() {
+        DeviceEditorMiddle clear = DeviceEditorMiddle.of("LVWAP", false, true, false, false, OptionalInt.empty());
+        DeviceEditorMiddle reset = DeviceEditorMiddle.of("T-Rudder", true, true, false, false, OptionalInt.empty());
+
+        assertFalse(clear.enabled());
+        assertEquals(Why.BINDS_UNREAD, clear.why());
+        assertTrue(reset.enabled());
     }
 
     /** A hand-edited .binds can spell the name otherwise, and missing it would let CLEAR strand those bindings. */

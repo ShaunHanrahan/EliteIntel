@@ -56,7 +56,6 @@ import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
 import java.awt.*;
 import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.EventObject;
@@ -65,6 +64,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.OptionalInt;
 import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -499,7 +499,8 @@ public class AliasDesignerPanel extends JPanel {
      */
     private void reMerge(WayOut way, DeviceDivergence.Finding finding) {
         String device = finding.deviceName();
-        offEdt(() -> LabelReMerge.stored(device, way.installIds()), merge -> {
+        String title = getText("bindings.aliasDesigner.wayOut.title");
+        offEdt(title, () -> LabelReMerge.stored(device, way.installIds()), merge -> {
             Map<String, String> answers = Map.of();
             if (!merge.collisions().isEmpty()) {
                 Map<String, String> sideNames = new LinkedHashMap<>(installLabels);
@@ -546,18 +547,28 @@ public class AliasDesignerPanel extends JPanel {
 
     /** Runs a way out off the EDT, says what happened, and reads everything again. */
     private void runWayOut(Callable<String> work) {
-        offEdt(work, message -> {
-            HudConfirmDialog.info(this, getText("bindings.aliasDesigner.wayOut.title"), message,
-                    getText("bindings.aliasDesigner.firstSetup.close"));
+        runAndReport(getText("bindings.aliasDesigner.wayOut.title"), work);
+    }
+
+    /**
+     * Runs a write off the EDT - a way out, APPLY or DISCARD - says what happened when there is something to say, and
+     * reads everything again.
+     */
+    private void runAndReport(String title, Callable<String> work) {
+        offEdt(title, work, message -> {
+            if (message != null) {
+                HudConfirmDialog.info(this, title, message, getText("bindings.aliasDesigner.firstSetup.close"));
+            }
             initData();
         });
     }
 
     /**
      * Reads or writes game files and the master off the EDT, with the buttons disabled meanwhile, then hands the
-     * result back on it. A failure is shown, not only logged - the user pressed a button and must be told.
+     * result back on it. A failure is shown under {@code title}, not only logged - the user pressed a button and must
+     * be told - and the screen is read again, since a write may have got part of the way.
      */
-    private <T> void offEdt(Callable<T> work, Consumer<T> onEdt) {
+    private <T> void offEdt(String title, Callable<T> work, Consumer<T> onEdt) {
         for (Component button : waysOutPanel.getComponents()) button.setEnabled(false);
         // WHY: APPLY and DISCARD wait too - a revert and an Apply writing the same installation at once would each
         // keep an Edit History copy of a file the other was replacing.
@@ -571,7 +582,7 @@ public class AliasDesignerPanel extends JPanel {
             } catch (Exception e) {
                 // WHY: broad on purpose - a thread boundary, and anything escaping it would leave the buttons
                 // disabled with no word of why.
-                log.warn("A way out of the divergence list failed", e);
+                log.warn("{} failed", title, e);
                 failure = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
             }
             T loaded = result;
@@ -581,14 +592,14 @@ public class AliasDesignerPanel extends JPanel {
                 refreshScreenActions();
                 showWaysOut();
                 if (loadedFailure != null) {
-                    HudConfirmDialog.info(this, getText("bindings.aliasDesigner.wayOut.title"),
-                            getText("bindings.aliasDesigner.wayOut.failed", loadedFailure),
+                    HudConfirmDialog.info(this, title, getText("bindings.aliasDesigner.wayOut.failed", loadedFailure),
                             getText("bindings.aliasDesigner.firstSetup.close"));
+                    initData();
                     return;
                 }
                 onEdt.accept(loaded);
             });
-        }, "BindForge-WayOut").start();
+        }, "BindForge-ScreenWrite").start();
     }
 
     /** The installations' names as the list shows them, sorted. */
@@ -611,7 +622,7 @@ public class AliasDesignerPanel extends JPanel {
                 getText("bindings.aliasDesigner.firstSetup.cancel"))) {
             return;
         }
-        runScreenAction(getText("bindings.aliasDesigner.apply.title"), () -> applyText(new DeviceApply().apply()));
+        runAndReport(getText("bindings.aliasDesigner.apply.title"), () -> applyText(new DeviceApply().apply()));
     }
 
     private String applyText(DeviceApply.Result result) {
@@ -642,46 +653,10 @@ public class AliasDesignerPanel extends JPanel {
                 getText("bindings.aliasDesigner.firstSetup.cancel"))) {
             return;
         }
-        runScreenAction(getText("bindings.aliasDesigner.discard.title"), () -> {
+        runAndReport(getText("bindings.aliasDesigner.discard.title"), () -> {
             BindForgeDeviceDraftManager.getInstance().discard();
             return null;
         });
-    }
-
-    /**
-     * Runs APPLY or DISCARD off the EDT, with every button that writes disabled meanwhile, says what happened when
-     * there is something to say, and reads everything again.
-     */
-    private void runScreenAction(String title, Callable<String> work) {
-        screenActionRunning = true;
-        refreshScreenActions();
-        for (Component button : waysOutPanel.getComponents()) button.setEnabled(false);
-        new Thread(() -> {
-            String message = null;
-            String failure = null;
-            try {
-                message = work.call();
-            } catch (Exception e) {
-                // WHY: broad on purpose - a thread boundary, and the user pressed a button and must be told.
-                log.warn("{} failed", title, e);
-                failure = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
-            }
-            String loadedMessage = message;
-            String loadedFailure = failure;
-            SwingUtilities.invokeLater(() -> {
-                screenActionRunning = false;
-                refreshScreenActions();
-                showWaysOut();
-                if (loadedFailure != null) {
-                    HudConfirmDialog.info(this, title, getText("bindings.aliasDesigner.wayOut.failed", loadedFailure),
-                            getText("bindings.aliasDesigner.firstSetup.close"));
-                } else if (loadedMessage != null) {
-                    HudConfirmDialog.info(this, title, loadedMessage,
-                            getText("bindings.aliasDesigner.firstSetup.close"));
-                }
-                initData();
-            });
-        }, "BindForge-ScreenAction").start();
     }
 
     /**
@@ -892,7 +867,9 @@ public class AliasDesignerPanel extends JPanel {
      */
     private void openDeviceEditor(int row) {
         if (row < 0 || row >= currentMyDevices.size()) return;
-        if (currentReport == null) {
+        // WHY: the master, not the report - a refresh that failed also leaves no report, and with a master present
+        // that is no reason to send the user to first setup (review, 2026-10-11).
+        if (masterEmpty) {
             if (HudConfirmDialog.confirm(this, getText("bindings.aliasDesigner.editor.heading"),
                     getText("bindings.aliasDesigner.editor.beforeSetUp.message"),
                     getText("bindings.aliasDesigner.firstSetup.button"),
@@ -959,24 +936,26 @@ public class AliasDesignerPanel extends JPanel {
 
     /**
      * What the editor's middle button is: read from the master, the draft and {@code .binds} as it opens. A
-     * {@code .binds} that cannot be read stops the editor opening rather than offering CLEAR on a device it might
-     * name - the game would reject the whole preset.
+     * {@code .binds} that cannot be read - a folder that is not there included - refuses CLEAR rather than offering it
+     * on a device it might name, since the game would reject the whole preset. Labels can still be edited.
      */
     private static DeviceEditorMiddle middleFor(MyDevice device, String name, FrontierStockDevices stock) {
         boolean builtIn = name == null ? device.builtIn() : stock.ships(name);
         if (name == null) return DeviceEditorMiddle.of(null, builtIn, false, false, false, 0);
         BindForgeDeviceDraftManager draft = BindForgeDeviceDraftManager.getInstance();
         boolean started = draft.isStarted();
-        Map<String, Integer> counts;
+        OptionalInt bindings;
         try {
-            counts = BindsDeviceReferences.referenceCounts(PlayerSession.getInstance().getBindingsDir());
+            bindings = OptionalInt.of(DeviceEditorMiddle.bindingsNaming(name,
+                    BindsDeviceReferences.referenceCounts(PlayerSession.getInstance().getBindingsDir())));
         } catch (IOException e) {
-            throw new UncheckedIOException("the bindings could not be read: " + e.getMessage(), e);
+            log.warn("Could not read which devices the bindings name, so Clear is refused for {}: {}", name,
+                    e.getMessage());
+            bindings = OptionalInt.empty();
         }
         return DeviceEditorMiddle.of(name, builtIn,
                 BindForgeDeviceMasterManager.getInstance().findByName(name) != null,
-                started, started && draft.findByName(name) != null,
-                DeviceEditorMiddle.bindingsNaming(name, counts));
+                started, started && draft.findByName(name) != null, bindings);
     }
 
     private static Map<String, String> storedLabels(String name) {

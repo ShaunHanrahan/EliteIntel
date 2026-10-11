@@ -59,7 +59,7 @@ class DeviceApplyTest {
         DeviceApply.Result result = new DeviceApply(
                 () -> { order.add("promote"); return List.of("RVWAP"); },
                 removals -> { order.add("push"); return empty; },
-                Set::of).apply();
+                Set::of, FrontierStockDevices.getInstance()).apply();
 
         assertEquals(List.of("promote", "push"), order);
         assertEquals(List.of("RVWAP"), result.removed(), "what the draft removed is handed to the caller");
@@ -147,7 +147,7 @@ class DeviceApplyTest {
         draft.removeByName("LVWAP");
 
         DeviceApply.Result result = new DeviceApply(draft::promote, pusher(List.of(steam))::push,
-                () -> { throw new IOException("locked"); }).apply();
+                () -> { throw new IOException("locked"); }, FrontierStockDevices.getInstance()).apply();
 
         assertTrue(result.bindsUnread());
         assertEquals(List.of("LVWAP"), result.heldBack());
@@ -171,6 +171,44 @@ class DeviceApplyTest {
         assertEquals(List.of("LVWAP"), master.pendingRemovals());
     }
 
+    /**
+     * Review, 2026-10-11: RESET LABELS on a built-in the bindings name still takes effect. Frontier's element stays,
+     * and .binds names inputs by token, never by label, so nothing a binding needs is lost.
+     */
+    @Test
+    void aResetBuiltInIsAppliedEvenWhenTheBindingsNameIt() throws IOException {
+        Target steam = steamInstallation();
+        long id = master.record("T-Rudder", "044F", "B679", true).id();
+        master.replaceLabels(id, Map.of("Joy_XAxis", "RUDDER"));
+        apply(List.of(steam), Set.of());
+        draft.removeByName("T-Rudder");
+
+        DeviceApply.Result result = apply(List.of(steam), Set.of("T-Rudder"));
+
+        assertEquals(List.of("T-Rudder"), result.cleanedUp());
+        assertTrue(result.heldBack().isEmpty());
+        assertFalse(Files.exists(buttonMap(steam, "T-Rudder")));
+        assertEquals(DEVICE_MAPPINGS, Files.readString(steam.controlSchemes().resolve("DeviceMappings.xml")),
+                "Frontier's element is left exactly as it was");
+        assertTrue(master.pendingRemovals().isEmpty());
+    }
+
+    /** Unreadable bindings hold back the user's entries, never a reset - it needs nothing from them. */
+    @Test
+    void unreadableBindingsDoNotHoldBackAReset() throws IOException {
+        Target steam = steamInstallation();
+        long id = master.record("T-Rudder", "044F", "B679", true).id();
+        master.replaceLabels(id, Map.of("Joy_XAxis", "RUDDER"));
+        apply(List.of(steam), Set.of());
+        draft.removeByName("T-Rudder");
+
+        DeviceApply.Result result = new DeviceApply(draft::promote, pusher(List.of(steam))::push,
+                () -> { throw new IOException("locked"); }, FrontierStockDevices.getInstance()).apply();
+
+        assertFalse(result.bindsUnread(), "nothing was held back for it");
+        assertEquals(List.of("T-Rudder"), result.cleanedUp());
+    }
+
     private void lvwapAppliedTo(Target steam) {
         long id = master.record("LVWAP", "3344", "83F4", true).id();
         master.replaceLabels(id, Map.of("Joy_1", "LV MAIN TRIGGER"));
@@ -179,7 +217,8 @@ class DeviceApplyTest {
     }
 
     private DeviceApply.Result apply(List<Target> targets, Set<String> namedInBinds) {
-        return new DeviceApply(draft::promote, pusher(targets)::push, () -> namedInBinds).apply();
+        return new DeviceApply(draft::promote, pusher(targets)::push, () -> namedInBinds,
+                FrontierStockDevices.getInstance()).apply();
     }
 
     private DeviceFilesPush pusher(List<Target> targets) {

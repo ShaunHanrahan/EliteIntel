@@ -107,7 +107,8 @@ final class DeviceEditorDialog extends JDialog {
     private final HudUnsavedHint unsavedHint = new HudUnsavedHint();
     private JButton save;
     private JButton middle;
-    private boolean saving;
+    /** A write to the draft is under way - SAVE, CLEAR, RESET LABELS or an undo - so nothing else may start. */
+    private boolean busy;
 
     /** @param onSaved run on the EDT after a save, so the screen reads everything again */
     DeviceEditorDialog(Component parent, Opening opening, Runnable onSaved) {
@@ -220,7 +221,8 @@ final class DeviceEditorDialog extends JDialog {
             row = line(panel, row, getText(rule.kind() == DeviceEditorMiddle.Kind.UNDO_RESET
                     ? "bindings.aliasDesigner.editor.reset"
                     : "bindings.aliasDesigner.editor.cleared"), HudPalette.HUD_COLOR_ROLE_WARNING);
-        } else if (rule.why() == DeviceEditorMiddle.Why.NAMED_IN_BINDS) {
+        } else if (rule.why() == DeviceEditorMiddle.Why.NAMED_IN_BINDS
+                || rule.why() == DeviceEditorMiddle.Why.BINDS_UNREAD) {
             row = line(panel, row, whyText(rule), HudPalette.HUD_COLOR_ROLE_WARNING);
         }
         row = field(panel, row, "bindings.aliasDesigner.editor.field.vid", device.vid());
@@ -396,14 +398,14 @@ final class DeviceEditorDialog extends JDialog {
     private void refreshDirty() {
         boolean dirty = dirty();
         unsavedHint.setVisible(dirty);
-        save.setEnabled(dirty && !saving);
+        save.setEnabled(dirty && !busy);
     }
 
     // ------------------------------------------------------------------ leaving
 
     /** BACK, the close glyph and Esc: asks first when there are unsaved edits. */
     private void leave() {
-        if (saving) return;
+        if (busy) return;
         if (!dirty()) {
             dispose();
             return;
@@ -425,36 +427,15 @@ final class DeviceEditorDialog extends JDialog {
 
     /** Writes the device's whole label set into the draft, off the EDT, and closes once it is there. */
     private void save() {
-        if (!dirty() || saving) return;
-        saving = true;
-        refreshDirty();
+        if (!dirty() || busy) return;
         Map<String, String> labels =
                 DeviceEditorInputs.toSave(opening.saved(), boxValues(), opening.gameDrawsIt());
         MyDevice device = opening.device();
-        new Thread(() -> {
-            String failure = null;
-            try {
-                BindForgeDeviceDraftManager.getInstance()
-                        .saveLabels(opening.deviceName(), device.vid(), device.pid(), labels);
-            } catch (RuntimeException e) {
-                // WHY: broad on purpose - a thread boundary, and the user pressed SAVE and must be told.
-                log.warn("The Device Editor could not save {}", opening.deviceName(), e);
-                failure = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
-            }
-            String loadedFailure = failure;
-            SwingUtilities.invokeLater(() -> {
-                saving = false;
-                if (loadedFailure != null) {
-                    refreshDirty();
-                    HudConfirmDialog.info(this, getText("bindings.aliasDesigner.editor.heading"),
-                            getText("bindings.aliasDesigner.editor.saveFailed", loadedFailure),
-                            getText("bindings.aliasDesigner.firstSetup.close"));
-                    return;
-                }
-                dispose();
-                onSaved.run();
-            });
-        }, "BindForge-DeviceEditorSave").start();
+        runAndClose(() -> {
+            BindForgeDeviceDraftManager.getInstance()
+                    .saveLabels(opening.deviceName(), device.vid(), device.pid(), labels);
+            return true;
+        }, "bindings.aliasDesigner.editor.saveFailed");
     }
 
     // ------------------------------------------------------------------ the middle button
@@ -468,6 +449,7 @@ final class DeviceEditorDialog extends JDialog {
             case NOTHING_TO_RESET -> getText("bindings.aliasDesigner.editor.why.nothingToReset");
             case NAMED_IN_BINDS -> getText("bindings.aliasDesigner.editor.namedInBinds", rule.bindings(),
                     opening.deviceName());
+            case BINDS_UNREAD -> getText("bindings.aliasDesigner.editor.why.bindsUnread");
         };
     }
 
@@ -477,11 +459,11 @@ final class DeviceEditorDialog extends JDialog {
      */
     private void middleAction() {
         DeviceEditorMiddle rule = opening.middle();
-        if (saving || !rule.enabled()) return;
+        if (busy || !rule.enabled()) return;
         String name = opening.deviceName();
         BindForgeDeviceDraftManager draft = BindForgeDeviceDraftManager.getInstance();
         if (rule.undoing()) {
-            runAndClose(() -> draft.restoreFromMaster(name));
+            runAndClose(() -> draft.restoreFromMaster(name), "bindings.aliasDesigner.editor.actionFailed");
             return;
         }
         boolean reset = rule.kind() == DeviceEditorMiddle.Kind.RESET_LABELS;
@@ -495,18 +477,26 @@ final class DeviceEditorDialog extends JDialog {
                 getText("button.back"))) {
             return;
         }
-        runAndClose(() -> draft.removeByName(name));
+        runAndClose(() -> draft.removeByName(name), "bindings.aliasDesigner.editor.actionFailed");
     }
 
-    /** Writes the draft off the EDT, then closes and has the screen read everything again - as SAVE does. */
-    private void runAndClose(Runnable work) {
-        saving = true;
+    /**
+     * Writes the draft off the EDT - SAVE, CLEAR, RESET LABELS or an undo - then closes and has the screen read
+     * everything again. A write that changed nothing ({@code false}) is reported, not closed on in silence: the device
+     * changed since the dialog opened, an Apply having run meanwhile, say (review, 2026-10-11).
+     *
+     * @param failedKey the message for a failure, taking the reason as its argument
+     */
+    private void runAndClose(BooleanSupplier work, String failedKey) {
+        busy = true;
         middle.setEnabled(false);
         refreshDirty();
         new Thread(() -> {
             String failure = null;
             try {
-                work.run();
+                if (!work.getAsBoolean()) {
+                    failure = getText("bindings.aliasDesigner.editor.stale", opening.deviceName());
+                }
             } catch (RuntimeException e) {
                 // WHY: broad on purpose - a thread boundary, and the user pressed the button and must be told.
                 log.warn("The Device Editor could not change {}", opening.deviceName(), e);
@@ -514,13 +504,12 @@ final class DeviceEditorDialog extends JDialog {
             }
             String loadedFailure = failure;
             SwingUtilities.invokeLater(() -> {
-                saving = false;
+                busy = false;
                 if (loadedFailure != null) {
                     middle.setEnabled(opening.middle().enabled());
                     refreshDirty();
                     HudConfirmDialog.info(this, getText("bindings.aliasDesigner.editor.heading"),
-                            getText("bindings.aliasDesigner.editor.actionFailed", loadedFailure),
-                            getText("bindings.aliasDesigner.firstSetup.close"));
+                            getText(failedKey, loadedFailure), getText("bindings.aliasDesigner.firstSetup.close"));
                     return;
                 }
                 dispose();

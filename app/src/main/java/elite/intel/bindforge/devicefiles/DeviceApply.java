@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Function;
@@ -31,7 +32,10 @@ import java.util.stream.Collectors;
  * <p>
  * <strong>A removal never strands a binding</strong> (Alan, 2026-10-11, A10). An entry {@code .binds} still names
  * is held back and stays pending: without it the game rejects the whole preset. Moving those bindings is a
- * {@code .binds} rewrite, which is not built. When {@code .binds} cannot be read, every removal is held back.
+ * {@code .binds} rewrite, which is not built. When {@code .binds} cannot be read, every such removal is held back.
+ * <strong>One of Frontier's names is never held back</strong> (review, 2026-10-11): RESET LABELS on a built-in removes
+ * only its {@code .buttonMap}, never Frontier's element, and {@code .binds} names inputs by token, never by label -
+ * so nothing a binding needs is lost, and holding it back would leave the reset pending forever.
  * <p>
  * <strong>A removal stays pending until every installation has taken it</strong>, so one on an unplugged drive is
  * retried by the next Apply rather than forgotten.
@@ -56,7 +60,7 @@ public final class DeviceApply {
      *                      for the next Apply
      * @param heldBack      pending removals left in the installations because {@code .binds} names them, or could
      *                      not be read
-     * @param bindsUnread   whether {@code .binds} could not be read, which is why everything was held back
+     * @param bindsUnread   whether {@code .binds} could not be read and an entry of the user's was held back for it
      */
     public record Result(List<String> removed, Report report, List<String> cleanedUp, List<String> notEverywhere,
                          List<String> heldBack, boolean bindsUnread) {
@@ -72,6 +76,7 @@ public final class DeviceApply {
     private final Supplier<List<String>> promote;
     private final Function<Set<String>, Report> push;
     private final BindsNames bindsNames;
+    private final FrontierStockDevices stock;
 
     /**
      * Promotes the stored draft and pushes to the stored installations.
@@ -80,13 +85,17 @@ public final class DeviceApply {
      */
     public DeviceApply() throws IOException {
         this(BindForgeDeviceDraftManager.getInstance()::promote, new DeviceFilesPush()::push,
-                () -> BindsDeviceReferences.referencedEntryNames(PlayerSession.getInstance().getBindingsDir()));
+                () -> BindsDeviceReferences.referenceCounts(PlayerSession.getInstance().getBindingsDir()).keySet(),
+                FrontierStockDevices.getInstance());
     }
 
-    DeviceApply(Supplier<List<String>> promote, Function<Set<String>, Report> push, BindsNames bindsNames) {
+    /** @param bindsNames must throw rather than answer when it cannot be sure - a missing folder is not "none" */
+    DeviceApply(Supplier<List<String>> promote, Function<Set<String>, Report> push, BindsNames bindsNames,
+                FrontierStockDevices stock) {
         this.promote = promote;
         this.push = push;
         this.bindsNames = bindsNames;
+        this.stock = stock;
     }
 
     public Result apply() {
@@ -96,39 +105,58 @@ public final class DeviceApply {
         Set<String> inMaster = master.findAll().stream().map(DeviceRow::deviceName).collect(Collectors.toSet());
         List<String> pending = master.pendingRemovals().stream().filter(name -> !inMaster.contains(name)).toList();
 
-        Set<String> named;
-        boolean bindsUnread = false;
-        try {
-            named = folded(bindsNames.read());
-        } catch (IOException e) {
-            log.warn("Could not read .binds, so no device is removed by this Apply: {}", e.getMessage());
-            named = null;
-            bindsUnread = true;
+        Split split = split(pending, readBindsNames());
+
+        Report report = push.apply(split.removals());
+        List<String> cleanedUp = List.of();
+        List<String> notEverywhere = List.of();
+        if (!split.removals().isEmpty()) {
+            if (everyInstallationTookIt(report)) {
+                split.removals().forEach(master::clearPendingRemoval);
+                cleanedUp = List.copyOf(split.removals());
+            } else {
+                notEverywhere = List.copyOf(split.removals());
+            }
         }
+        return new Result(removed, report, cleanedUp, notEverywhere, split.heldBack(), split.bindsUnread());
+    }
+
+    /** The names {@code .binds} gives devices, folded to lower case - or empty when they cannot be read. */
+    private Optional<Set<String>> readBindsNames() {
+        try {
+            return Optional.of(folded(bindsNames.read()));
+        } catch (IOException e) {
+            log.warn("Could not read .binds, so no entry of the user's is removed by this Apply: {}", e.getMessage());
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * Which pending removals this Apply can carry out, and which wait for a {@code .binds} rewrite. Frontier's names
+     * go either way: their element stays, and a label is nothing a binding needs.
+     */
+    private Split split(List<String> pending, Optional<Set<String>> named) {
         Set<String> removals = new TreeSet<>();
         List<String> heldBack = new ArrayList<>();
+        boolean bindsUnread = false;
         for (String name : pending) {
-            // WHY: compared ignoring case. A hand-edited .binds can spell a name otherwise, and holding back an
-            // entry that might be in use costs a leftover; removing one that is costs the whole preset.
-            if (named == null || named.contains(name.toLowerCase(Locale.ROOT))) {
+            if (stock.ships(name)) {
+                removals.add(name);
+            } else if (named.isEmpty()) {
+                heldBack.add(name);
+                bindsUnread = true;
+            } else if (named.get().contains(name.toLowerCase(Locale.ROOT))) {
+                // WHY: compared ignoring case. A hand-edited .binds can spell a name otherwise, and holding back an
+                // entry that might be in use costs a leftover; removing one that is costs the whole preset.
                 heldBack.add(name);
             } else {
                 removals.add(name);
             }
         }
+        return new Split(removals, heldBack, bindsUnread);
+    }
 
-        Report report = push.apply(removals);
-        List<String> cleanedUp = List.of();
-        List<String> notEverywhere = List.of();
-        if (!removals.isEmpty()) {
-            if (everyInstallationTookIt(report)) {
-                removals.forEach(master::clearPendingRemoval);
-                cleanedUp = List.copyOf(removals);
-            } else {
-                notEverywhere = List.copyOf(removals);
-            }
-        }
-        return new Result(removed, report, cleanedUp, notEverywhere, heldBack, bindsUnread);
+    private record Split(Set<String> removals, List<String> heldBack, boolean bindsUnread) {
     }
 
     private static boolean everyInstallationTookIt(Report report) {

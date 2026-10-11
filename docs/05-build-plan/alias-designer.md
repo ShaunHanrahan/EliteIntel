@@ -54,6 +54,9 @@ installations with each other before then. Once the master exists, each row offe
 
 ## Known issues — fix when a slice passes them
 
+- **The gear cell is a copy of `CommanderTabPanel`'s** (`AliasDesignerPanel.GearCell`, with its renderer and editor).
+  The review of A9/A10 (2026-10-11, finding 4) asks for one shared HUD gear column in `ui.widget` now, not at a third
+  list. **Deferred by Alan:** sharing it edits `CommanderTabPanel`, V1.1's fleet screen — settle with Krondor first.
 
 - **First setup has no undo in the app** (found 2026-10-08, Alan). Its labelled backup
   (`playerbackups\<time>_first-setup\<id>-<storefront>\`) can only be copied back by hand: the Player Backups
@@ -119,6 +122,15 @@ Whether Alias Designer writes it or hands it to the Bind Editor is undecided (Al
 
 *Newest first. Two or three lines each: what was decided and where it is recorded, what was found, what the
 next slice needs.*
+
+- **2026-10-11 — A9/A10 review fixes** (`code-integrity-review.md`, Alan: all but #4). Recorded under *After review*
+  in [built — A10](../02-features/bindforge/alias-designer.md#built--2026-10-11-alan-a10): a reset built-in is applied
+  whatever `.binds` says (Apply had held back every named pending name, Frontier's included, so a reset never landed);
+  `BindsDeviceReferences.referenceCounts` is strict — a missing folder, or one with no readable `.binds`, throws, and
+  CLEAR is refused (`Why.BINDS_UNREAD`) while the editor still opens; a no-op CLEAR or undo is reported; the gear
+  asks `masterEmpty`; hats cap at four. One off-EDT runner per screen (`offEdt` + `runAndReport`, `runAndClose`).
+  **#4 deferred** — Known issues. **Anything deciding a removal reads `referenceCounts`, never the lenient
+  `referencedEntryNames`.**
 
 - **2026-10-11 — A10 built** (Alan answered five questions, one at a time). Recorded in [built — A10](../02-features/bindforge/alias-designer.md#built--2026-10-11-alan-a10)
   and a new rule, [an edit `.binds` depends on updates `.binds`](../02-features/bindforge/alias-designer.md#an-edit-binds-depends-on-updates-binds--2026-10-11-alan):

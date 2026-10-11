@@ -83,6 +83,19 @@ class DeviceEditorInputsTest {
         assertEquals(2, inputs.hats(), "every hat up to the highest labelled");
     }
 
+    /**
+     * Review, 2026-10-11: a damaged or hand-edited label naming hat 500 must not build two thousand boxes, and one
+     * past {@code int} must not throw. Neither names a hat the game can bind.
+     */
+    @Test
+    void aHatPastWhatTheGameCanBindOffersNoBox() {
+        DeviceEditorInputs inputs = DeviceEditorInputs.ofSavedLabels(
+                labels("Joy_POV500Up", "FAR", "Joy_POV99999999999Left", "FARTHER", "Joy_POV4Down", "LAST"));
+
+        assertEquals(4, inputs.hats(), "up to the fourth, which DirectInput can report");
+        assertEquals("Joy_POV99999999999Left", DeviceEditorInputs.defaultLabel("Joy_POV99999999999Left"));
+    }
+
     @Test
     void anUnattachedControllerWithNoLabelsOffersNothing() {
         assertTrue(DeviceEditorInputs.ofSavedLabels(Map.of()).isEmpty());

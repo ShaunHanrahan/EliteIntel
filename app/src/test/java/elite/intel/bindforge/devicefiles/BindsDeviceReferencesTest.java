@@ -11,6 +11,7 @@ import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -111,6 +112,34 @@ class BindsDeviceReferencesTest {
         binds("Racing.4.2.binds", "<Root><A><Primary Device=\"LVWAP\" Key=\"Joy_3\" /></A></Root>");
 
         assertEquals(Map.of("LVWAP", 3), BindsDeviceReferences.referenceCounts(bindings));
+    }
+
+    /**
+     * Review, 2026-10-11: the counts gate removals, so a bindings folder that is not there must not read as
+     * "nothing names this device" - that would let CLEAR and Apply strip an entry the game needs.
+     */
+    @Test
+    void countsRefuseAFolderThatIsNotThere() {
+        assertThrows(IOException.class, () -> BindsDeviceReferences.referenceCounts(bindings.resolve("moved")));
+    }
+
+    @Test
+    void countsRefuseAFolderWhoseBindsAllFailToParse() throws IOException {
+        binds("Custom.4.2.binds", "<Root><unclosed></Root>");
+
+        assertThrows(IOException.class, () -> BindsDeviceReferences.referenceCounts(bindings));
+    }
+
+    /** An empty folder is an answer, not a failure: no custom preset names anything. */
+    @Test
+    void countsOfAnEmptyFolderAreEmpty() throws IOException {
+        assertTrue(BindsDeviceReferences.referenceCounts(bindings).isEmpty());
+    }
+
+    /** Severity stays lenient: a missing folder only turns findings yellow. */
+    @Test
+    void namesOfAFolderThatIsNotThereAreEmpty() throws IOException {
+        assertTrue(BindsDeviceReferences.referencedEntryNames(bindings.resolve("moved")).isEmpty());
     }
 
     private void binds(String name, String content) throws IOException {

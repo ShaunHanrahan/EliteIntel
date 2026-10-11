@@ -47,6 +47,14 @@ public record DeviceEditorInputs(boolean attached, boolean axesKnown, int axesWi
     private static final Pattern AXIS = Pattern.compile("Joy_(X|Y|Z|RX|RY|RZ|U|V)Axis");
     private static final Pattern HAT = Pattern.compile("Joy_POV(\\d+)(Up|Right|Down|Left)");
 
+    /**
+     * The most hats a controller can report to the game: DirectInput's joystick state carries four POVs
+     * ({@code DIJOYSTATE2.rgdwPOV[4]}), the game's {@code Joy_POV1} to {@code Joy_POV4}. A saved label naming a higher
+     * one - hand-edited, or from a damaged file - names nothing the game can bind, and must not build a box for every
+     * hat up to it (review, 2026-10-11).
+     */
+    static final int MAX_HATS = 4;
+
     public DeviceEditorInputs {
         axes = List.copyOf(axes);
         buttons = List.copyOf(buttons);
@@ -69,8 +77,9 @@ public record DeviceEditorInputs(boolean attached, boolean axesKnown, int axesWi
 
     /**
      * The inputs a controller that is not attached is known to have: those its saved labels name. A hat is offered
-     * whole - all four directions - when any of its directions is labelled, and every hat up to the highest one.
-     * Half-axis labels ({@code Pos_}, {@code Neg_}) name no box: they are kept and written out unchanged.
+     * whole - all four directions - when any of its directions is labelled, and every hat up to the highest one, up to
+     * {@link #MAX_HATS}; a higher one is kept and written out unchanged, like a half-axis label. Half-axis labels
+     * ({@code Pos_}, {@code Neg_}) name no box: they are kept and written out unchanged.
      */
     public static DeviceEditorInputs ofSavedLabels(Map<String, String> saved) {
         TreeSet<Integer> buttons = new TreeSet<>();
@@ -83,7 +92,8 @@ public record DeviceEditorInputs(boolean attached, boolean axesKnown, int axesWi
             } else if ((matcher = AXIS.matcher(token)).matches()) {
                 axes.add(GameAxis.valueOf(matcher.group(1)));
             } else if ((matcher = HAT.matcher(token)).matches()) {
-                hats = Math.max(hats, buttonNumber(matcher.group(1)).orElse(0));
+                int hat = buttonNumber(matcher.group(1)).orElse(0);
+                if (hat <= MAX_HATS) hats = Math.max(hats, hat);
             }
         }
         return new DeviceEditorInputs(false, true, 0,
@@ -142,7 +152,8 @@ public record DeviceEditorInputs(boolean attached, boolean axesKnown, int axesWi
             return ButtonMapLabels.axisLabel(GameAxis.valueOf(matcher.group(1)));
         }
         if ((matcher = HAT.matcher(token)).matches()) {
-            return ButtonMapLabels.hatLabel(Integer.parseInt(matcher.group(1)), matcher.group(2));
+            String direction = matcher.group(2);
+            return buttonNumber(matcher.group(1)).map(hat -> ButtonMapLabels.hatLabel(hat, direction)).orElse(token);
         }
         return token;
     }

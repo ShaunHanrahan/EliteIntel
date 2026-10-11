@@ -447,7 +447,7 @@ row shows its ways out as buttons, as first setup shows its choices; each asks b
 | An entry the master does not hold | **Adopt** from one installation. Revert would leave it where it is: the push never removes |
 | Labels differ | **Compare labels** — the re-merge — or **revert** |
 | `DeviceMappings.xml` unreadable | **None.** The push cannot read it either; the row says to restore it or fix it by hand |
-| Orphan `.buttonMap` | **None.** ~~Removing a file is [CLEAR](#actions-and-what-each-one-reaches)'s; the row says so~~ CLEAR acts on a device, and an orphan has none: the row says to remove it by hand or restore it (2026-10-11, [A10](#built--2026-10-11-alan-a10)) |
+| Orphan `.buttonMap` | **None.** CLEAR acts on a device, and an orphan has none: the row says to remove it by hand or restore it (2026-10-11, [A10](#built--2026-10-11-alan-a10)) |
 
 - **Adopt from a row takes that device and nothing else.** Adopting the whole installation, as the startup check's
   adopt does, would also drop from the master every entry that installation lacks — fixing one stick's PID could
@@ -1237,9 +1237,9 @@ Alan answered five questions, one at a time:
 
 - **CLEAR is refused while `.binds` names the device** — the rule above — with the count: *"142 bindings name
   LVWAP. Clearing it means moving them to its hardware ID, which is not built yet."* Compared ignoring case.
-  **The Apply cleanup never removes an entry `.binds` names either**, whoever made it pending — first setup's
-  shadowed and losing names included: it stays pending, and the report says so. When `.binds` cannot be read,
-  nothing is removed.
+  **The Apply cleanup never removes an entry of the user's that `.binds` names either**, whoever made it pending —
+  first setup's shadowed and losing names included: it stays pending, and the report says so. When `.binds` cannot
+  be read, no entry of the user's is removed. *A built-in's reset is never held back* — see *After review* below.
 - **RESET LABELS on `VPCPanel` or `VPCThrottle` puts Frontier's map back**, byte for byte from the jar
   (`FrontierStockButtonMaps.shippedContent`), since a `.buttonMap` Frontier shipped is never removed. On any other
   built-in it deletes the file in every installation, and [startup generation](#at-elite-intel-startup-a-buttonmap-for-every-connected-named-controller)
@@ -1271,6 +1271,25 @@ Alan answered five questions, one at a time:
 - **Found:** a device cleared and then saved again came back as a new draft row, and Apply would have stored it as a
   pending removal while it was in the master. A name the draft holds is now never pending.
 - **CLEAR and RESET LABELS confirm, naming the installation count**; both write the draft only.
+
+*After review — 2026-10-11 (`code-integrity-review.md`, Alan):*
+
+- **A reset built-in is applied whatever `.binds` says.** Apply held back every pending name `.binds` mentioned,
+  Frontier's included — so RESET LABELS on a stick the user flies with was reported as left in place, and stayed
+  pending for good while the master and the installations disagreed. A built-in loses only its `.buttonMap`, and
+  `.binds` names inputs by token, so nothing a binding needs goes; only the user's names are checked now.
+- **A bindings folder that is not there is unreadable, not empty**, for the two places that decide a removal:
+  CLEAR's refusal and Apply's hold-back (`BindsDeviceReferences.referenceCounts`). So is one whose `.binds` files
+  all fail to parse. Otherwise a typo in settings, or an unmounted drive, would read as "nothing names this device"
+  and let CLEAR strip an entry the game needs. The editor still opens, with CLEAR refused and saying why. An empty
+  folder is an answer: no custom preset names anything. Severity stays lenient — there it only turns findings
+  yellow — and a skipped `.binds` is now logged by name.
+- **A CLEAR or undo that changed nothing says so** rather than closing as if it worked: the device changed since the
+  dialog opened.
+- **The gear asks whether the master is empty**, not whether the refresh produced a report — a failed refresh no
+  longer sends the user to first setup.
+- **An unattached controller offers hats only up to the fourth**, the most DirectInput reports (`Joy_POV1`–`Joy_POV4`).
+  A saved label naming a higher one is kept and written out, like a half-axis label, and builds no boxes.
 
 ## Renaming a Device
 

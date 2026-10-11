@@ -3,6 +3,7 @@ package elite.intel.bindforge.devices;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.OptionalInt;
 
 /**
  * The Device Editor's middle button - CLEAR, or RESET LABELS on a built-in - and whether it can be pressed
@@ -42,7 +43,12 @@ public record DeviceEditorMiddle(Kind kind, boolean enabled, Why why, int bindin
         /** A built-in with no saved labels: the file on disk is already the generated one, or Frontier's. */
         NOTHING_TO_RESET,
         /** {@code .binds} names it. */
-        NAMED_IN_BINDS
+        NAMED_IN_BINDS,
+        /**
+         * {@code .binds} could not be read - the folder is not there, or no preset in it parses - so whether it names
+         * the device is unknown, and CLEAR is refused rather than guessed (review, 2026-10-11).
+         */
+        BINDS_UNREAD
     }
 
     public DeviceEditorMiddle {
@@ -66,6 +72,12 @@ public record DeviceEditorMiddle(Kind kind, boolean enabled, Why why, int bindin
      */
     public static DeviceEditorMiddle of(String deviceName, boolean builtIn, boolean inMaster, boolean draftStarted,
                                         boolean inDraft, int bindings) {
+        return of(deviceName, builtIn, inMaster, draftStarted, inDraft, OptionalInt.of(bindings));
+    }
+
+    /** As above, with {@code bindings} empty when {@code .binds} could not be read. */
+    public static DeviceEditorMiddle of(String deviceName, boolean builtIn, boolean inMaster, boolean draftStarted,
+                                        boolean inDraft, OptionalInt bindings) {
         Kind kind = builtIn ? Kind.RESET_LABELS : Kind.CLEAR;
         if (deviceName == null) return new DeviceEditorMiddle(kind, false, Why.NO_NAME, 0);
         if (draftStarted && inMaster && !inDraft) {
@@ -75,7 +87,10 @@ public record DeviceEditorMiddle(Kind kind, boolean enabled, Why why, int bindin
         boolean held = draftStarted ? inDraft : inMaster;
         if (!held) return new DeviceEditorMiddle(kind, false, builtIn ? Why.NOTHING_TO_RESET : Why.NOT_ADDED, 0);
         if (builtIn) return new DeviceEditorMiddle(kind, true, Why.NONE, 0);
-        if (bindings > 0) return new DeviceEditorMiddle(kind, false, Why.NAMED_IN_BINDS, bindings);
+        if (bindings.isEmpty()) return new DeviceEditorMiddle(kind, false, Why.BINDS_UNREAD, 0);
+        if (bindings.getAsInt() > 0) {
+            return new DeviceEditorMiddle(kind, false, Why.NAMED_IN_BINDS, bindings.getAsInt());
+        }
         return new DeviceEditorMiddle(kind, true, Why.NONE, 0);
     }
 

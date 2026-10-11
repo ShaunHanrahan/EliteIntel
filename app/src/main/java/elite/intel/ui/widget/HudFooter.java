@@ -45,7 +45,7 @@ public final class HudFooter {
      * left slot and the right-hand group, for a destructive action that must not sit beside either - the Device
      * Editor's CLEAR (2026-10-10).
      *
-     * @param middle   centred buttons, left to right; may be empty
+     * @param middle   centred buttons, left to right; may be empty or null, as {@code trailing} may
      * @param trailing right-aligned components in visual left-to-right order - the unsaved hint, then the actions
      *                 with primary last; may be null
      */
@@ -72,7 +72,7 @@ public final class HudFooter {
 
         footer.add(west, BorderLayout.WEST);
         footer.add(east, BorderLayout.EAST);
-        if (!middle.isEmpty()) {
+        if (middle != null && !middle.isEmpty()) {
             JPanel centre = new JPanel(new FlowLayout(FlowLayout.CENTER, HudPalette.HUD_GAP, 0));
             centre.setOpaque(false);
             for (AbstractButton button : middle) {

@@ -1,5 +1,7 @@
 package elite.intel.bindforge.devicefiles;
 
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
@@ -10,6 +12,7 @@ import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -30,6 +33,8 @@ import java.util.stream.Stream;
  */
 public final class BindsDeviceReferences {
 
+    private static final Logger log = LogManager.getLogger(BindsDeviceReferences.class);
+
     private static final String BINDS_SUFFIX = ".binds";
     private static final String DEVICE_ATTRIBUTE = "Device";
 
@@ -49,28 +54,59 @@ public final class BindsDeviceReferences {
      * A file that cannot be parsed is skipped rather than failing the scan - the folder demonstrably holds
      * files with a {@code .binds} name that are not binds files, most often a {@code StartPreset} picked by
      * mistake, and one of those must not stop the rest being read.
+     * <p>
+     * Lenient: a folder that is not there names nothing. That suits severity, where it only turns findings yellow;
+     * anything deciding a removal uses {@link #referenceCounts(Path)}, which refuses to guess.
      */
     public static Set<String> referencedEntryNames(Path bindingsFolder) throws IOException {
-        return Set.copyOf(referenceCounts(bindingsFolder).keySet());
+        if (!Files.isDirectory(bindingsFolder)) return Set.of();
+        return Set.copyOf(read(bindingsFolder).counts().keySet());
     }
 
     /**
      * How many bindings name each entry, across every {@code .binds} in {@code bindingsFolder} - one per
      * {@code Device=} naming it. The count is what makes a question about the device answerable: 142 bindings is
-     * worth a moment's thought, 2 is not. Unreadable files are skipped, as above.
+     * worth a moment's thought, 2 is not.
+     * <p>
+     * <strong>Strict, because it gates removals</strong> - whether CLEAR is offered, and whether Apply takes an entry
+     * out (review, 2026-10-11). A folder that is not there, or one whose {@code .binds} files all fail to parse, would
+     * otherwise read as "nothing names this device", and removing a named entry makes the game reject the whole
+     * preset. So both throw, and the callers take their "cannot read" path. One unparsable file among readable ones
+     * is still skipped, as above. An empty folder is an answer: no custom preset names anything.
+     *
+     * @throws IOException when the folder is missing or no {@code .binds} in it could be read
      */
     public static Map<String, Integer> referenceCounts(Path bindingsFolder) throws IOException {
+        if (!Files.isDirectory(bindingsFolder)) {
+            throw new NoSuchFileException(bindingsFolder.toString(), null, "the bindings folder is not there");
+        }
+        Reading reading = read(bindingsFolder);
+        if (reading.files() > 0 && reading.parsed() == 0) {
+            throw new IOException("none of the " + reading.files() + " .binds files in " + bindingsFolder
+                    + " could be read");
+        }
+        return reading.counts();
+    }
+
+    private static Reading read(Path bindingsFolder) throws IOException {
         Map<String, Integer> counts = new LinkedHashMap<>();
-        for (Path file : bindsFilesIn(bindingsFolder)) {
+        List<Path> files = bindsFilesIn(bindingsFolder);
+        int parsed = 0;
+        for (Path file : files) {
             try {
                 collectInto(file, counts);
+                parsed++;
             } catch (SAXException | ParserConfigurationException | IOException e) {
                 // WHY: skipped, not fatal. See above - one unreadable file in the folder is an ordinary
-                // condition, and the names in the others are still worth having.
-                continue;
+                // condition, and the names in the others are still worth having. Logged, because these names now
+                // decide whether a device may be cleared, and a support bundle should say which file was skipped.
+                log.warn("Skipped {} while reading which devices the bindings name: {}", file, e.getMessage());
             }
         }
-        return Map.copyOf(counts);
+        return new Reading(Map.copyOf(counts), files.size(), parsed);
+    }
+
+    private record Reading(Map<String, Integer> counts, int files, int parsed) {
     }
 
     private static void collectInto(Path bindsFile, Map<String, Integer> counts)
