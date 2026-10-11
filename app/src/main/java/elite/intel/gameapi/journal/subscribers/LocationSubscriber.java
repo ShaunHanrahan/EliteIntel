@@ -67,8 +67,11 @@ public class LocationSubscriber {
 
         // Only when the journal's body type maps to something: determineType answers null for "Planet", and
         // assigning that erased the classification a scan had established, on every startup.
+        // The arrival star is the one at distance 0 (the journal omits DistFromStarLS there). This was inverted:
+        // a login at a system's main star relabelled it STAR, and the home-system lookup, which asks for the
+        // PRIMARY_STAR record, then found nothing (bundle 2026-10-11).
         LocationDto.LocationType bodyType =
-                LocationDto.determineType(event.getBodyType().toLowerCase(Locale.ROOT), event.getDistFromStarLS() > 0);
+                LocationDto.determineType(event.getBodyType().toLowerCase(Locale.ROOT), event.getDistFromStarLS() == 0);
         if (bodyType != null) {
             dto.setLocationType(bodyType);
         }

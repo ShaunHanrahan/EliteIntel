@@ -89,6 +89,30 @@ class DiscoveryObjectiveLifecycleTest {
     }
 
     @Test
+    void anUnchartedPlanetInASystemSomeoneElseFoundShowsTheCard() {
+        savePrimaryStar(false);
+        surveys.recordBodyCount(system, 15);
+        LocationDto planet = saveBody(21, "2", "Icy body", 0);
+        planet.setOurDiscovery(true);
+        locations.save(planet);
+
+        HudObjective card = source.currentObjective().orElseThrow();
+
+        assertEquals("NEW DISCOVERY", card.title());
+        assertEquals(star.toUpperCase(), card.subtitle());
+        assertEquals(2, card.rows().getFirst().current(), "the arrival star and the new planet");
+    }
+
+    @Test
+    void aSystemSomeoneElseFoundWithEveryBodyChartedHasNoCard() {
+        savePrimaryStar(false);
+        surveys.recordBodyCount(system, 15);
+        saveBody(21, "2", "Icy body", 0);
+
+        assertTrue(source.currentObjective().isEmpty());
+    }
+
+    @Test
     void discoveryAnnouncementsOffHidesTheCard() {
         session.setDiscoveryAnnouncementOn(false);
 
@@ -144,6 +168,7 @@ class DiscoveryObjectiveLifecycleTest {
 
     @Test
     void afterTheHonkTheCardPricesTheSystemAndEverythingUnsold() {
+        bioSamples.clear(); // the samples table is shared, and another test's priced sample would join the total
         surveys.recordBodyCount(system, 15);
         DiscoveryObjectiveSource priced = new DiscoveryObjectiveSource(session, locations, surveys,
                 new ExobiologyObjectiveSource(), address -> new CartographicDataManager.Worth(12_103, 1_500_000),
@@ -155,6 +180,29 @@ class DiscoveryObjectiveLifecycleTest {
         assertEquals("12103", rows.get(1).value().replaceAll("\\D", ""), "grouped for the app language, so digits only");
         assertEquals("UNSOLD DATA", rows.get(2).label());
         assertEquals("1500000", rows.get(2).value().replaceAll("\\D", ""));
+    }
+
+    @Test
+    void finishedOrganicsJoinTheSystemValueAndTheUnsoldTotal() {
+        BioSampleDto here = completedSample("Tubus");
+        here.setPayout(1_514_500);
+        here.setFistDiscoveryBonus(6_058_000);
+        BioSampleDto elsewhere = completedSample("Stratum");
+        elsewhere.setPrimaryStar("Another System");
+        elsewhere.setPayout(19_010_800);
+
+        CartographicDataManager.Worth worth = DiscoveryObjectiveSource.withOrganics(
+                new CartographicDataManager.Worth(12_103, 1_500_000), star, List.of(here, elsewhere));
+
+        assertEquals(12_103 + 1_514_500 + 6_058_000, worth.system());
+        assertEquals(1_500_000 + 1_514_500 + 6_058_000 + 19_010_800, worth.unsold());
+    }
+
+    @Test
+    void noSamplesCarriedLeavesTheCartographicFiguresAlone() {
+        CartographicDataManager.Worth worth = DiscoveryObjectiveSource.withOrganics(new CartographicDataManager.Worth(12_103, 1_500_000), star, List.of());
+
+        assertEquals(new CartographicDataManager.Worth(12_103, 1_500_000), worth);
     }
 
     @Test

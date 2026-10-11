@@ -16,15 +16,18 @@ import java.util.function.BooleanSupplier;
 import java.util.function.LongFunction;
 
 /**
- * The explorer's card for a system nobody had discovered before the commander arrived.
+ * The explorer's card for a system with something in it nobody had discovered before the commander: the
+ * whole system when the arrival star is new, or, in a system someone else found first, from the moment the
+ * FSS resolves a star or planet that is still uncharted.
  * <p>
  * It follows the survey as it goes:
  * <ol>
- *   <li>on arrival, before the honk, only the system name under a NEW DISCOVERY banner - nothing has
- *       been counted yet, so there is nothing else to say;</li>
+ *   <li>on arrival in a new system, before the honk, only the system name under a NEW DISCOVERY banner -
+ *       nothing has been counted yet, so there is nothing else to say;</li>
  *   <li>after the honk, the FSS progress: bodies found out of the bodies the honk counted, then what the
- *       system's data is estimated to sell for and what all the data in the ship is (see
- *       {@link elite.intel.gameapi.cartography.CartographicValue} for how far to trust the figures);</li>
+ *       system's data and finished organic samples are estimated to sell for, and what all the unsold data and
+ *       samples the commander carries are (see {@link elite.intel.gameapi.cartography.CartographicValue} for
+ *       how far to trust the cartographic figures);</li>
  *   <li>as the FSS resolves them, a line counting the stars - the arrival star among them, which is why the
  *       FSS bar starts at one - then a line per kind of find worth a detour (icy bodies, high metal content
  *       worlds, gas giants, bodies with geological signals), and a green line per body with life showing
@@ -38,8 +41,8 @@ import java.util.function.LongFunction;
  * the card. It is scoped to the system the commander is in, so leaving it clears the card and a plotted
  * route, ranked below it, takes over.
  * <p>
- * Derived on every poll from stored state - the primary star's discovery flag, the body rows the scans
- * wrote, the honk's count and the samples taken - so it reads the same after a restart.
+ * Derived on every poll from stored state - the bodies' discovery flags, the body rows the scans wrote,
+ * the honk's count and the samples taken - so it reads the same after a restart.
  */
 public class DiscoveryObjectiveSource implements HudObjectiveSource {
 
@@ -92,14 +95,14 @@ public class DiscoveryObjectiveSource implements HudObjectiveSource {
         Long systemAddress = here == null ? null : here.getSystemAddress();
         if (systemAddress == null || systemAddress == 0) return Optional.empty();
 
-        // The arrival scan of the primary star is what says nobody had been here. ScanEventSubscriber
+        // A scan that says nobody had charted the body is what earns the card - the arrival star's, or any
+        // star or planet the FSS resolves later in a system someone else found first. ScanEventSubscriber
         // already refuses the flag from a nav beacon or a populated system, where it cannot be believed.
-        LocationDto primaryStar = locationManager.findBySystemAddress(systemAddress);
-        if (primaryStar == null || !primaryStar.isOurDiscovery()) return Optional.empty();
+        List<LocationDto> bodies = locationManager.findBodies(systemAddress);
+        if (bodies.stream().noneMatch(LocationDto::isOurDiscovery)) return Optional.empty();
 
         if (atBodyWithSamplingToDo(systemAddress, here.getInGameId())) return Optional.empty();
 
-        List<LocationDto> bodies = locationManager.findBodies(systemAddress);
         Map<Long, List<BioSampleDto>> samplesByBody = new HashMap<>();
         for (LocationDto body : bodies) {
             if (hasLife(body) && body.getGenus() != null && !body.getGenus().isEmpty()) {
@@ -107,12 +110,32 @@ public class DiscoveryObjectiveSource implements HudObjectiveSource {
             }
         }
 
-        String systemName = primaryStar.getStarName() == null || primaryStar.getStarName().isBlank()
+        LocationDto primaryStar = locationManager.findBySystemAddress(systemAddress);
+        String systemName = primaryStar == null || primaryStar.getStarName() == null || primaryStar.getStarName().isBlank()
                 ? playerSession.getPrimaryStarName()
                 : primaryStar.getStarName();
         return Optional.of(card("discovery:" + systemAddress, systemName,
                 fssSurveys.find(systemAddress).orElse(null), bodies, samplesByBody,
-                worth.apply(systemAddress)));
+                withOrganics(worth.apply(systemAddress), systemName, exobiology.carriedSamples())));
+    }
+
+    /**
+     * The ship's cartographic data plus the organics the commander carries, so the two lines total the
+     * whole of the discovery work: Universal Cartographics and Vista Genomics are separate sales, but both
+     * are what the survey earned. A sample counts its first-discovery bonus only where the scan settled it
+     * was ours to claim.
+     *
+     * @param systemName the system whose samples join its value, matched on the star the sample was filed under
+     */
+    static CartographicDataManager.Worth withOrganics(CartographicDataManager.Worth cartographic, String systemName,
+                                                      List<BioSampleDto> carried) {
+        long system = 0, unsold = 0;
+        for (BioSampleDto sample : carried) {
+            long value = sample.getPayout() + sample.getFistDiscoveryBonus();
+            unsold += value;
+            if (systemName != null && systemName.equalsIgnoreCase(sample.getPrimaryStar())) system += value;
+        }
+        return new CartographicDataManager.Worth(cartographic.system() + system, cartographic.unsold() + unsold);
     }
 
     /**
@@ -131,7 +154,7 @@ public class DiscoveryObjectiveSource implements HudObjectiveSource {
      * @param survey        the honk's count, or null before the honk
      * @param bodies        the system's stars and planets on record, in body order
      * @param samplesByBody completed samples per BodyID, for the bodies a DSS has surveyed
-     * @param worth         what the exploration data in the ship is estimated to sell for
+     * @param worth         what the exploration data and organic samples carried are estimated to sell for
      */
     static HudObjective card(String id, String systemName, FssSurveyManager.Survey survey,
                              List<LocationDto> bodies, Map<Long, List<BioSampleDto>> samplesByBody,

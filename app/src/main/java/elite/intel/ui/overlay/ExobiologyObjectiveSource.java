@@ -106,6 +106,14 @@ public class ExobiologyObjectiveSource implements HudObjectiveSource {
     }
 
     /**
+     * Every finished sample the commander carries. Selling to Vista Genomics or dying clears them, so this is
+     * the unsold haul, not a career's worth.
+     */
+    List<BioSampleDto> carriedSamples() {
+        return bioSamplesManager.listAll();
+    }
+
+    /**
      * Finished samples recorded on this body. Scoped to the body rather than
      * reading every sample the commander has ever taken, which is a career-long
      * list and would be deserialised in full on each poll.
