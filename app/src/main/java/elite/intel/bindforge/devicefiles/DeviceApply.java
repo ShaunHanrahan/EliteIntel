@@ -77,6 +77,7 @@ public final class DeviceApply {
     private final Function<Set<String>, Report> push;
     private final BindsNames bindsNames;
     private final FrontierStockDevices stock;
+    private final BindForgeDeviceMasterManager master;
 
     /**
      * Promotes the stored draft and pushes to the stored installations.
@@ -86,26 +87,29 @@ public final class DeviceApply {
     public DeviceApply() throws IOException {
         this(BindForgeDeviceDraftManager.getInstance()::promote, new DeviceFilesPush()::push,
                 () -> BindsDeviceReferences.referenceCounts(PlayerSession.getInstance().getBindingsDir()).keySet(),
-                FrontierStockDevices.getInstance());
+                FrontierStockDevices.getInstance(), BindForgeDeviceMasterManager.getInstance());
     }
 
     /** @param bindsNames must throw rather than answer when it cannot be sure - a missing folder is not "none" */
     DeviceApply(Supplier<List<String>> promote, Function<Set<String>, Report> push, BindsNames bindsNames,
-                FrontierStockDevices stock) {
+                FrontierStockDevices stock, BindForgeDeviceMasterManager master) {
         this.promote = promote;
         this.push = push;
         this.bindsNames = bindsNames;
         this.stock = stock;
+        this.master = master;
     }
 
     public Result apply() {
         List<String> removed = promote.get();
-        BindForgeDeviceMasterManager master = BindForgeDeviceMasterManager.getInstance();
 
         Set<String> inMaster = master.findAll().stream().map(DeviceRow::deviceName).collect(Collectors.toSet());
         List<String> pending = master.pendingRemovals().stream().filter(name -> !inMaster.contains(name)).toList();
 
-        Split split = split(pending, readBindsNames());
+        // WHY: read only when it can decide something. Frontier's names never consult it, and most Applies remove
+        // nothing - reading it then is wasted, and its warning would describe a hold-back that never happened.
+        boolean anyUsersName = pending.stream().anyMatch(name -> !stock.ships(name));
+        Split split = split(pending, anyUsersName ? readBindsNames() : Optional.empty());
 
         Report report = push.apply(split.removals());
         List<String> cleanedUp = List.of();
@@ -134,6 +138,9 @@ public final class DeviceApply {
     /**
      * Which pending removals this Apply can carry out, and which wait for a {@code .binds} rewrite. Frontier's names
      * go either way: their element stays, and a label is nothing a binding needs.
+     *
+     * @param named the names {@code .binds} gives devices, or empty when they could not be read - or were not read,
+     *              because no name in {@code pending} is the user's
      */
     private Split split(List<String> pending, Optional<Set<String>> named) {
         Set<String> removals = new TreeSet<>();

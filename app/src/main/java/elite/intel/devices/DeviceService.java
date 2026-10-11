@@ -81,6 +81,7 @@ public class DeviceService {
 
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicBoolean available = new AtomicBoolean(false);
+    private final AtomicBoolean enumerated = new AtomicBoolean(false);
     private final AtomicBoolean mouseAvailable = new AtomicBoolean(false);
     // SDL button mask from the previous tick. Poll thread only.
     private int prevMouseMask;
@@ -112,6 +113,13 @@ public class DeviceService {
     // -------------------------------------------------------------------------
 
     public boolean isAvailable() { return available.get(); }
+
+    /**
+     * Whether the first look at the hardware is done - every controller present at start has been added to
+     * {@link #getConnectedDevices()}. {@link #isAvailable()} turns true before that, so an empty list while only it
+     * is true means "not looked yet", not "nothing plugged in". BindForge's missing-controller warning waits on this.
+     */
+    public boolean hasEnumerated() { return enumerated.get(); }
 
     /**
      * Whether mouse buttons are being read. False on a Wayland session or wherever the video subsystem
@@ -174,6 +182,7 @@ public class DeviceService {
                 for (int id : currentIds) {
                     if (knownIds.add(id)) onDeviceAdded(id);
                 }
+                enumerated.set(true);
 
                 Iterator<Integer> it = knownIds.iterator();
                 while (it.hasNext()) {
@@ -200,6 +209,7 @@ public class DeviceService {
             closeAllHandles();
             SDLInit.SDL_Quit();
             available.set(false);
+            enumerated.set(false);
             mouseAvailable.set(false);
             log.info("Device service stopped");
         }

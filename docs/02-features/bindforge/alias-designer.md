@@ -1291,6 +1291,13 @@ Alan answered five questions, one at a time:
 - **An unattached controller offers hats only up to the fourth**, the most DirectInput reports (`Joy_POV1`–`Joy_POV4`).
   A saved label naming a higher one is kept and written out, like a half-axis label, and builds no boxes.
 
+*Second review — 2026-10-11 (`code-integrity-review.md`, Alan):*
+
+- **Apply reads `.binds` only when a pending removal is the user's.** Frontier's names never consult it and most
+  Applies remove nothing, so the read was wasted — and when the folder was missing, its warning described a hold-back
+  that never happened.
+- **A stale CLEAR or undo shows its own message**, not wrapped in *"This could not be done"*.
+
 ## Renaming a Device
 
 A rename is **not** a single-field edit. The alias is the primary key of a three-link chain:
@@ -1381,7 +1388,7 @@ cannot fix that from outside, and a missing stick is usually a cable, not a conf
 **What it must not do** is treat an absent controller as a reason to change anything. An entry for hardware
 that is not plugged in stays exactly where it is — entries deliberately outlive hardware, which is what makes
 a stick work again when it is plugged back in. The
-[`ATTACHED` / `MISSING` column](#my-devices) is the standing version of this, and the startup line is the
+[`ATTACHED` / `MISSING` column](#my-devices) is the standing version of this, and the ~~startup line~~ one-time warning is the
 once-per-run version.
 
 #### Built — 2026-10-11 (Alan, A13)
@@ -1411,6 +1418,14 @@ warning, spoken and logged), triggered by `AliasDesignerPanel`. Alan answered th
   the folder readable, and without the counts every unplugged entry would be announced.
 - **Two rows under one name** — before first setup, an installation can still hold a stale PID — are one controller,
   and it is not missing when either is attached.
+
+*After review — 2026-10-11 (`code-integrity-review.md`, Alan):*
+
+- **"Running" is not "has listed the hardware."** The Device Service reports itself available before its first look at
+  the controllers, so a screen opened in that moment — just after launch, or after the services are restarted — would
+  have announced every bound stick as missing, and the one warning would have been the wrong one. The warning now
+  waits for `DeviceService.hasEnumerated()`, set after the poll loop's first pass and cleared at stop; until then it
+  says nothing and is kept, as with the service stopped.
 
 *Not to be confused with a **control** disappearing from the game itself — a different case, in the
 [version-bump merge](overview.md#what-the-startup-check-actually-decides).*

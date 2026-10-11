@@ -75,9 +75,12 @@ class MissingControllerWarningTest {
         assertFalse(warning.pending());
     }
 
-    /** With nothing looking at the hardware every controller reads absent - so nothing is said, and it waits. */
+    /**
+     * Until the Device Service has listed the hardware - stopped, or running but not through its first look yet -
+     * every controller reads absent. So nothing is said, and it waits.
+     */
     @Test
-    void aStoppedDeviceServiceSaysNothingAndKeepsItForLater() {
+    void hardwareNotYetListedSaysNothingAndKeepsItForLater() {
         MissingControllerWarning warning = warning(folder -> Map.of("LVWAP", 142));
 
         warning.judgeOnce(false, LVWAP_UNPLUGGED, BINDINGS);

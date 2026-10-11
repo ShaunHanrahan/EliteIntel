@@ -79,15 +79,17 @@ public final class MissingControllerWarning {
      * Judges the controllers once, if this run has not yet. Safe from any thread; meant for the refresh thread, since
      * reading {@code .binds} touches the disk.
      *
-     * @param deviceServiceRunning whether the Device Service could report controllers when {@code devices} was built
-     * @param devices              the My Devices rows from a refresh made after the screen was first shown
-     * @param bindingsFolder       the folder holding the shared {@code .binds}
+     * @param hardwareListed whether the Device Service was running and had finished its first look at the hardware
+     *                       when {@code devices} was built - {@code DeviceService.hasEnumerated()}
+     * @param devices        the My Devices rows from a refresh made after the screen was first shown
+     * @param bindingsFolder the folder holding the shared {@code .binds}
      */
-    public void judgeOnce(boolean deviceServiceRunning, List<MyDevice> devices, Path bindingsFolder) {
-        // WHY: not used up. With nothing looking at the hardware every controller reads absent, and the next showing
-        // of the screen may find the service running.
-        if (!deviceServiceRunning) {
-            log.info("Device service is not running, so missing controllers cannot be judged yet");
+    public void judgeOnce(boolean hardwareListed, List<MyDevice> devices, Path bindingsFolder) {
+        // WHY: not used up. Until the hardware is listed every controller still being enumerated reads absent - the
+        // service reports itself running a moment before that (review, 2026-10-11) - and the next showing of the
+        // screen may find it done.
+        if (!hardwareListed) {
+            log.info("The Device Service has not listed the controllers, so missing ones cannot be judged yet");
             return;
         }
         if (!given.compareAndSet(false, true)) return;

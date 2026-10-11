@@ -59,7 +59,7 @@ class DeviceApplyTest {
         DeviceApply.Result result = new DeviceApply(
                 () -> { order.add("promote"); return List.of("RVWAP"); },
                 removals -> { order.add("push"); return empty; },
-                Set::of, FrontierStockDevices.getInstance()).apply();
+                Set::of, FrontierStockDevices.getInstance(), master).apply();
 
         assertEquals(List.of("promote", "push"), order);
         assertEquals(List.of("RVWAP"), result.removed(), "what the draft removed is handed to the caller");
@@ -147,7 +147,7 @@ class DeviceApplyTest {
         draft.removeByName("LVWAP");
 
         DeviceApply.Result result = new DeviceApply(draft::promote, pusher(List.of(steam))::push,
-                () -> { throw new IOException("locked"); }, FrontierStockDevices.getInstance()).apply();
+                () -> { throw new IOException("locked"); }, FrontierStockDevices.getInstance(), master).apply();
 
         assertTrue(result.bindsUnread());
         assertEquals(List.of("LVWAP"), result.heldBack());
@@ -203,10 +203,26 @@ class DeviceApplyTest {
         draft.removeByName("T-Rudder");
 
         DeviceApply.Result result = new DeviceApply(draft::promote, pusher(List.of(steam))::push,
-                () -> { throw new IOException("locked"); }, FrontierStockDevices.getInstance()).apply();
+                () -> { throw new IOException("locked"); }, FrontierStockDevices.getInstance(), master).apply();
 
         assertFalse(result.bindsUnread(), "nothing was held back for it");
         assertEquals(List.of("T-Rudder"), result.cleanedUp());
+    }
+
+    /**
+     * Review, 2026-10-11: .binds is read only when a pending removal is the user's - otherwise it decides nothing, and
+     * a failed read would log a hold-back that never happened.
+     */
+    @Test
+    void bindingsAreNotReadWhenNoNameOfTheUsersIsPending() throws IOException {
+        Target steam = steamInstallation();
+        master.record("LVWAP", "3344", "83F4", true);
+        List<String> reads = new ArrayList<>();
+
+        new DeviceApply(draft::promote, pusher(List.of(steam))::push,
+                () -> { reads.add("read"); return Set.of(); }, FrontierStockDevices.getInstance(), master).apply();
+
+        assertTrue(reads.isEmpty());
     }
 
     private void lvwapAppliedTo(Target steam) {
@@ -218,7 +234,7 @@ class DeviceApplyTest {
 
     private DeviceApply.Result apply(List<Target> targets, Set<String> namedInBinds) {
         return new DeviceApply(draft::promote, pusher(targets)::push, () -> namedInBinds,
-                FrontierStockDevices.getInstance()).apply();
+                FrontierStockDevices.getInstance(), master).apply();
     }
 
     private DeviceFilesPush pusher(List<Target> targets) {

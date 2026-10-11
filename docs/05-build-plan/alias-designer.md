@@ -124,6 +124,13 @@ Whether Alias Designer writes it or hands it to the Bind Editor is undecided (Al
 *Newest first. Two or three lines each: what was decided and where it is recorded, what was found, what the
 next slice needs.*
 
+- **2026-10-11 — A13 and second A10 review fixes** (`code-integrity-review.md`, Alan: all six). Recorded under *After
+  review* in [built — A13](../02-features/bindforge/alias-designer.md#built--2026-10-11-alan-a13) and *Second review*
+  in [built — A10](../02-features/bindforge/alias-designer.md#built--2026-10-11-alan-a10): the warning waits for the
+  new `DeviceService.hasEnumerated()` (running is not listed); Apply reads `.binds` only for a user's pending name;
+  `DeviceApply` takes the master manager; a stale CLEAR shows its own message; `deviceServiceRunning` is set on the
+  EDT.
+
 - **2026-10-11 — A13 built** (Alan answered three questions, one at a time). Recorded in [built — A13](../02-features/bindforge/alias-designer.md#built--2026-10-11-alan-a13):
   only controllers `.binds` names; **not at Elite-Intel startup but the first time Alias Designer is shown** in the
   run; spoken and logged. **Found:** `AliasDesignerPanel.initData()` first runs at application start, possibly before
@@ -154,8 +161,7 @@ next slice needs.*
   before first setup the gear offers SET UP instead of the editor; unreadable axes show all eight; an axis rests
   where first seen; SAVE writes every box, but only edited or saved ones on a device the game draws with icons;
   CLEAR/RESET LABELS sits disabled in the footer's new middle place. SAVE closes the dialog. GAP 7 is built and in
-  the canon §10. **Tell Krondor:** `DeviceService` now polls hats (`DeviceHatEvent`) — a second change there after
-  A8b's. **A10 needs:** wire the disabled middle button in `DeviceEditorDialog.buildUi`; the draft holds saved labels
+  the canon §10. `DeviceService` now polls hats (`DeviceHatEvent`). **A10 needs:** wire the disabled middle button in `DeviceEditorDialog.buildUi`; the draft holds saved labels
   but the Alias column and install strip still read the master, so APPLY is what makes a save visible there. The
   Swing layout is untested by the suite — open the editor on a real stick.
 
@@ -163,8 +169,7 @@ next slice needs.*
   [which axes and hats a controller has](../02-features/bindforge/alias-designer.md#which-axes-and-hats-a-controller-has--2026-10-10-alan):
   labels fall back to all eight when the description's count disagrees with SDL's (`agreesWith` — **A9's AXES tab
   should use it too**); the Windows path check ignores case; the Linux parser follows the kernel on usage counts
-  and delimiters; `DeviceDescription` keeps axes sorted and unique. **Tell Krondor** that `DeviceService.onDeviceAdded`
-  gained a block, before his next `master` merge, so a conflict there is resolved knowingly.
+  and delimiters; `DeviceDescription` keeps axes sorted and unique.
 
 - **2026-10-10 — A8b built** (Alan chose six design answers, one at a time). Recorded in [which axes and hats a
   controller has](../02-features/bindforge/alias-designer.md#which-axes-and-hats-a-controller-has--2026-10-10-alan):

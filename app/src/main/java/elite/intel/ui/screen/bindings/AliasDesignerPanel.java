@@ -168,6 +168,7 @@ public class AliasDesignerPanel extends JPanel {
      * Device Service had listed it, so it is never the one that judges.
      */
     private final AtomicBoolean missingWarningWanted = new AtomicBoolean();
+    /** Whether the Device Service was running at the last refresh. Written and read on the EDT only. */
     private boolean deviceServiceRunning;
     private final InstallationDeviceScanner deviceScanner = new InstallationDeviceScanner();
     private JButton setUpButton;
@@ -327,6 +328,8 @@ public class AliasDesignerPanel extends JPanel {
             Markers markers = Markers.NONE;
             boolean empty = false;
             List<String> changes = List.of();
+            // WHY: null until read, so a refresh that failed before the hardware leaves the last answer on screen.
+            Boolean running = null;
             try {
                 empty = BindForgeDeviceMasterManager.getInstance().findAll().isEmpty();
                 changes = DraftChanges.stored();
@@ -337,15 +340,16 @@ public class AliasDesignerPanel extends JPanel {
                 recordWhatEachInstallationHolds(rows);
                 divergence = divergenceFor(rows);
                 Map<String, List<DeviceEntry>> entries = entriesByInstall(rows);
-                List<Device> attached = readAttached();
-                myDevices = readMyDevices(attached, entries);
-                builtIn = BuiltInDeviceList.build(FrontierStockDevices.getInstance(), attached);
+                Attached attached = readAttached();
+                running = attached.running();
+                myDevices = readMyDevices(attached.devices(), entries);
+                builtIn = BuiltInDeviceList.build(FrontierStockDevices.getInstance(), attached.devices());
                 // WHY: only against a master. Before first setup M, not added and the divergence colour mean
                 // nothing, and the column is left out rather than filled with an invented state.
                 if (divergence.report() != null) markers = markersFor(rows, entries, myDevices, divergence.findings());
                 // WHY: last, so nothing it does can cost the screen what this refresh has already read.
                 if (judgeMissing) {
-                    MissingControllerWarning.getInstance().judgeOnce(deviceServiceRunning, myDevices,
+                    MissingControllerWarning.getInstance().judgeOnce(attached.listed(), myDevices,
                             PlayerSession.getInstance().getBindingsDir());
                 }
             } catch (RuntimeException e) {
@@ -361,7 +365,9 @@ public class AliasDesignerPanel extends JPanel {
             Markers loadedMarkers = markers;
             boolean loadedEmpty = empty;
             List<String> loadedChanges = changes;
+            Boolean loadedRunning = running;
             SwingUtilities.invokeLater(() -> {
+                if (loadedRunning != null) deviceServiceRunning = loadedRunning;
                 installLabels = loadedLabels;
                 installPaths = loadedPaths;
                 masterEmpty = loadedEmpty;
@@ -754,14 +760,26 @@ public class AliasDesignerPanel extends JPanel {
      * half a list and no built-in can read attached, and both views say so on screen rather than leaving an
      * absence to be mistaken for "nothing is plugged in".
      */
-    private List<Device> readAttached() {
+    private Attached readAttached() {
         DeviceService service = DeviceService.getInstance();
-        deviceServiceRunning = service.isAvailable();
-        if (!deviceServiceRunning) {
+        // WHY: read before the list, so "listed" vouches for a list taken after the first enumeration finished.
+        boolean listed = service.hasEnumerated();
+        boolean running = service.isAvailable();
+        if (!running) {
             log.info("Device service is not running, so no controllers can be read - the list will show only "
                     + "what the installations' files name");
         }
-        return deviceServiceRunning ? service.getConnectedDevices() : List.of();
+        return new Attached(running ? service.getConnectedDevices() : List.of(), running, running && listed);
+    }
+
+    /**
+     * The controllers one refresh read, and what that read can vouch for.
+     *
+     * @param running whether the Device Service was running, which the device views show
+     * @param listed  whether it had finished its first look at the hardware, so an absent controller is really absent
+     *                - it is running a moment before that (review, 2026-10-11)
+     */
+    private record Attached(List<Device> devices, boolean running, boolean listed) {
     }
 
     /**

@@ -485,31 +485,33 @@ final class DeviceEditorDialog extends JDialog {
      * everything again. A write that changed nothing ({@code false}) is reported, not closed on in silence: the device
      * changed since the dialog opened, an Apply having run meanwhile, say (review, 2026-10-11).
      *
-     * @param failedKey the message for a failure, taking the reason as its argument
+     * @param failedKey the message for a write that threw, taking the reason as its argument. A stale device has its
+     *                  own message, shown alone - wrapped in this one it would say "could not be done" and "nothing
+     *                  was done" in one breath (review, 2026-10-11)
      */
     private void runAndClose(BooleanSupplier work, String failedKey) {
         busy = true;
         middle.setEnabled(false);
         refreshDirty();
         new Thread(() -> {
-            String failure = null;
+            String message = null;
             try {
                 if (!work.getAsBoolean()) {
-                    failure = getText("bindings.aliasDesigner.editor.stale", opening.deviceName());
+                    message = getText("bindings.aliasDesigner.editor.stale", opening.deviceName());
                 }
             } catch (RuntimeException e) {
                 // WHY: broad on purpose - a thread boundary, and the user pressed the button and must be told.
                 log.warn("The Device Editor could not change {}", opening.deviceName(), e);
-                failure = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+                message = getText(failedKey, e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
             }
-            String loadedFailure = failure;
+            String loadedMessage = message;
             SwingUtilities.invokeLater(() -> {
                 busy = false;
-                if (loadedFailure != null) {
+                if (loadedMessage != null) {
                     middle.setEnabled(opening.middle().enabled());
                     refreshDirty();
                     HudConfirmDialog.info(this, getText("bindings.aliasDesigner.editor.heading"),
-                            getText(failedKey, loadedFailure), getText("bindings.aliasDesigner.firstSetup.close"));
+                            loadedMessage, getText("bindings.aliasDesigner.firstSetup.close"));
                     return;
                 }
                 dispose();
