@@ -23,6 +23,7 @@ import elite.intel.bindforge.devices.DeviceEditorInputs;
 import elite.intel.bindforge.devices.DeviceEditorMiddle;
 import elite.intel.bindforge.devices.DeviceIdentities;
 import elite.intel.bindforge.devices.InstallationMarkers;
+import elite.intel.bindforge.devices.MissingControllerWarning;
 import elite.intel.bindforge.devices.MyDevice;
 import elite.intel.bindforge.devices.MyDeviceList;
 import elite.intel.bindforge.install.GameInstallation;
@@ -55,6 +56,7 @@ import javax.swing.table.TableCellEditor;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
 import java.awt.*;
+import java.awt.event.HierarchyEvent;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -106,6 +108,9 @@ import static elite.intel.ui.theme.HudPalette.HUD_TABLE_ROW_HEIGHT;
  * and the draft's changes to every installation and reports per installation; it is offered whenever the master
  * exists, since Apply with nothing saved is the retry after a partial one. DISCARD throws the whole draft away and
  * is offered only when the draft changes something, which the line beside it names.
+ * <p>
+ * <strong>The first time it is shown in a run, it says which named controllers are missing</strong> - those the
+ * bindings name, spoken and logged, once (Alan, 2026-10-11, A13; {@link MissingControllerWarning}).
  */
 public class AliasDesignerPanel extends JPanel {
 
@@ -157,6 +162,12 @@ public class AliasDesignerPanel extends JPanel {
     /** The My Devices rows, in table order - the gear opens the one it sits on. */
     private List<MyDevice> currentMyDevices = List.of();
     private final AtomicBoolean refreshInProgress = new AtomicBoolean();
+    /**
+     * Set when the screen is shown while this run's missing-controller warning is still to come, and taken by the next
+     * refresh to start. A refresh already running when the screen appeared may have read the hardware before the
+     * Device Service had listed it, so it is never the one that judges.
+     */
+    private final AtomicBoolean missingWarningWanted = new AtomicBoolean();
     private boolean deviceServiceRunning;
     private final InstallationDeviceScanner deviceScanner = new InstallationDeviceScanner();
     private JButton setUpButton;
@@ -175,6 +186,15 @@ public class AliasDesignerPanel extends JPanel {
     AliasDesignerPanel(InstallationRegistry registry) {
         this.registry = registry;
         buildUi();
+        // WHY: the first time the user opens this screen in a run, not at startup (Alan, 2026-10-11, A13). initData()
+        // first runs as the application starts, before the Device Service has looked at any hardware, so this asks
+        // for a refresh of its own and the warning judges that one.
+        addHierarchyListener(event -> {
+            if ((event.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) == 0 || !isShowing()) return;
+            if (!MissingControllerWarning.getInstance().pending()) return;
+            missingWarningWanted.set(true);
+            initData();
+        });
     }
 
     private void buildUi() {
@@ -298,6 +318,7 @@ public class AliasDesignerPanel extends JPanel {
     public void initData() {
         if (!refreshInProgress.compareAndSet(false, true)) return;
         new Thread(() -> {
+            boolean judgeMissing = missingWarningWanted.getAndSet(false);
             Map<String, String> labels = Map.of();
             Map<String, String> paths = Map.of();
             Divergence divergence = new Divergence(null, List.of());
@@ -322,6 +343,11 @@ public class AliasDesignerPanel extends JPanel {
                 // WHY: only against a master. Before first setup M, not added and the divergence colour mean
                 // nothing, and the column is left out rather than filled with an invented state.
                 if (divergence.report() != null) markers = markersFor(rows, entries, myDevices, divergence.findings());
+                // WHY: last, so nothing it does can cost the screen what this refresh has already read.
+                if (judgeMissing) {
+                    MissingControllerWarning.getInstance().judgeOnce(deviceServiceRunning, myDevices,
+                            PlayerSession.getInstance().getBindingsDir());
+                }
             } catch (RuntimeException e) {
                 // WHY: broad on purpose. This is a thread boundary, and an exception escaping it would kill
                 // the thread silently and leave the table showing whatever it showed before, with no clue why.
@@ -347,6 +373,8 @@ public class AliasDesignerPanel extends JPanel {
                 currentReport = loadedDivergence.report();
                 showFindings(loadedDivergence.findings());
                 refreshInProgress.set(false);
+                // WHY: the screen was shown while this refresh was already running, which did not take the request.
+                if (missingWarningWanted.get()) initData();
             });
         }, "BindForge-Divergence").start();
     }

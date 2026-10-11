@@ -1370,7 +1370,7 @@ installation is detected, the draft starts empty and any connected devices are a
 
 ### A missing controller is worth exactly one warning — settled 2026-09-24
 
-**Elite-Intel says once, at startup, which named controllers are not attached** — *"controller such and such
+**Elite-Intel says once, ~~at startup~~ the first time Alias Designer is opened in a run *(2026-10-11, below)*, which named controllers are not attached** — *"controller such and such
 is missing"* — and then waits and sees. Nothing is changed, nothing is repaired, and the message is not
 repeated.
 
@@ -1383,6 +1383,34 @@ that is not plugged in stays exactly where it is — entries deliberately outliv
 a stick work again when it is plugged back in. The
 [`ATTACHED` / `MISSING` column](#my-devices) is the standing version of this, and the startup line is the
 once-per-run version.
+
+#### Built — 2026-10-11 (Alan, A13)
+
+Built as `bindforge.devices.MissingControllers` (who is named — pure) and `MissingControllerWarning` (the one
+warning, spoken and logged), triggered by `AliasDesignerPanel`. Alan answered three questions, one at a time:
+
+- **Only controllers `.binds` names.** A named controller that is not attached is mentioned only when a binding
+  names it (`BindsDeviceReferences.referenceCounts`, ignoring case) — the reason to warn at all is bindings that will
+  not load, and an entry for hardware sold years ago would otherwise be announced on every run. "Named" is the
+  master's name, or before first setup the installation's entry name. A Frontier name is never mentioned; that is
+  judged by name, not by VID/PID, so a user's element shadowing a built-in still counts as the user's.
+- **Not at Elite-Intel startup — the first time the user opens Alias Designer** in the run. The Device Service has
+  been listing controllers since launch; BindForge says nothing until the user comes to it. The screen's first showing
+  starts a refresh of its own, and the warning judges that one: the screen's refresh at application start can run
+  before any hardware has been listed.
+- **Spoken and logged**, as the other one-time checks are: one spoken line naming the controllers, and one log line
+  each with how many bindings name it — *"Controller LVWAP is not connected - 142 bindings name it"*.
+
+*Also settled while building it:*
+
+- **Once per run is once per Elite-Intel process.** Nothing missing uses the warning up too: a stick unplugged later
+  is the `MISSING` column's to show.
+- **With the Device Service not running nothing is said, and the warning is kept** for the next time the screen is
+  shown — with nothing looking, every controller reads absent.
+- **When `.binds` cannot be read nothing is said, and the warning is used up**: showing the screen again does not make
+  the folder readable, and without the counts every unplugged entry would be announced.
+- **Two rows under one name** — before first setup, an installation can still hold a stale PID — are one controller,
+  and it is not missing when either is attached.
 
 *Not to be confused with a **control** disappearing from the game itself — a different case, in the
 [version-bump merge](overview.md#what-the-startup-check-actually-decides).*

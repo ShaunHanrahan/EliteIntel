@@ -29,6 +29,7 @@ data; most of what the spec describes is still ahead.
 | Startup `.buttonMap` (A8) | `bindforge.devicefiles.ButtonMapGeneration` (per installation, create-only), `ButtonMapLabels` (the generated labels: buttons, the axes the controller has — all eight when unknown — and four per hat); `bindforge.devices.ButtonMapStartup` runs it on every connect, started as `BUTTON_MAP_STARTUP` in `AppController` |
 | Device Editor (A9) | `ui.screen.bindings.DeviceEditorDialog`, opened by the gear column on My Devices in `AliasDesignerPanel` (`GearCell`, copied from `CommanderTabPanel`); `bindforge.devices.DeviceEditorInputs` (boxes, defaults, what SAVE writes) and `DeviceEditorLights` (highlighting), both pure; `BindForgeDeviceDraftManager.saveLabels`; `FrontierStockDevices.gameDrawsIt`; `devices.events.DeviceHatEvent`, polled in `DeviceService`; the footer's middle place and unsaved hint in `HudModalSpec` |
 | Actions (A10) | `bindforge.devices.DeviceEditorMiddle` (CLEAR / RESET LABELS / their undo, and when refused — pure), wired in `DeviceEditorDialog`; `BindForgeDeviceDraftManager.removeByName`, `restoreFromMaster`, `stored`; APPLY and DISCARD in `AliasDesignerPanel`'s footer, calling `DeviceApply` (removals held back while `.binds` names them; cleared once every installation took them); `DeviceFilesPush.push(Set)` and `DeviceMappingsMerge.remove`; `FrontierStockButtonMaps.shippedContent`; `BindsDeviceReferences.referenceCounts`; `bindforge.devicefiles.DraftChanges` (does the draft change anything — pure) |
+| Missing-controller warning (A13) | `bindforge.devices.MissingControllers` (who is named, pure), `MissingControllerWarning` (once per process, spoken and logged); triggered by `AliasDesignerPanel`'s first showing, which starts its own refresh (`missingWarningWanted`); `speech.missingController(s)` in the nine `gui*.properties` |
 | Which axes and hats (A8b) | `elite.intel.devices.model.DeviceDescription` (axes by game slot, `axesWithoutSlot`, SDL's numbering via `axisAt`, hat count) and `GameAxis`; `devices.hid.DeviceDescriber` reads it at connect — `WindowsHidUsages` (`hid.dll`), `LinuxHidUsages` + `HidReportDescriptor` (`/sys`), `AxisSlots` (pure rules); `DeviceService.description(deviceId)` |
 | Divergence list (A3) | `DeviceDivergence.againstMaster` (pure; each installation against the master, from `DeviceFilesCheck`), `DeviceDivergenceScanner.scanAgainstMaster` (adds orphans and `.binds`), `BindsDeviceReferences`, `ButtonMapAudit`. Before first setup, `DeviceDivergence.rank` still compares installations with each other |
 | Ways out per row (A3b) | `bindforge.devicefiles.DivergenceWaysOut` (which ways a row gets, pure), `DeviceFilesAdopt.adopt(installId, deviceName)` (one device) and `adoptLabels` (the re-merge), `LabelReMerge` (master plus installations as `LabelMerge` sides); buttons beneath the list in `AliasDesignerPanel`, each confirmed. Revert is `DeviceFilesPush.push(installId)` |
@@ -109,10 +110,10 @@ installations with each other before then. Once the master exists, each row offe
 | A10 | **Actions** — DISCARD of the whole draft (if any), CLEAR, RESET LABELS, APPLY, reported per installation. *SAVE moved to A9 (2026-10-10).* Unlocks [Core C6](core.md#slices), the exit prompt, which needs an editor holding unsaved edits. **RESET LABELS must delete the `.buttonMap` in every installation**, or A8 never regenerates it | A9 (done) | **done 2026-10-11** |
 | A11 | **Rename** — every installation first, `.binds` last, all or nothing | A10 (done) | **blocked** — its `.binds` rewrite is `bindforge.io`; waits on the question in the README |
 | A12 | **When hardware changes** — a missing device, the identity question, retarget, one missing device at a time | A11 | waiting |
-| A13 | **The missing-controller warning**, once per run | — | **next** — the one slice here not blocked |
+| A13 | **The missing-controller warning**, once per run | — | **done 2026-10-11** |
 
-**A13 needs nothing from Core** — and with A11 and A6b both waiting on the `.binds` rewrite, it is the section's
-only unblocked slice. **Core C6** is unblocked by A10 as well.
+**No slice here is next.** A6b and A11 wait on the `.binds` rewrite, and A7 and A12 wait on them. The unblocked work
+is [Core C6](core.md#slices), the exit prompt, which A10 unblocked.
 
 **One `.binds` rewrite unblocks three slices:** A6b's hex case, A11's rename, and CLEAR on a device `.binds` names
 (refused until then — [the rule](../02-features/bindforge/alias-designer.md#an-edit-binds-depends-on-updates-binds--2026-10-11-alan)).
@@ -122,6 +123,13 @@ Whether Alias Designer writes it or hands it to the Bind Editor is undecided (Al
 
 *Newest first. Two or three lines each: what was decided and where it is recorded, what was found, what the
 next slice needs.*
+
+- **2026-10-11 — A13 built** (Alan answered three questions, one at a time). Recorded in [built — A13](../02-features/bindforge/alias-designer.md#built--2026-10-11-alan-a13):
+  only controllers `.binds` names; **not at Elite-Intel startup but the first time Alias Designer is shown** in the
+  run; spoken and logged. **Found:** `AliasDesignerPanel.initData()` first runs at application start, possibly before
+  the Device Service has listed anything — so the first showing starts its own refresh and the warning judges that
+  one. Device Service down keeps the warning; unreadable `.binds` uses it up. The Swing trigger is untested by the
+  suite — unplug a bound stick, open the tab twice, hear one line. **Next:** nothing here is unblocked; Core C6 is.
 
 - **2026-10-11 — A9/A10 review fixes** (`code-integrity-review.md`, Alan: all but #4). Recorded under *After review*
   in [built — A10](../02-features/bindforge/alias-designer.md#built--2026-10-11-alan-a10): a reset built-in is applied
