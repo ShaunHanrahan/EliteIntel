@@ -30,7 +30,8 @@ import java.util.Map;
  */
 public final class ButtonMapLabels {
 
-    private static final String[] HAT_DIRECTIONS = {"Up", "Right", "Down", "Left"};
+    /** A hat's four directions, in the spec's order - also the order of SDL's hat bits, 1, 2, 4 and 8. */
+    public static final List<String> HAT_DIRECTIONS = List.of("Up", "Right", "Down", "Left");
 
     private ButtonMapLabels() {
     }
@@ -43,21 +44,47 @@ public final class ButtonMapLabels {
     public static Map<String, String> generate(int buttonCount, int axisCount, DeviceDescription description) {
         Map<String, String> labels = new LinkedHashMap<>();
         for (int button = 1; button <= buttonCount; button++) {
-            labels.put("Joy_" + button, "Button " + button);
+            labels.put(buttonToken(button), buttonLabel(button));
         }
         for (GameAxis axis : axesToLabel(axisCount, description)) {
-            labels.put(axis.token(), axis.name() + " Axis");
+            labels.put(axis.token(), axisLabel(axis));
         }
         for (int hat = 1; hat <= description.hatCount(); hat++) {
             for (String direction : HAT_DIRECTIONS) {
-                labels.put("Joy_POV" + hat + direction, "Hat " + hat + " " + direction);
+                labels.put(hatToken(hat, direction), hatLabel(hat, direction));
             }
         }
         return labels;
     }
 
-    private static List<GameAxis> axesToLabel(int axisCount, DeviceDescription description) {
+    /**
+     * The axes a controller is labelled for: those its description names when it agrees with SDL's count, and all
+     * eight when it does not - the rule the Device Editor's AXES tab follows too (Alan, 2026-10-10, A9).
+     */
+    public static List<GameAxis> axesToLabel(int axisCount, DeviceDescription description) {
         if (description.agreesWith(axisCount)) return description.axes();
         return axisCount > 0 ? Arrays.asList(GameAxis.values()) : List.of();
+    }
+
+    /** {@code Joy_14} - 1-based, as the game numbers buttons. */
+    public static String buttonToken(int button) {
+        return "Joy_" + button;
+    }
+
+    public static String buttonLabel(int button) {
+        return "Button " + button;
+    }
+
+    public static String axisLabel(GameAxis axis) {
+        return axis.name() + " Axis";
+    }
+
+    /** {@code Joy_POV1Up} - hats 1-based, as the game numbers them. */
+    public static String hatToken(int hat, String direction) {
+        return "Joy_POV" + hat + direction;
+    }
+
+    public static String hatLabel(int hat, String direction) {
+        return "Hat " + hat + " " + direction;
     }
 }

@@ -16,6 +16,8 @@ import elite.intel.bindforge.devicefiles.InstallationDeviceScanner;
 import elite.intel.bindforge.devicefiles.LabelReMerge;
 import elite.intel.bindforge.devices.BuiltInDevice;
 import elite.intel.bindforge.devices.BuiltInDeviceList;
+import elite.intel.bindforge.devices.DeviceEditorInputs;
+import elite.intel.bindforge.devices.DeviceIdentities;
 import elite.intel.bindforge.devices.InstallationMarkers;
 import elite.intel.bindforge.devices.MyDevice;
 import elite.intel.bindforge.devices.MyDeviceList;
@@ -23,12 +25,18 @@ import elite.intel.bindforge.install.GameInstallation;
 import elite.intel.bindforge.install.InstallationRegistry;
 import elite.intel.bindforge.install.WindowsGameInstallationProvider;
 import elite.intel.db.dao.BindForgeInstallationsDao.InstallationRow;
+import elite.intel.db.dao.BindForgeDeviceDraftDao.DraftRow;
+import elite.intel.db.dao.BindForgeDeviceMasterDao.DeviceRow;
+import elite.intel.db.managers.BindForgeDeviceDraftManager;
 import elite.intel.db.managers.BindForgeDeviceMasterManager;
 import elite.intel.devices.DeviceService;
 import elite.intel.devices.model.Device;
+import elite.intel.devices.model.DeviceDescription;
+import elite.intel.devices.model.DeviceIdentity;
 import elite.intel.session.PlayerSession;
 import elite.intel.ui.dialog.HudConfirmDialog;
 import elite.intel.ui.theme.AppTheme;
+import elite.intel.ui.theme.HudGlyphs;
 import elite.intel.ui.theme.HudPalette;
 import elite.intel.ui.widget.HudFooter;
 import elite.intel.ui.widget.HudPanel;
@@ -39,10 +47,14 @@ import org.apache.logging.log4j.Logger;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableCellEditor;
+import javax.swing.table.TableCellRenderer;
+import javax.swing.table.TableColumn;
 import java.awt.*;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.EventObject;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -57,6 +69,8 @@ import java.util.stream.Collectors;
 import static elite.intel.ui.i18n.MultiLingualTextProvider.getText;
 import static elite.intel.ui.theme.AppTheme.*;
 import static elite.intel.ui.theme.HudPalette.HUD_COLOR_ROLE_APPLICATION_BACKGROUND;
+import static elite.intel.ui.theme.HudPalette.HUD_ICON_TABLE;
+import static elite.intel.ui.theme.HudPalette.HUD_TABLE_ROW_HEIGHT;
 
 /**
  * Alias Designer, being built in stages: My Devices above the divergence list, and first setup opened from here
@@ -79,7 +93,9 @@ import static elite.intel.ui.theme.HudPalette.HUD_COLOR_ROLE_APPLICATION_BACKGRO
  * <strong>Built-in Devices is the second view of the device list</strong>, a tab beside My Devices: Frontier's
  * shipped entries from the reference in the jar, read-only, with the divergence list beneath both (Alan, 2026-10-08).
  * <p>
- * Still to come: the one-record editor.
+ * <strong>A gear ends every My Devices row</strong> and opens the Device Editor for that device - the one record,
+ * edited in a dialog and saved to the draft (Alan, 2026-10-10). Before first setup it says SET UP comes first and
+ * offers it: first setup throws any draft away as it fills the master, so edits saved before then would be lost.
  */
 public class AliasDesignerPanel extends JPanel {
 
@@ -126,6 +142,10 @@ public class AliasDesignerPanel extends JPanel {
     private DeviceFilesCheck.Report currentReport;
     private JPanel waysOutPanel;
     private Map<String, String> installLabels = Map.of();
+    /** Each installation's folder, keyed as findings key them - for the Device Editor's install strip. */
+    private Map<String, String> installPaths = Map.of();
+    /** The My Devices rows, in table order - the gear opens the one it sits on. */
+    private List<MyDevice> currentMyDevices = List.of();
     private final AtomicBoolean refreshInProgress = new AtomicBoolean();
     private boolean deviceServiceRunning;
     private final InstallationDeviceScanner deviceScanner = new InstallationDeviceScanner();
@@ -172,7 +192,7 @@ public class AliasDesignerPanel extends JPanel {
             if (!e.getValueIsAdjusting()) showWaysOut();
         });
 
-        myDevicesModel = new ReadOnlyTableModel(myDevicesColumnNames(List.of()), 0);
+        myDevicesModel = new MyDevicesTableModel(myDevicesColumnNames(List.of()));
         myDevicesTable = new JTable(myDevicesModel);
         myDevicesTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         HudTable.style(myDevicesTable);
@@ -239,6 +259,7 @@ public class AliasDesignerPanel extends JPanel {
         if (!refreshInProgress.compareAndSet(false, true)) return;
         new Thread(() -> {
             Map<String, String> labels = Map.of();
+            Map<String, String> paths = Map.of();
             Divergence divergence = new Divergence(null, List.of());
             List<MyDevice> myDevices = List.of();
             List<BuiltInDevice> builtIn = List.of();
@@ -248,6 +269,8 @@ public class AliasDesignerPanel extends JPanel {
                 empty = BindForgeDeviceMasterManager.getInstance().findAll().isEmpty();
                 List<InstallationRow> rows = registry.currentWithStartupScan();
                 labels = labelsFor(rows);
+                paths = rows.stream().collect(Collectors.toMap(AliasDesignerPanel::keyOf, InstallationRow::rootPath,
+                        (first, second) -> first, LinkedHashMap::new));
                 recordWhatEachInstallationHolds(rows);
                 divergence = divergenceFor(rows);
                 Map<String, List<DeviceEntry>> entries = entriesByInstall(rows);
@@ -263,6 +286,7 @@ public class AliasDesignerPanel extends JPanel {
                 log.warn("Could not refresh the divergence list", e);
             }
             Map<String, String> loadedLabels = labels;
+            Map<String, String> loadedPaths = paths;
             Divergence loadedDivergence = divergence;
             List<MyDevice> loadedMyDevices = myDevices;
             List<BuiltInDevice> loadedBuiltIn = builtIn;
@@ -270,6 +294,7 @@ public class AliasDesignerPanel extends JPanel {
             boolean loadedEmpty = empty;
             SwingUtilities.invokeLater(() -> {
                 installLabels = loadedLabels;
+                installPaths = loadedPaths;
                 masterEmpty = loadedEmpty;
                 setUpButton.setEnabled(masterEmpty);
                 showMyDevices(loadedMyDevices, loadedMarkers);
@@ -683,11 +708,14 @@ public class AliasDesignerPanel extends JPanel {
         List<String> names = new ArrayList<>();
         DEVICE_COLUMN_KEYS.forEach(key -> names.add(getText(key)));
         markerInstalls.forEach(install -> names.add(installLabels.getOrDefault(install, install)));
+        // WHY: the gear is last, after the Installations columns, and on every row (spec, My Devices).
+        names.add("");
         return names.toArray(String[]::new);
     }
 
     private void showMyDevices(List<MyDevice> devices, Markers markers) {
         currentMarkers = markers;
+        currentMyDevices = devices;
         myDevicesModel.setRowCount(0);
         // WHY: the column set follows the installations, which can be added or removed between refreshes.
         myDevicesModel.setColumnIdentifiers(myDevicesColumnNames(markers.installs()));
@@ -704,6 +732,7 @@ public class AliasDesignerPanel extends JPanel {
                 Map<String, InstallationMarkers.Marker> deviceMarkers = markers.perDevice().get(i);
                 markers.installs().forEach(install -> cells.add(markerText(deviceMarkers.get(install))));
             }
+            while (cells.size() < myDevicesModel.getColumnCount()) cells.add("");
             myDevicesModel.addRow(cells.toArray());
         }
         // WHY: said in the table rather than only in the log. An empty list because nothing is plugged in and
@@ -713,6 +742,106 @@ public class AliasDesignerPanel extends JPanel {
             myDevicesModel.addRow(new Object[]{getText("bindings.aliasDesigner.deviceService.stopped")});
         }
         HudTable.fitColumnsToContent(myDevicesTable, MAX_COLUMN_WIDTH);
+        // WHY: after the columns are rebuilt - setColumnIdentifiers makes new ones, without the gear's renderer.
+        TableColumn gear = myDevicesTable.getColumnModel().getColumn(myDevicesModel.getColumnCount() - 1);
+        gear.setCellRenderer(new GearRenderer());
+        gear.setCellEditor(new GearEditor());
+        gear.setPreferredWidth(HUD_TABLE_ROW_HEIGHT + 4);
+        gear.setMaxWidth(HUD_TABLE_ROW_HEIGHT + 10);
+    }
+
+    /**
+     * Opens the Device Editor for one My Devices row. Before first setup there is no master for its edits to be saved
+     * against - first setup throws any draft away - so it says SET UP comes first, and offers it (Alan, 2026-10-10).
+     */
+    private void openDeviceEditor(int row) {
+        if (row < 0 || row >= currentMyDevices.size()) return;
+        if (currentReport == null) {
+            if (HudConfirmDialog.confirm(this, getText("bindings.aliasDesigner.editor.heading"),
+                    getText("bindings.aliasDesigner.editor.beforeSetUp.message"),
+                    getText("bindings.aliasDesigner.firstSetup.button"),
+                    getText("button.back"))) {
+                openFirstSetup();
+            }
+            return;
+        }
+        MyDevice device = currentMyDevices.get(row);
+        Map<String, InstallationMarkers.Marker> markers =
+                row < currentMarkers.perDevice().size() ? currentMarkers.perDevice().get(row) : Map.of();
+        List<DeviceEditorDialog.StripLine> strip = currentMarkers.installs().stream()
+                .map(install -> new DeviceEditorDialog.StripLine(installLabels.getOrDefault(install, install),
+                        markers.get(install), installPaths.getOrDefault(install, "")))
+                .toList();
+        new Thread(() -> {
+            DeviceEditorDialog.Opening opening = null;
+            String failure = null;
+            try {
+                opening = openingFor(device, strip);
+            } catch (RuntimeException e) {
+                // WHY: broad on purpose - a thread boundary, and the user pressed the gear and must be told.
+                log.warn("The Device Editor could not read {}", device.label(), e);
+                failure = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+            }
+            DeviceEditorDialog.Opening loaded = opening;
+            String loadedFailure = failure;
+            SwingUtilities.invokeLater(() -> {
+                if (loaded == null) {
+                    HudConfirmDialog.info(this, getText("bindings.aliasDesigner.editor.heading"),
+                            getText("bindings.aliasDesigner.editor.loadFailed", loadedFailure),
+                            getText("bindings.aliasDesigner.firstSetup.close"));
+                    return;
+                }
+                new DeviceEditorDialog(this, loaded, this::initData).showDialog();
+            });
+        }, "BindForge-DeviceEditorRead").start();
+    }
+
+    /**
+     * What the Device Editor opens with. The name is the master's, or Frontier's for a built-in the master does not
+     * hold; with neither, the device has no name yet. The labels are the draft's when it holds the device - SAVE
+     * writes there - and the master's otherwise. The inputs are the controller's when it is attached, read by which
+     * axis they are, and the ones its labels name when it is not.
+     */
+    private static DeviceEditorDialog.Opening openingFor(MyDevice device, List<DeviceEditorDialog.StripLine> strip) {
+        FrontierStockDevices stock = FrontierStockDevices.getInstance();
+        String name = device.alias() != null
+                ? device.alias()
+                : device.builtIn() ? stock.covering(device.vid(), device.pid()).map(DeviceEntry::name).orElse(null)
+                : null;
+        Map<String, String> saved = name == null ? Map.of() : storedLabels(name);
+
+        Device live = device.attached() ? attachedController(device.hardware()) : null;
+        DeviceDescription description = live == null
+                ? null
+                : DeviceService.getInstance().description(live.id()).orElse(DeviceDescription.axesUnknown(0));
+        DeviceEditorInputs inputs = live == null
+                ? DeviceEditorInputs.ofSavedLabels(saved)
+                : DeviceEditorInputs.ofController(live.buttonCount(), live.axisCount(), description);
+        return new DeviceEditorDialog.Opening(device, name, live == null ? null : live.id(), description, inputs,
+                saved, name != null && stock.gameDrawsIt(name), strip);
+    }
+
+    private static Map<String, String> storedLabels(String name) {
+        BindForgeDeviceDraftManager draft = BindForgeDeviceDraftManager.getInstance();
+        if (draft.isStarted()) {
+            DraftRow row = draft.findByName(name);
+            if (row != null) return draft.labelsOf(row.id());
+        }
+        BindForgeDeviceMasterManager master = BindForgeDeviceMasterManager.getInstance();
+        DeviceRow row = master.findByName(name);
+        return row == null ? Map.of() : master.labelsOf(row.id());
+    }
+
+    /** The attached controller with this VID/PID - the first, since two identical units are out of scope. */
+    private static Device attachedController(HardwareId hardware) {
+        for (Device device : DeviceService.getInstance().getConnectedDevices()) {
+            Optional<DeviceIdentity> identity = DeviceIdentities.of(device);
+            if (identity.isPresent() && identity.get().vid().equals(hardware.vid())
+                    && identity.get().pid().equals(hardware.pid())) {
+                return device;
+            }
+        }
+        return null;
     }
 
     /**
@@ -752,7 +881,7 @@ public class AliasDesignerPanel extends JPanel {
      * What a marker says. A difference is a word as well as a colour, so the state never rests on colour alone
      * (Alan, 2026-10-08).
      */
-    private static String markerText(InstallationMarkers.Marker marker) {
+    static String markerText(InstallationMarkers.Marker marker) {
         if (marker == null) return "";
         return getText(switch (marker.state()) {
             case MATCHES -> "bindings.aliasDesigner.marker.matches";
@@ -899,12 +1028,114 @@ public class AliasDesignerPanel extends JPanel {
         }
     }
 
-    private static Color colourOf(DeviceDivergence.Severity severity) {
+    static Color colourOf(DeviceDivergence.Severity severity) {
         return switch (severity) {
             case RED -> HudPalette.HUD_COLOR_ROLE_DANGER;
             case YELLOW -> HudPalette.HUD_COLOR_ROLE_WARNING;
             case GREEN -> HudPalette.HUD_COLOR_ROLE_SUCCESS;
         };
+    }
+
+    /** My Devices: read-only but for the gear, which is the last column. */
+    private static final class MyDevicesTableModel extends DefaultTableModel {
+        private MyDevicesTableModel(Object[] columnNames) {
+            super(columnNames, 0);
+        }
+
+        @Override
+        public boolean isCellEditable(int row, int column) {
+            return column == getColumnCount() - 1;
+        }
+    }
+
+    /**
+     * A gear cell, copied from the fleet list's in {@code CommanderTabPanel} so the two lists open their editors the
+     * same way (UI component map, Alias Designer). It becomes one shared HUD gear column when a third list takes it.
+     */
+    private static final class GearCell {
+        final JPanel panel = new JPanel(new BorderLayout());
+        final JButton gear = new JButton();
+        private final ImageIcon gearBase =
+                HudGlyphs.scaledIcon(AliasDesignerPanel.class, "/images/settings.png", HUD_ICON_TABLE);
+        private ImageIcon gearOrange;
+        private ImageIcon gearDark;
+
+        GearCell() {
+            gear.setOpaque(false);
+            gear.setContentAreaFilled(false);
+            gear.setBorderPainted(false);
+            gear.setFocusPainted(false);
+            gear.setHorizontalAlignment(SwingConstants.CENTER);
+            gear.setToolTipText(getText("bindings.aliasDesigner.editor.gear"));
+            panel.add(gear, BorderLayout.CENTER);
+        }
+
+        private ImageIcon gearIcon(boolean selected) {
+            if (selected) {
+                if (gearDark == null) {
+                    gearDark = HudGlyphs.tintIcon(gearBase, HUD_ICON_TABLE, HUD_ICON_TABLE,
+                            HudPalette.HUD_COLOR_ROLE_SELECTED_TEXT);
+                }
+                return gearDark;
+            }
+            if (gearOrange == null) {
+                gearOrange = HudGlyphs.tintIcon(gearBase, HUD_ICON_TABLE, HUD_ICON_TABLE,
+                        HudPalette.HUD_COLOR_ROLE_CONTROL_DECORATION);
+            }
+            return gearOrange;
+        }
+
+        /** @param device whether the row is a device - the "service stopped" row has no gear */
+        JPanel apply(boolean selected, boolean device) {
+            panel.setBackground(selected
+                    ? HudPalette.HUD_COLOR_ROLE_PRIMARY_ACTION
+                    : HudPalette.HUD_COLOR_ROLE_TABLE_CELL_BACKGROUND);
+            panel.setOpaque(true);
+            gear.setIcon(device ? gearIcon(selected) : null);
+            gear.setEnabled(device);
+            return panel;
+        }
+    }
+
+    private final class GearRenderer implements TableCellRenderer {
+        private final GearCell cell = new GearCell();
+
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value, boolean selected,
+                                                       boolean focused, int row, int column) {
+            return cell.apply(selected, row < currentMyDevices.size());
+        }
+    }
+
+    /** Opens the Device Editor on a single click, as the fleet list's gear opens a ship's settings. */
+    private final class GearEditor extends AbstractCellEditor implements TableCellEditor {
+        private final GearCell cell = new GearCell();
+        private int editingRow = -1;
+
+        GearEditor() {
+            cell.gear.addActionListener(e -> {
+                int row = editingRow;
+                fireEditingStopped();
+                openDeviceEditor(row);
+            });
+        }
+
+        @Override
+        public Object getCellEditorValue() {
+            return "";
+        }
+
+        @Override
+        public boolean isCellEditable(EventObject e) {
+            return true;
+        }
+
+        @Override
+        public Component getTableCellEditorComponent(JTable table, Object value, boolean selected, int row,
+                                                     int column) {
+            editingRow = row;
+            return cell.apply(true, row < currentMyDevices.size());
+        }
     }
 
     private static final class ReadOnlyTableModel extends DefaultTableModel {

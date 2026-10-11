@@ -1,6 +1,6 @@
 # `elite.intel.devices` - Developer Reference
 
-The devices package owns joystick, HOTAS, gamepad, and pedal input, plus the mouse buttons as a pseudo-device. It polls SDL3 on a single dedicated platform thread and publishes connect/disconnect, axis, and button events on the DeviceBus. It is shared infrastructure - the input monitor, Bindings, and push-to-talk all consume these events rather than managing their own SDL3 context.
+The devices package owns joystick, HOTAS, gamepad, and pedal input, plus the mouse buttons as a pseudo-device. It polls SDL3 on a single dedicated platform thread and publishes connect/disconnect, axis, button and hat events on the DeviceBus. It is shared infrastructure - the input monitor, Bindings, and push-to-talk all consume these events rather than managing their own SDL3 context.
 
 Read-only device access only. This package never writes to the game, the
 `.binds` file, or any other file.
@@ -32,7 +32,8 @@ pollLoop()
     ├─ for each open handle:
     │     pollJoystick()
     │       ├─ SDL_GetJoystickAxis()   → DeviceAxisEvent (on change only)
-    │       └─ SDL_GetJoystickButton() → DeviceButtonEvent (on state transition only)
+    │       ├─ SDL_GetJoystickButton() → DeviceButtonEvent (on state transition only)
+    │       └─ SDL_GetJoystickHat()    → DeviceHatEvent (on change only)
     │
     └─ pollMouse()                  ← only when the video subsystem came up
           └─ SDL_GetGlobalMouseState() → DeviceButtonEvent(MOUSE_DEVICE_ID, ...) (on transition only)
@@ -100,9 +101,12 @@ The loop runs on the `elite-intel-devices` platform thread (not a virtual thread
 - Buttons: previous `boolean` stored in
   `prevButtons[deviceId][buttonIndex]`. Published on both press and release transitions. Never published while held
   (unlike keyboard repeat events).
+- Hats: previous direction bits stored in `prevHats[deviceId][hatIndex]`, starting centred. Published whenever the
+  bits change, including the return to centre. Added 2026-10-10 for BindForge's Device Editor (A9), which lights a
+  hat direction while it is pushed.
 
 `POLL_INTERVAL_MS = 16` gives approximately 60 Hz polling rate. The `openHandles`,
-`prevAxes`, `prevButtons`, and
+`prevAxes`, `prevButtons`, `prevHats`, and
 `vidPidByDevice` maps are accessed exclusively from the poll thread; no synchronization is needed.
 
 `connectedDevices` is a `CopyOnWriteArrayList` so
@@ -121,6 +125,7 @@ All events are published on `DeviceBus`.
 | `DeviceDisconnectedEvent` | Known device no longer enumerated | `deviceId` (SDL3 instance ID) |
 | `DeviceAxisEvent` | Axis raw value changes | `deviceId`, `axisIndex`, `value` [-1.0, 1.0] |
 | `DeviceButtonEvent` | Button state transitions (a controller, or the mouse under `MOUSE_DEVICE_ID`) | `deviceId`, `buttonIndex`, `pressed` |
+| `DeviceHatEvent` | A hat's position changes | `deviceId`, `hatIndex` (0-based; the game's `POV1` is 0), `directions` - SDL's bits `UP` 1, `RIGHT` 2, `DOWN` 4, `LEFT` 8, two at once on a diagonal |
 | `DeviceDuplicateWarningEvent` | Two connected devices share VID/PID | `device1`, `device2` |
 
 `DeviceServiceStateEvent` is published from the poll thread before any other events. Subscribers that touch Swing components must switch to the EDT.
@@ -311,6 +316,7 @@ onDeviceAdded
 | `events/DeviceDisconnectedEvent` | Device removed |
 | `events/DeviceAxisEvent` | Axis change (delta only) |
 | `events/DeviceButtonEvent` | Button press or release |
+| `events/DeviceHatEvent` | Hat moved, pushed or centred |
 | `events/DeviceDuplicateWarningEvent` | Two devices share VID/PID |
 
 ## Key Constants

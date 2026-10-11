@@ -74,6 +74,30 @@ class BindForgeDeviceDraftManagerTest {
         assertEquals("83F4", master.findByName("LVWAP").pid());
     }
 
+    /** The Device Editor's SAVE: the whole set replaces the device's labels in the draft, never the master's. */
+    @Test
+    void savingLabelsReplacesTheDraftDevicesSetAndLeavesTheMasterAlone() {
+        DraftRow saved = draft.saveLabels("LVWAP", "3344", "83F4", labels("Joy_1", "TRIGGER", "Joy_3", "Button 3"));
+
+        assertTrue(draft.isStarted());
+        assertEquals(lvwap, saved.masterId(), "the master device's own draft row, not a new one");
+        assertEquals(labels("Joy_1", "TRIGGER", "Joy_3", "Button 3"), draft.labelsOf(saved.id()));
+        assertEquals(labels("Joy_1", "LV MAIN TRIGGER", "Joy_2", "PINKY"), master.labelsOf(lvwap));
+        assertEquals(List.of("LVWAP", "RVWAP"), names(draft.findAll()), "the rest of the master is in the draft too");
+    }
+
+    /** A built-in the master holds no labels for is added under Frontier's name, as a name the user has seen. */
+    @Test
+    void savingLabelsForADeviceTheDraftLacksAddsIt() {
+        DraftRow saved = draft.saveLabels("T-Rudder", "044F", "B679", labels("Joy_RZAxis", "RUDDER"));
+
+        assertNull(saved.masterId());
+        assertEquals("B679", saved.pid());
+        assertTrue(saved.aliasConfirmed());
+        assertEquals(labels("Joy_RZAxis", "RUDDER"), draft.labelsOf(saved.id()));
+        assertNull(master.findByName("T-Rudder"));
+    }
+
     @Test
     void promotingMakesTheDraftTheMasterAndEndsTheDraft() {
         draft.start();

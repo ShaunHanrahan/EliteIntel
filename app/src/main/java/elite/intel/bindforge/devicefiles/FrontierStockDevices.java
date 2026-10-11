@@ -2,14 +2,20 @@ package elite.intel.bindforge.devicefiles;
 
 import elite.intel.bindforge.devicefiles.DeviceEntry.HardwareId;
 
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
+
+import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
 import java.time.LocalDate;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 /**
  * Frontier's shipped {@code DeviceMappings.xml}, as captured on 2026-09-06 and carried inside the jar.
@@ -30,6 +36,9 @@ public final class FrontierStockDevices {
 
     /** Travels in the jar rather than on disk, so it cannot be edited by a game update or by the user. */
     static final String RESOURCE = "/bindforge/FrontierStock-DeviceMappings.xml";
+
+    private static final String GAME_PAD = "GamePad";
+    private static final String SUPPORTS_ICONS = "SupportsIcons";
 
     /**
      * When the resource was captured from a game installation ({@code reference-data/FrontierStock-README.md}).
@@ -54,9 +63,15 @@ public final class FrontierStockDevices {
 
     private final Map<String, DeviceEntry> byName;
     private final Map<HardwareId, DeviceEntry> byHardware;
+    private final Set<String> drawnByGame;
 
     /** Package-private as a test seam: the shipped resource cannot hold a malformed list, and a test must. */
     FrontierStockDevices(List<DeviceEntry> entries) {
+        this(entries, Set.of());
+    }
+
+    /** @param drawnByGame the elements carrying {@code <SupportsIcons>}, at any depth */
+    FrontierStockDevices(List<DeviceEntry> entries, Set<String> drawnByGame) {
         Map<String, DeviceEntry> names = new HashMap<>();
         Map<HardwareId, DeviceEntry> hardware = new HashMap<>();
         for (DeviceEntry entry : entries) {
@@ -85,6 +100,7 @@ public final class FrontierStockDevices {
         this.inFileOrder = List.copyOf(entries);
         this.byName = Map.copyOf(names);
         this.byHardware = Map.copyOf(hardware);
+        this.drawnByGame = Set.copyOf(drawnByGame);
     }
 
     /**
@@ -135,6 +151,16 @@ public final class FrontierStockDevices {
         return inFileOrder.stream().map(DeviceEntry::name).toList();
     }
 
+    /**
+     * Whether the game draws this Frontier device's inputs itself, so a text label would replace an icon: an element
+     * carrying {@code <SupportsIcons>} - the X52, X52 Pro, T.Flight HOTAS 4 and Hotas One - or {@code <GamePad>},
+     * which the game binds by its own {@code GamePad_} tokens. The same rule {@link ButtonMapGeneration} applies to
+     * an installation's file; this answers it from the reference, for the Device Editor (Alan, 2026-10-10, A9).
+     */
+    public boolean gameDrawsIt(String deviceName) {
+        return GAME_PAD.equals(deviceName) || drawnByGame.contains(deviceName);
+    }
+
     /** Every entry, in the order the file lists them. */
     public List<DeviceEntry> entries() {
         return inFileOrder;
@@ -149,9 +175,26 @@ public final class FrontierStockDevices {
             if (xml == null) {
                 throw new IllegalStateException("Frontier stock reference is missing from the jar: " + RESOURCE);
             }
-            return new FrontierStockDevices(DeviceMappingsParser.parse(xml, RESOURCE));
+            byte[] bytes = xml.readAllBytes();
+            return new FrontierStockDevices(DeviceMappingsParser.parse(new ByteArrayInputStream(bytes), RESOURCE),
+                    drawnByGame(bytes));
         } catch (IOException e) {
             throw new UncheckedIOException("Could not read the Frontier stock reference: " + RESOURCE, e);
         }
+    }
+
+    /** The top-level elements asking for the game's icons. Frontier puts the marker inside an {@code <Alternative>} too. */
+    private static Set<String> drawnByGame(byte[] xml) throws IOException {
+        Set<String> names = new HashSet<>();
+        Element root = DeviceFileXml.parse(xml).getDocumentElement();
+        if (root == null) return names;
+        NodeList children = root.getChildNodes();
+        for (int i = 0; i < children.getLength(); i++) {
+            if (children.item(i) instanceof Element element
+                    && element.getElementsByTagName(SUPPORTS_ICONS).getLength() > 0) {
+                names.add(element.getTagName());
+            }
+        }
+        return names;
     }
 }

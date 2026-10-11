@@ -33,7 +33,7 @@ section, the chord capture field, the live keyboard map, the conflict callout an
 | 4 | **A badge on a tab** | the Anomalies count, the destructive-change Error signal | Degrades — the count goes in the tab title, the app's existing pattern |
 | 5 | ~~**Tabs inside a table row**~~ | ~~Alias Designer — one tab per detected installation~~ | **Avoided 2026-10-08** — the markers are one column per installation |
 | 6 | **Esc clears a search field** | the Bind Editor shell | Degrades — the × already clears |
-| 7 | **A middle place in a dialog's footer** — `HudModalSpec` has BACK on the left and actions on the right only | Alias Designer's Device Editor — CLEAR between BACK and SAVE (2026-10-10) | **Blocks** the layout as decided; added to the scaffold with A9, and to the canon in the same commit |
+| 7 | ~~**A middle place in a dialog's footer**~~ | Alias Designer's Device Editor — CLEAR between BACK and SAVE (2026-10-10) | **Built with A9** — `HudModalSpec.middle`, and in the canon's §10 |
 
 **Two tensions with the canon**, which are design questions rather than missing code — see
 [below](#tensions-with-the-canon).
@@ -274,6 +274,10 @@ extras first) — there is no middle. Alan put the Device Editor's CLEAR in the 
 the destructive button is not next to either of the ones reached for by habit. **Built with A9** as a new role in
 `HudModalSpec`/`HudModalScaffold`, and documented in the canon's dialog section in the same commit, as the canon
 requires. Custom Commands' DELETE could use it later.
+
+*Built 2026-10-10 (A9):* `HudModalSpec.Builder.middle(button)` — the `MIDDLE` role — centred by `HudFooter` between
+the left slot and the right-hand group. The same change gave the spec `unsavedHint(component)`, so a modal can put
+the canon's `HudUnsavedHint` immediately left of SAVE, as §10 asks; the right-hand group held buttons only before.
 
 ---
 

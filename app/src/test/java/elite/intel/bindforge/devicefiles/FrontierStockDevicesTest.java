@@ -36,6 +36,20 @@ class FrontierStockDevicesTest {
     private final FrontierStockDevices stock = FrontierStockDevices.getInstance();
 
     /**
+     * The devices the game draws with its own icons, so the Device Editor never writes a default text label over
+     * one - the same four generation skips, found at any depth (the X52's marker sits inside an Alternative too),
+     * and GamePad.
+     */
+    @Test
+    void theGameDrawsTheIconDevicesAndThePad() {
+        for (String drawn : List.of("SaitekX52", "SaitekX52Pro", "ThrustMasterHOTAS4", "TFlightHotasOne", "GamePad")) {
+            assertTrue(stock.gameDrawsIt(drawn), drawn);
+        }
+        assertFalse(stock.gameDrawsIt("T-Rudder"));
+        assertFalse(stock.gameDrawsIt("LVWAP"));
+    }
+
+    /**
      * The file lives twice - as evidence in the docs, and as a resource the application reads - and the two
      * drifting apart would be invisible. The shipped copy would quietly stop being what the README says
      * Frontier shipped, and every provenance answer built on it would be wrong without anything failing.

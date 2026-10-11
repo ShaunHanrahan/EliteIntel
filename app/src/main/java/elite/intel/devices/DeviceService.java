@@ -27,7 +27,7 @@ import static org.lwjgl.sdl.SDLInit.*;
 
 /**
  * Polls SDL3 for joystick/HOTAS/gamepad/pedal input on a dedicated platform thread. Publishes
- * connect/disconnect, axis, and button events on DeviceBus. Read-only device
+ * connect/disconnect, axis, button and hat events on DeviceBus. Read-only device
  * access - never writes to the game or any game file.
  *
  * Singleton shared infrastructure: the input monitor, Bindings, and push-to-talk all consume these
@@ -95,6 +95,7 @@ public class DeviceService {
     private final Map<Integer, Long> openHandles = new LinkedHashMap<>();
     private final Map<Integer, short[]> prevAxes = new HashMap<>();
     private final Map<Integer, boolean[]> prevButtons = new HashMap<>();
+    private final Map<Integer, int[]> prevHats = new HashMap<>();
     private final Map<Integer, int[]> vidPidByDevice = new HashMap<>(); // [vendor, product]
 
     private DeviceService() {}
@@ -340,6 +341,7 @@ public class DeviceService {
 
         Device device = new Device(id, name, axes, buttons, usbPath, guid);
         int hats = Math.max(0, SDLJoystick.SDL_GetNumJoystickHats(handle));
+        prevHats.put(id, new int[hats]);
         descriptions.put(id, DeviceDescriber.describe(name, usbPath, axes, hats));
         connectedDevices.add(device);
         log.info("Device connected: {} (id={}, axes={}, buttons={})", name, id, axes, buttons);
@@ -353,6 +355,7 @@ public class DeviceService {
         if (handle != null) SDLJoystick.SDL_CloseJoystick(handle);
         prevAxes.remove(id);
         prevButtons.remove(id);
+        prevHats.remove(id);
         vidPidByDevice.remove(id);
         connectedDevices.removeIf(d -> d.id() == id);
         descriptions.remove(id);
@@ -381,6 +384,18 @@ public class DeviceService {
                 DeviceBus.publish(new DeviceButtonEvent(id, b, pressed));
             }
         }
+
+        // WHY: polled for the Device Editor's live highlighting (BindForge A9, 2026-10-10). Same delta-only contract
+        // as the buttons; a hat starts centred, so one already pushed at connect is reported on the first tick.
+        int[] prevHat = prevHats.get(id);
+        if (prevHat == null) return;
+        for (int h = 0; h < prevHat.length; h++) {
+            int directions = SDLJoystick.SDL_GetJoystickHat(handle, h) & 0x0F;
+            if (directions != prevHat[h]) {
+                prevHat[h] = directions;
+                DeviceBus.publish(new DeviceHatEvent(id, h, directions));
+            }
+        }
     }
 
     private void closeAllHandles() {
@@ -388,6 +403,7 @@ public class DeviceService {
         openHandles.clear();
         prevAxes.clear();
         prevButtons.clear();
+        prevHats.clear();
         vidPidByDevice.clear();
         connectedDevices.clear();
         descriptions.clear();

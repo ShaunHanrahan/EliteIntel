@@ -135,6 +135,29 @@ public class BindForgeDeviceDraftManager {
     }
 
     /**
+     * The Device Editor's SAVE: the device's whole label set into the draft, in one transaction with starting the
+     * draft (Alan, 2026-10-10, A9). A device the draft does not hold yet - a built-in the master has no labels for -
+     * is added under the name and hardware given, as a name the user has seen.
+     *
+     * @return the draft row the labels were saved on
+     */
+    public DraftRow saveLabels(String deviceName, String vid, String pid, Map<String, String> labels) {
+        return inTransaction(daos -> {
+            startIfNone(daos);
+            BindForgeDeviceDraftDao draft = daos.draft();
+            DraftRow row = draft.findByName(deviceName);
+            if (row == null) {
+                draft.insert(null, deviceName, vid, pid, true, null);
+                row = draft.findByName(deviceName);
+            }
+            long id = row.id();
+            draft.deleteLabels(id);
+            labels.forEach((token, label) -> draft.putLabel(id, token, label));
+            return row;
+        });
+    }
+
+    /**
      * Puts one master device back into the draft as the master holds it, undoing every saved edit to it -
      * including its removal. A master device that no longer exists is simply left out of the draft.
      * <p>

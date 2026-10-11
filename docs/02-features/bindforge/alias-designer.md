@@ -906,8 +906,9 @@ generated labels all need to.
   [testing item 23](../../00-overview/testing-required.md#bindforge).
 - **`Device` and its events are unchanged.** The description is a separate record looked up by device id, so
   `DeviceService` — which V1.1 also changes — gains one short block and nothing else.
-- **Not built here: hat movement.** Lighting a hat needs `DeviceService` to poll hat state, which is
-  [A9's](../../05-build-plan/alias-designer.md#slices) to add when it lights one.
+- ~~**Not built here: hat movement.** Lighting a hat needs `DeviceService` to poll hat state, which is
+  [A9's](../../05-build-plan/alias-designer.md#slices) to add when it lights one.~~ *Built in A9:* `DeviceHatEvent`,
+  published on change.
 
 *After review — 2026-10-10 (Alan):*
 
@@ -948,8 +949,8 @@ still to come.*
   built from what the controller reports, not from a fixed layout: a pedal set with three axes and no buttons
   shows DEVICE and AXES. The axes and hats a controller has are
   [read as it connects](#which-axes-and-hats-a-controller-has--2026-10-10-alan) (A8b); SDL alone gives only an
-  axis count, and two VIRPIL sticks put their twist on Z and on RZ. Where the axes cannot be read, the AXES tab
-  needs A9 to decide what to show.
+  axis count, and two VIRPIL sticks put their twist on Z and on RZ. ~~Where the axes cannot be read, the AXES tab
+  needs A9 to decide what to show.~~ *Decided in A9 — [below](#built-as-a-dialog--2026-10-10-alan-a9).*
 - **DEVICE** holds the name, VID and PID, the Windows name, whether it is attached, and the
   [install strip](#the-install-strip--a-readout-not-a-switch).
 - **AXES** has one label box per axis the controller reports, named by the axis it is (`Joy_XAxis`,
@@ -971,6 +972,44 @@ still to come.*
 - **BACK is DISCARD.** Leaving with unsaved edits — BACK, the close glyph or Esc — asks **Save**, **Discard** or
   **Keep editing**. *That is the [exit prompt](#exit-prompt) narrowed to one device, with a way back in.*
 - **APPLY is not in the dialog.** It is the screen's button, beneath the list, and reaches every installation.
+
+#### Built as a dialog — 2026-10-10 (Alan, A9)
+
+Built as `ui.screen.bindings.DeviceEditorDialog`, opened from the gear on `AliasDesignerPanel`'s My Devices rows,
+with `bindforge.devices.DeviceEditorInputs` (which boxes, their defaults, what SAVE writes — pure) and
+`DeviceEditorLights` (live highlighting — pure). SAVE is `BindForgeDeviceDraftManager.saveLabels`, one transaction.
+Alan answered five questions, one at a time:
+
+- **Before first setup the gear does not open the editor.** It says first setup comes first and offers **SET UP**,
+  which starts it. First setup throws any draft away as it fills the master, so labels saved before it would be lost
+  without a word.
+- **Axes that cannot be read are all eight** — when the description could not be read, or counts other than SDL
+  does (`agreesWith`) — with a line saying which axes the controller has could not be read. This is what generation
+  labels in the same case, and a label for an axis the controller lacks is never shown in the game. None is lit,
+  since SDL's numbering is not matched.
+- **An axis rests where it is first seen** after the dialog opens. The Device Service reports an axis only when it
+  moves, in raw steps, so the first report arrives within a hair of where the axis sat; a throttle parked at half
+  rests at half. Lit beyond 5% of its travel — 0.1 of the −1…1 range.
+- **SAVE writes every box, defaults included** — once the master holds labels for a device, startup generation skips
+  it, so a default left unwritten would never reach the game, which would show a raw `Joy_14`. **Except on a device
+  the game draws itself** (`<SupportsIcons>`, `<GamePad>` — `FrontierStockDevices.gameDrawsIt`): there a box is
+  written only when it already had a saved label or was changed, so a `Button 3` never replaces an icon nobody
+  touched. A saved label with no box — a half-axis, or an input the controller does not report today — is kept.
+- **CLEAR, or RESET LABELS on a built-in, is in the footer's middle place, disabled** until the Actions slice
+  (A10), so the layout is final and A10 only wires it.
+
+*Also settled while building it:*
+
+- **SAVE closes the dialog** once the draft holds the labels, and is dimmed until a box differs from what it opened
+  with — compared as SAVE would keep it, so trimming spaces is not an edit. `HudUnsavedHint` sits beside it.
+- **A built-in the master holds no labels for is saved under Frontier's name**, added to the draft with the attached
+  controller's VID/PID. Apply writes its `.buttonMap` only.
+- **The labels shown are the draft's** when the draft holds the device, and the master's otherwise. The install strip
+  is the device's Installations markers, against the saved master.
+- **A box holds at most 18 characters** as it is typed; a longer saved label is cut to 18 on SAVE.
+- **No default button** — Enter in a label box would otherwise save and close mid-edit.
+- **Hat movement is polled by the Device Service** — `DeviceHatEvent`, SDL's direction bits, on change only.
+- **An unattached controller with no saved labels** shows DEVICE alone, and says to plug it in.
 
 ### One record, and where it lands — reworked 2026-09-26
 
