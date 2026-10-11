@@ -1,5 +1,7 @@
 package elite.intel.ui.screen.bindings;
 
+import elite.intel.bindforge.devicefiles.BindsDeviceReferences;
+import elite.intel.bindforge.devicefiles.DeviceApply;
 import elite.intel.bindforge.devicefiles.DeviceDivergence;
 import elite.intel.bindforge.devicefiles.DeviceDivergenceScanner;
 import elite.intel.bindforge.devicefiles.DeviceEntry;
@@ -10,6 +12,7 @@ import elite.intel.bindforge.devicefiles.DeviceFilesPush;
 import elite.intel.bindforge.devicefiles.DeviceMappingsParser;
 import elite.intel.bindforge.devicefiles.DivergenceWaysOut;
 import elite.intel.bindforge.devicefiles.DivergenceWaysOut.WayOut;
+import elite.intel.bindforge.devicefiles.DraftChanges;
 import elite.intel.bindforge.devicefiles.FirstSetup;
 import elite.intel.bindforge.devicefiles.FrontierStockDevices;
 import elite.intel.bindforge.devicefiles.InstallationDeviceScanner;
@@ -17,6 +20,7 @@ import elite.intel.bindforge.devicefiles.LabelReMerge;
 import elite.intel.bindforge.devices.BuiltInDevice;
 import elite.intel.bindforge.devices.BuiltInDeviceList;
 import elite.intel.bindforge.devices.DeviceEditorInputs;
+import elite.intel.bindforge.devices.DeviceEditorMiddle;
 import elite.intel.bindforge.devices.DeviceIdentities;
 import elite.intel.bindforge.devices.InstallationMarkers;
 import elite.intel.bindforge.devices.MyDevice;
@@ -52,6 +56,7 @@ import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
 import java.awt.*;
 import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.EventObject;
@@ -96,6 +101,11 @@ import static elite.intel.ui.theme.HudPalette.HUD_TABLE_ROW_HEIGHT;
  * <strong>A gear ends every My Devices row</strong> and opens the Device Editor for that device - the one record,
  * edited in a dialog and saved to the draft (Alan, 2026-10-10). Before first setup it says SET UP comes first and
  * offers it: first setup throws any draft away as it fills the master, so edits saved before then would be lost.
+ * <p>
+ * <strong>APPLY and DISCARD are the screen's</strong>, in its footer (Alan, 2026-10-11, A10). APPLY writes the master
+ * and the draft's changes to every installation and reports per installation; it is offered whenever the master
+ * exists, since Apply with nothing saved is the retry after a partial one. DISCARD throws the whole draft away and
+ * is offered only when the draft changes something, which the line beside it names.
  */
 public class AliasDesignerPanel extends JPanel {
 
@@ -150,7 +160,12 @@ public class AliasDesignerPanel extends JPanel {
     private boolean deviceServiceRunning;
     private final InstallationDeviceScanner deviceScanner = new InstallationDeviceScanner();
     private JButton setUpButton;
+    private JButton applyButton;
+    private JButton discardButton;
+    private JLabel pendingLine;
     private boolean masterEmpty;
+    private List<String> currentChanges = List.of();
+    private boolean screenActionRunning;
 
     public AliasDesignerPanel() {
         this(new InstallationRegistry(
@@ -242,8 +257,33 @@ public class AliasDesignerPanel extends JPanel {
         stacked.add(myDevices);
         stacked.add(section);
 
+        // WHY: APPLY is the primary, last on the right; DISCARD sits on the left with the line naming what it would
+        // throw away, so the two are never side by side.
+        applyButton = makeButton(getText("bindings.aliasDesigner.button.apply"));
+        applyButton.setEnabled(false);
+        applyButton.addActionListener(e -> applyAll());
+        discardButton = makeButtonSubtle(getText("bindings.aliasDesigner.button.discard"));
+        discardButton.setEnabled(false);
+        discardButton.addActionListener(e -> discardAll());
+        pendingLine = AppTheme.hudReadoutValue("", HudPalette.HUD_COLOR_ROLE_WARNING);
+        JPanel left = transparentPanel(new FlowLayout(FlowLayout.LEFT, HudPalette.HUD_GAP, 0));
+        left.add(discardButton);
+        left.add(pendingLine);
+
         add(stacked, BorderLayout.CENTER);
-        add(HudFooter.build(false, null, null, List.of(setUpButton, rescanButton)), BorderLayout.SOUTH);
+        add(HudFooter.build(false, null, left, List.of(setUpButton, rescanButton, applyButton)), BorderLayout.SOUTH);
+    }
+
+    /**
+     * APPLY once the master exists, DISCARD while the draft changes something - and neither while one of them, or a
+     * way out, is running.
+     */
+    private void refreshScreenActions() {
+        applyButton.setEnabled(!masterEmpty && !screenActionRunning);
+        discardButton.setEnabled(!currentChanges.isEmpty() && !screenActionRunning);
+        pendingLine.setText(currentChanges.isEmpty()
+                ? ""
+                : getText("bindings.aliasDesigner.pending", String.join(", ", currentChanges)));
     }
 
     /**
@@ -265,8 +305,10 @@ public class AliasDesignerPanel extends JPanel {
             List<BuiltInDevice> builtIn = List.of();
             Markers markers = Markers.NONE;
             boolean empty = false;
+            List<String> changes = List.of();
             try {
                 empty = BindForgeDeviceMasterManager.getInstance().findAll().isEmpty();
+                changes = DraftChanges.stored();
                 List<InstallationRow> rows = registry.currentWithStartupScan();
                 labels = labelsFor(rows);
                 paths = rows.stream().collect(Collectors.toMap(AliasDesignerPanel::keyOf, InstallationRow::rootPath,
@@ -292,11 +334,14 @@ public class AliasDesignerPanel extends JPanel {
             List<BuiltInDevice> loadedBuiltIn = builtIn;
             Markers loadedMarkers = markers;
             boolean loadedEmpty = empty;
+            List<String> loadedChanges = changes;
             SwingUtilities.invokeLater(() -> {
                 installLabels = loadedLabels;
                 installPaths = loadedPaths;
                 masterEmpty = loadedEmpty;
+                currentChanges = loadedChanges;
                 setUpButton.setEnabled(masterEmpty);
+                refreshScreenActions();
                 showMyDevices(loadedMyDevices, loadedMarkers);
                 showBuiltIn(loadedBuiltIn);
                 currentReport = loadedDivergence.report();
@@ -394,6 +439,7 @@ public class AliasDesignerPanel extends JPanel {
                 case REMERGE -> reMerge(way, finding);
             }
         });
+        button.setEnabled(!screenActionRunning);
         return button;
     }
 
@@ -513,6 +559,10 @@ public class AliasDesignerPanel extends JPanel {
      */
     private <T> void offEdt(Callable<T> work, Consumer<T> onEdt) {
         for (Component button : waysOutPanel.getComponents()) button.setEnabled(false);
+        // WHY: APPLY and DISCARD wait too - a revert and an Apply writing the same installation at once would each
+        // keep an Edit History copy of a file the other was replacing.
+        screenActionRunning = true;
+        refreshScreenActions();
         new Thread(() -> {
             T result = null;
             String failure = null;
@@ -527,6 +577,8 @@ public class AliasDesignerPanel extends JPanel {
             T loaded = result;
             String loadedFailure = failure;
             SwingUtilities.invokeLater(() -> {
+                screenActionRunning = false;
+                refreshScreenActions();
                 showWaysOut();
                 if (loadedFailure != null) {
                     HudConfirmDialog.info(this, getText("bindings.aliasDesigner.wayOut.title"),
@@ -546,6 +598,90 @@ public class AliasDesignerPanel extends JPanel {
                 .map(key -> installLabels.getOrDefault(key, key))
                 .sorted()
                 .collect(Collectors.joining(", "));
+    }
+
+    /**
+     * APPLY: the draft into the master, then the master and the pending removals out to every installation, reported
+     * per installation. Asked first - it is the one button on the screen that writes a game file.
+     */
+    private void applyAll() {
+        if (!HudConfirmDialog.confirm(this, getText("bindings.aliasDesigner.apply.title"),
+                getText("bindings.aliasDesigner.apply.confirm", installLabels.size()),
+                getText("bindings.aliasDesigner.apply.do"),
+                getText("bindings.aliasDesigner.firstSetup.cancel"))) {
+            return;
+        }
+        runScreenAction(getText("bindings.aliasDesigner.apply.title"), () -> applyText(new DeviceApply().apply()));
+    }
+
+    private String applyText(DeviceApply.Result result) {
+        StringBuilder text = new StringBuilder(revertText(result.report()));
+        if (!result.cleanedUp().isEmpty()) {
+            text.append('\n').append(getText("bindings.aliasDesigner.apply.removed",
+                    String.join(", ", result.cleanedUp())));
+        }
+        if (!result.notEverywhere().isEmpty()) {
+            text.append('\n').append(getText("bindings.aliasDesigner.apply.notEverywhere",
+                    String.join(", ", result.notEverywhere())));
+        }
+        if (result.bindsUnread()) {
+            text.append('\n').append(getText("bindings.aliasDesigner.apply.bindsUnread"));
+        } else if (!result.heldBack().isEmpty()) {
+            text.append('\n').append(getText("bindings.aliasDesigner.apply.heldBack",
+                    String.join(", ", result.heldBack())));
+        }
+        return text.toString();
+    }
+
+    /** DISCARD: the whole draft thrown away, after naming what it holds. No installation is touched. */
+    private void discardAll() {
+        if (currentChanges.isEmpty()) return;
+        if (!HudConfirmDialog.confirm(this, getText("bindings.aliasDesigner.discard.title"),
+                getText("bindings.aliasDesigner.discard.confirm", String.join(", ", currentChanges)),
+                getText("bindings.aliasDesigner.discard.do"),
+                getText("bindings.aliasDesigner.firstSetup.cancel"))) {
+            return;
+        }
+        runScreenAction(getText("bindings.aliasDesigner.discard.title"), () -> {
+            BindForgeDeviceDraftManager.getInstance().discard();
+            return null;
+        });
+    }
+
+    /**
+     * Runs APPLY or DISCARD off the EDT, with every button that writes disabled meanwhile, says what happened when
+     * there is something to say, and reads everything again.
+     */
+    private void runScreenAction(String title, Callable<String> work) {
+        screenActionRunning = true;
+        refreshScreenActions();
+        for (Component button : waysOutPanel.getComponents()) button.setEnabled(false);
+        new Thread(() -> {
+            String message = null;
+            String failure = null;
+            try {
+                message = work.call();
+            } catch (Exception e) {
+                // WHY: broad on purpose - a thread boundary, and the user pressed a button and must be told.
+                log.warn("{} failed", title, e);
+                failure = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+            }
+            String loadedMessage = message;
+            String loadedFailure = failure;
+            SwingUtilities.invokeLater(() -> {
+                screenActionRunning = false;
+                refreshScreenActions();
+                showWaysOut();
+                if (loadedFailure != null) {
+                    HudConfirmDialog.info(this, title, getText("bindings.aliasDesigner.wayOut.failed", loadedFailure),
+                            getText("bindings.aliasDesigner.firstSetup.close"));
+                } else if (loadedMessage != null) {
+                    HudConfirmDialog.info(this, title, loadedMessage,
+                            getText("bindings.aliasDesigner.firstSetup.close"));
+                }
+                initData();
+            });
+        }, "BindForge-ScreenAction").start();
     }
 
     /**
@@ -818,7 +954,29 @@ public class AliasDesignerPanel extends JPanel {
                 ? DeviceEditorInputs.ofSavedLabels(saved)
                 : DeviceEditorInputs.ofController(live.buttonCount(), live.axisCount(), description);
         return new DeviceEditorDialog.Opening(device, name, live == null ? null : live.id(), description, inputs,
-                saved, name != null && stock.gameDrawsIt(name), strip);
+                saved, name != null && stock.gameDrawsIt(name), strip, middleFor(device, name, stock));
+    }
+
+    /**
+     * What the editor's middle button is: read from the master, the draft and {@code .binds} as it opens. A
+     * {@code .binds} that cannot be read stops the editor opening rather than offering CLEAR on a device it might
+     * name - the game would reject the whole preset.
+     */
+    private static DeviceEditorMiddle middleFor(MyDevice device, String name, FrontierStockDevices stock) {
+        boolean builtIn = name == null ? device.builtIn() : stock.ships(name);
+        if (name == null) return DeviceEditorMiddle.of(null, builtIn, false, false, false, 0);
+        BindForgeDeviceDraftManager draft = BindForgeDeviceDraftManager.getInstance();
+        boolean started = draft.isStarted();
+        Map<String, Integer> counts;
+        try {
+            counts = BindsDeviceReferences.referenceCounts(PlayerSession.getInstance().getBindingsDir());
+        } catch (IOException e) {
+            throw new UncheckedIOException("the bindings could not be read: " + e.getMessage(), e);
+        }
+        return DeviceEditorMiddle.of(name, builtIn,
+                BindForgeDeviceMasterManager.getInstance().findByName(name) != null,
+                started, started && draft.findByName(name) != null,
+                DeviceEditorMiddle.bindingsNaming(name, counts));
     }
 
     private static Map<String, String> storedLabels(String name) {

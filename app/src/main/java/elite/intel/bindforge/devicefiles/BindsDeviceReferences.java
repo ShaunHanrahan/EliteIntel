@@ -11,9 +11,10 @@ import javax.xml.parsers.ParserConfigurationException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -50,20 +51,29 @@ public final class BindsDeviceReferences {
      * mistake, and one of those must not stop the rest being read.
      */
     public static Set<String> referencedEntryNames(Path bindingsFolder) throws IOException {
-        Set<String> names = new LinkedHashSet<>();
+        return Set.copyOf(referenceCounts(bindingsFolder).keySet());
+    }
+
+    /**
+     * How many bindings name each entry, across every {@code .binds} in {@code bindingsFolder} - one per
+     * {@code Device=} naming it. The count is what makes a question about the device answerable: 142 bindings is
+     * worth a moment's thought, 2 is not. Unreadable files are skipped, as above.
+     */
+    public static Map<String, Integer> referenceCounts(Path bindingsFolder) throws IOException {
+        Map<String, Integer> counts = new LinkedHashMap<>();
         for (Path file : bindsFilesIn(bindingsFolder)) {
             try {
-                collectInto(file, names);
+                collectInto(file, counts);
             } catch (SAXException | ParserConfigurationException | IOException e) {
                 // WHY: skipped, not fatal. See above - one unreadable file in the folder is an ordinary
                 // condition, and the names in the others are still worth having.
                 continue;
             }
         }
-        return Set.copyOf(names);
+        return Map.copyOf(counts);
     }
 
-    private static void collectInto(Path bindsFile, Set<String> names)
+    private static void collectInto(Path bindsFile, Map<String, Integer> counts)
             throws IOException, SAXException, ParserConfigurationException {
 
         NodeList all = newDocumentBuilder().parse(bindsFile.toFile()).getElementsByTagName("*");
@@ -71,7 +81,7 @@ public final class BindsDeviceReferences {
             Element element = (Element) all.item(i);
             if (!element.hasAttribute(DEVICE_ATTRIBUTE)) continue;
             String device = element.getAttribute(DEVICE_ATTRIBUTE).trim();
-            if (isAnEntryName(device)) names.add(device);
+            if (isAnEntryName(device)) counts.merge(device, 1, Integer::sum);
         }
     }
 

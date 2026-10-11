@@ -143,6 +143,49 @@ class DeviceMappingsMergeTest {
                 () -> DeviceMappingsMerge.merge(bytes(SPECIMEN), List.of(new UserEntry("Left Stick", "3344", "83F4"))));
     }
 
+    /** CLEAR, applied: the user's element goes, and every other element, comment and child is kept. */
+    @Test
+    void removingTheUsersElementKeepsEverythingElse() throws IOException {
+        Result merged = DeviceMappingsMerge.merge(bytes(SPECIMEN), List.of(RVWAP));
+
+        Result result = DeviceMappingsMerge.remove(merged.content(), List.of("RVWAP"));
+
+        assertTrue(result.changed());
+        assertEquals(List.of("GamePad", "SaitekX52", "T-Rudder"), names(result));
+        String written = text(result);
+        assertTrue(written.contains("<!-- XB1 Controller -->"), written);
+        assertTrue(written.contains("<SupportsIcons>SaitekX52</SupportsIcons>"), written);
+    }
+
+    /** The name has left the user's set, so a second copy further down goes with the first. */
+    @Test
+    void removingANameTakesEveryCopyOfIt() throws IOException {
+        String twice = """
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <Root>
+                \t<RVWAP><PID>43F4</PID><VID>3344</VID></RVWAP>
+                \t<T-Rudder><PID>B679</PID><VID>044F</VID></T-Rudder>
+                \t<RVWAP><PID>03F5</PID><VID>3344</VID></RVWAP>
+                </Root>
+                """;
+
+        assertEquals(List.of("T-Rudder"), names(DeviceMappingsMerge.remove(bytes(twice), List.of("RVWAP"))));
+    }
+
+    @Test
+    void removingANameTheFileDoesNotHoldChangesNothing() throws IOException {
+        Result result = DeviceMappingsMerge.remove(bytes(SPECIMEN), List.of("RVWAP", "rudder"));
+
+        assertFalse(result.changed());
+        assertArrayEquals(bytes(SPECIMEN), result.content(), "untouched, not re-laid-out");
+    }
+
+    @Test
+    void removingFromSomethingThatIsNotADeviceMappingsFileIsRefused() {
+        assertThrows(IOException.class,
+                () -> DeviceMappingsMerge.remove(bytes("<Bindings><RVWAP/></Bindings>"), List.of("RVWAP")));
+    }
+
     private static byte[] stockFile() throws IOException {
         try (InputStream xml = DeviceMappingsMergeTest.class.getResourceAsStream(FrontierStockDevices.RESOURCE)) {
             return Objects.requireNonNull(xml, FrontierStockDevices.RESOURCE + " is missing").readAllBytes();

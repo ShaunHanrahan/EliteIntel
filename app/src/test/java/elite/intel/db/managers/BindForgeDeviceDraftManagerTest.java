@@ -406,6 +406,61 @@ class BindForgeDeviceDraftManagerTest {
         assertFalse(draft.isStarted(), "a draft left started would replace the new master with its empty copy");
     }
 
+    /** CLEAR: the device leaves the draft, and applying makes it a pending removal for the cleanup (A10). */
+    @Test
+    void clearingADeviceMakesItAPendingRemovalOnApply() {
+        assertTrue(draft.removeByName("RVWAP"));
+
+        assertEquals(List.of("RVWAP"), draft.promote());
+        assertNull(master.findByName("RVWAP"));
+        assertEquals(List.of("RVWAP"), master.pendingRemovals());
+    }
+
+    @Test
+    void clearingANameTheDraftDoesNotHoldChangesNothing() {
+        assertFalse(draft.removeByName("TRudder2"));
+        assertEquals(List.of("LVWAP", "RVWAP"), names(draft.findAll()), "the draft is still a whole copy");
+    }
+
+    /**
+     * Found 2026-10-11: a device cleared and then saved again comes back as a new draft row with no master row
+     * behind it. Its name must not become a pending removal while it is in the master, or the cleanup would take a
+     * live device out of every installation.
+     */
+    @Test
+    void aDeviceClearedThenSavedAgainIsNeverAPendingRemoval() {
+        draft.removeByName("LVWAP");
+        draft.saveLabels("LVWAP", "3344", "83F4", labels("Joy_1", "TRIGGER"));
+
+        assertTrue(draft.promote().isEmpty());
+        assertNotNull(master.findByName("LVWAP"));
+        assertTrue(master.pendingRemovals().isEmpty());
+    }
+
+    /** UNDO CLEAR: the device comes back as the master holds it, and the draft changes nothing again. */
+    @Test
+    void undoingAClearPutsTheMastersDeviceBack() {
+        draft.removeByName("LVWAP");
+
+        assertTrue(draft.restoreFromMaster("LVWAP"));
+
+        DraftRow back = draft.findByName("LVWAP");
+        assertEquals(lvwap, back.masterId());
+        assertEquals(labels("Joy_1", "LV MAIN TRIGGER", "Joy_2", "PINKY"), draft.labelsOf(back.id()));
+        assertTrue(draft.promote().isEmpty(), "nothing is removed");
+    }
+
+    @Test
+    void storedReadsTheMasterAndTheDraftTogether() {
+        assertNull(draft.stored().draft(), "no draft is started");
+
+        draft.start();
+
+        Stored stored = draft.stored();
+        assertEquals(2, stored.master().size());
+        assertEquals(2, stored.draft().size());
+    }
+
     private static List<String> names(List<DraftRow> rows) {
         return rows.stream().map(DraftRow::deviceName).toList();
     }

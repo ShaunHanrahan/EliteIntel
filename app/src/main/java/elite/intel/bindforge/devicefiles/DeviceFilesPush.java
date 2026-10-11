@@ -15,6 +15,7 @@ import org.apache.logging.log4j.Logger;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -25,7 +26,9 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.Consumer;
 import java.util.function.IntSupplier;
 import java.util.function.Supplier;
@@ -47,8 +50,11 @@ import java.util.function.Supplier;
  * already kept during this push. After standardisation every installation holds the same files, so an entry per
  * installation would be several identical copies of one file.
  * <p>
- * Adds and updates only. Removing an entry or a {@code .buttonMap} - CLEAR, a rename, RESET LABELS - is not
- * done here.
+ * <strong>Adds and updates; removes only what it is handed.</strong> The master alone cannot tell a cleared device
+ * from an entry BindForge never owned, so {@link #push(Set)} takes the names to remove - Apply passes the pending
+ * removals (Alan, 2026-10-11, A10). A user's name loses its element and its {@code .buttonMap}; one of Frontier's
+ * names loses only the {@code .buttonMap}, and where Frontier shipped that file it is put back instead. Revert
+ * removes nothing.
  */
 public final class DeviceFilesPush {
 
@@ -162,14 +168,25 @@ public final class DeviceFilesPush {
         this.afterWrite = afterWrite;
     }
 
-    /** Pushes the master to every installation and reports what happened to each. */
+    /** Pushes the master to every installation, removing nothing, and reports what happened to each. */
     public Report push() {
+        return push(Set.of());
+    }
+
+    /**
+     * Apply: pushes the master to every installation and removes the devices named, in the same per-installation
+     * unit - so an installation's removals and its updates land together or not at all.
+     *
+     * @param removals devices to take out of every installation. The caller makes sure none is in the master and
+     *                 none is still named by {@code .binds}
+     */
+    public Report push(Set<String> removals) {
         List<MasterDevice> devices = master.get();
         int keep = retention.getAsInt();
         Set<String> keptThisPush = new HashSet<>();
         List<InstallationResult> results = new ArrayList<>();
         for (Target target : targets.get()) {
-            InstallationResult result = pushTo(target, devices, keep, keptThisPush);
+            InstallationResult result = pushTo(target, devices, removals, keep, keptThisPush);
             log.info("Device files for {} ({}): {}{}", target.storefront(), target.controlSchemes(),
                     result.outcome(), result.reason() == null ? "" : " - " + result.reason());
             results.add(result);
@@ -189,7 +206,7 @@ public final class DeviceFilesPush {
         List<InstallationResult> results = new ArrayList<>();
         for (Target target : targets.get()) {
             if (target.installId() != installId) continue;
-            InstallationResult result = pushTo(target, devices, retention.getAsInt(), new HashSet<>());
+            InstallationResult result = pushTo(target, devices, Set.of(), retention.getAsInt(), new HashSet<>());
             log.info("Device files for {} ({}), reverted to the master: {}{}", target.storefront(),
                     target.controlSchemes(), result.outcome(), result.reason() == null ? "" : " - " + result.reason());
             results.add(result);
@@ -197,13 +214,14 @@ public final class DeviceFilesPush {
         return new Report(results);
     }
 
-    private InstallationResult pushTo(Target target, List<MasterDevice> devices, int keep, Set<String> kept) {
+    private InstallationResult pushTo(Target target, List<MasterDevice> devices, Set<String> removals, int keep,
+                                      Set<String> kept) {
         if (!target.isReachable()) {
             return result(target, Outcome.SKIPPED_MISSING, "folder not found: " + target.controlSchemes(), false);
         }
         Plan plan;
         try {
-            plan = plan(target, devices, stock);
+            plan = plan(target, devices, removals, stock, FrontierStockButtonMaps.getInstance());
         } catch (IOException e) {
             return result(target, Outcome.FAILED, "could not read its device files: " + e.getMessage(), false);
         }
@@ -232,6 +250,12 @@ public final class DeviceFilesPush {
      * Apply cannot disagree about whether an installation is up to date.
      */
     static Plan plan(Target target, List<MasterDevice> devices, FrontierStockDevices stock) throws IOException {
+        return plan(target, devices, Set.of(), stock, FrontierStockButtonMaps.getInstance());
+    }
+
+    /** As {@link #plan(Target, List, FrontierStockDevices)}, with the devices Apply removes. */
+    static Plan plan(Target target, List<MasterDevice> devices, Set<String> removals, FrontierStockDevices stock,
+                     FrontierStockButtonMaps stockMaps) throws IOException {
         List<FileWrite> writes = new ArrayList<>();
 
         Path deviceMappings = GameInstallation.deviceMappingsIn(target.controlSchemes());
@@ -239,7 +263,20 @@ public final class DeviceFilesPush {
         boolean seeded = current == null;
         DeviceMappingsMerge.Result merged =
                 DeviceMappingsMerge.merge(seeded ? stockFile() : current, userEntries(devices, stock));
-        if (seeded || merged.changed()) writes.add(new FileWrite(deviceMappings, current, merged.content()));
+        byte[] mappings = merged.content();
+        boolean changed = merged.changed();
+        // WHY: one of Frontier's names keeps its element. On a built-in the element is Frontier's definition - RESET
+        // LABELS took the labels away, never the entry.
+        Set<String> userRemovals = new TreeSet<>();
+        for (String name : removals) {
+            if (!stock.ships(name)) userRemovals.add(name);
+        }
+        if (!userRemovals.isEmpty()) {
+            DeviceMappingsMerge.Result removed = DeviceMappingsMerge.remove(mappings, userRemovals);
+            mappings = removed.content();
+            changed |= removed.changed();
+        }
+        if (seeded || changed) writes.add(new FileWrite(deviceMappings, current, mappings));
 
         for (MasterDevice device : devices) {
             if (device.labels().isEmpty()) continue;
@@ -248,7 +285,35 @@ public final class DeviceFilesPush {
             byte[] previous = readIfPresent(buttonMap);
             if (!Arrays.equals(previous, content)) writes.add(new FileWrite(buttonMap, previous, content));
         }
+        for (String name : new TreeSet<>(removals)) {
+            FileWrite write = removeButtonMap(target, name, stockMaps);
+            if (write != null) writes.add(write);
+        }
         return new Plan(writes, seeded);
+    }
+
+    /**
+     * What removing a device does to its {@code .buttonMap}: the file is deleted, unless Frontier ships one under
+     * that name - {@code VPCPanel}, {@code VPCThrottle} - which is put back as Frontier shipped it, since a file
+     * Frontier shipped is never removed (Alan, 2026-10-11).
+     *
+     * @return the write, or {@code null} when the file is already as it should be
+     */
+    private static FileWrite removeButtonMap(Target target, String name, FrontierStockButtonMaps stockMaps)
+            throws IOException {
+        Path buttonMap;
+        try {
+            buttonMap = GameInstallation.buttonMapIn(target.controlSchemes(), name);
+        } catch (InvalidPathException e) {
+            // WHY: a name that cannot be a filename in DeviceButtonMaps has no file there to remove.
+            return null;
+        }
+        byte[] previous = readIfPresent(buttonMap);
+        Optional<byte[]> shipped = stockMaps.shippedContent(name);
+        if (shipped.isPresent()) {
+            return Arrays.equals(previous, shipped.get()) ? null : new FileWrite(buttonMap, previous, shipped.get());
+        }
+        return previous == null ? null : new FileWrite(buttonMap, previous, null);
     }
 
     /**
@@ -287,11 +352,16 @@ public final class DeviceFilesPush {
         List<FileWrite> done = new ArrayList<>();
         for (FileWrite write : writes) {
             try {
-                Files.createDirectories(write.path().getParent());
-                AtomicFiles.write(write.path(), write.content());
+                if (write.content() == null) {
+                    Files.deleteIfExists(write.path());
+                } else {
+                    Files.createDirectories(write.path().getParent());
+                    AtomicFiles.write(write.path(), write.content());
+                }
                 done.add(write);
             } catch (IOException e) {
-                return "could not write " + write.path().getFileName() + ": " + e.getMessage() + restore(done);
+                return (write.content() == null ? "could not remove " : "could not write ")
+                        + write.path().getFileName() + ": " + e.getMessage() + restore(done);
             }
         }
         return null;
@@ -367,6 +437,7 @@ public final class DeviceFilesPush {
     /**
      * @param previous what the file held before, or {@code null} when it did not exist - which is also what
      *                 putting it back means
+     * @param content  what to write, or {@code null} to remove the file
      */
     record FileWrite(Path path, byte[] previous, byte[] content) {
     }

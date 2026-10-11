@@ -10,10 +10,12 @@ import org.jdbi.v3.core.Handle;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -181,6 +183,45 @@ public class BindForgeDeviceDraftManager {
         });
     }
 
+    /**
+     * CLEAR, or RESET LABELS on a built-in: takes the device out of the draft, labels and all, starting the draft
+     * first (Alan, 2026-10-11, A10). Applying it makes the name a pending removal, which is what takes its entry
+     * and {@code .buttonMap} out of every installation.
+     *
+     * @return {@code false} when the draft holds no device of that name - nothing was changed
+     */
+    public boolean removeByName(String deviceName) {
+        return inTransaction(daos -> {
+            startIfNone(daos);
+            DraftRow row = daos.draft().findByName(deviceName);
+            if (row == null) return false;
+            daos.draft().delete(row.id());
+            return true;
+        });
+    }
+
+    /**
+     * UNDO CLEAR and UNDO RESET: puts a master device back into the draft exactly as the master holds it - {@link
+     * #revert(long)}, by name, since the dialog that asks knows the device by name.
+     *
+     * @return {@code false} when the master holds no device of that name - nothing was changed
+     * @throws IllegalStateException as {@link #revert(long)} does
+     */
+    public boolean restoreFromMaster(String deviceName) {
+        DeviceRow row = Database.withDao(BindForgeDeviceMasterDao.class, dao -> dao.findByName(deviceName));
+        if (row == null) return false;
+        revert(row.id());
+        return true;
+    }
+
+    /**
+     * The master and the draft, read in one transaction - what telling a draft with edits from an untouched one
+     * compares ({@code DraftChanges}).
+     */
+    public Stored stored() {
+        return inTransaction(daos -> new Stored(storedMaster(daos.master()), storedDraft(daos.draft())));
+    }
+
     /** Throws the draft away. The master, and every installation, are as they were. */
     public void discard() {
         inTransaction(daos -> {
@@ -210,11 +251,19 @@ public class BindForgeDeviceDraftManager {
             BindForgeDeviceMasterDao master = daos.master();
             if (!draft.exists()) return List.of();
 
-            List<String> removed = draft.masterNamesNotInDraft();
             List<PromotedDevice> devices = new ArrayList<>();
+            Set<String> draftNames = new HashSet<>();
             for (DraftRow row : draft.findAll()) {
                 devices.add(new PromotedDevice(row, labelMap(draft.labelsOf(row.id()))));
+                draftNames.add(row.deviceName());
             }
+            // WHY: a name the draft holds is never removed, whichever row holds it. A device cleared and then saved
+            // again comes back as a new draft row with no master row behind it, so its master row reads as removed
+            // - and stored as pending, the cleanup would take a device out of every installation while it was in the
+            // master (found 2026-10-11, A10).
+            List<String> removed = draft.masterNamesNotInDraft().stream()
+                    .filter(name -> !draftNames.contains(name))
+                    .toList();
 
             // WHY: the draft is emptied before the master. Its rows point at master rows, and emptying the master
             // first would work only because master_id happens to be ON DELETE SET NULL.

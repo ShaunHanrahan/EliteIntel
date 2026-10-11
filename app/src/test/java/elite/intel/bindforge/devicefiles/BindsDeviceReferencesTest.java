@@ -6,6 +6,7 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Map;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -96,6 +97,20 @@ class BindsDeviceReferencesTest {
     void aFolderWithNoBindsGivesNothing() throws IOException {
         assertTrue(BindsDeviceReferences.referencedEntryNames(bindings).isEmpty());
         assertTrue(BindsDeviceReferences.referencedEntryNames(bindings.resolve("gone")).isEmpty());
+    }
+
+    /** Each slot naming the device counts, across every preset - what CLEAR's refusal says is at stake (A10). */
+    @Test
+    void countsEverySlotNamingADeviceAcrossThePresets() throws IOException {
+        binds("Custom.4.2.binds", """
+                <Root>
+                  <A><Primary Device="LVWAP" Key="Joy_1" /><Secondary Device="LVWAP" Key="Joy_2" /></A>
+                  <B><Primary Device="Keyboard" Key="Key_B" /></B>
+                </Root>
+                """);
+        binds("Racing.4.2.binds", "<Root><A><Primary Device=\"LVWAP\" Key=\"Joy_3\" /></A></Root>");
+
+        assertEquals(Map.of("LVWAP", 3), BindsDeviceReferences.referenceCounts(bindings));
     }
 
     private void binds(String name, String content) throws IOException {

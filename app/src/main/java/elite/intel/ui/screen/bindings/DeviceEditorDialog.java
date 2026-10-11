@@ -2,6 +2,7 @@ package elite.intel.ui.screen.bindings;
 
 import com.google.common.eventbus.Subscribe;
 import elite.intel.bindforge.devices.DeviceEditorInputs;
+import elite.intel.bindforge.devices.DeviceEditorMiddle;
 import elite.intel.bindforge.devices.DeviceEditorLights;
 import elite.intel.bindforge.devices.InstallationMarkers;
 import elite.intel.bindforge.devices.MyDevice;
@@ -54,6 +55,10 @@ import static elite.intel.ui.theme.AppTheme.transparentPanel;
  * <strong>SAVE writes the draft and nothing else</strong> - never the master, never a game installation. APPLY is
  * the screen's button. Leaving with unsaved edits asks Save, Discard or Keep editing.
  * <p>
+ * <strong>CLEAR - RESET LABELS on a built-in - takes the device out of the draft</strong>, and APPLY takes it out of
+ * every installation ({@link DeviceEditorMiddle}, A10). A device cleared and not applied says so, cannot be edited,
+ * and offers its undo in the same place.
+ * <p>
  * <strong>Live highlighting</strong> listens to the Device Service for this device alone while the dialog is open
  * ({@link DeviceEditorLights}). The dialog never changes tab for an input: a box lights only where the user is
  * looking.
@@ -86,10 +91,11 @@ final class DeviceEditorDialog extends JDialog {
      * @param description which axes and hats it has when attached, else {@code null}
      * @param saved       the labels saved before the dialog opened: the draft's, or the master's with no draft
      * @param gameDrawsIt whether the game draws this device's inputs itself, so untouched defaults are not written
+     * @param middle      what the middle button is, and whether it can be pressed
      */
     record Opening(MyDevice device, String deviceName, Integer liveId, DeviceDescription description,
                    DeviceEditorInputs inputs, Map<String, String> saved, boolean gameDrawsIt,
-                   List<StripLine> strip) {
+                   List<StripLine> strip, DeviceEditorMiddle middle) {
     }
 
     private final Opening opening;
@@ -100,6 +106,7 @@ final class DeviceEditorDialog extends JDialog {
     private final Map<String, Color[]> restingColours = new LinkedHashMap<>();
     private final HudUnsavedHint unsavedHint = new HudUnsavedHint();
     private JButton save;
+    private JButton middle;
     private boolean saving;
 
     /** @param onSaved run on the EDT after a save, so the screen reads everything again */
@@ -130,6 +137,11 @@ final class DeviceEditorDialog extends JDialog {
         return opening.deviceName() != null;
     }
 
+    /** Labels can be edited once the device has a name - and not while it is cleared or reset, waiting for APPLY. */
+    private boolean editable() {
+        return named() && !opening.middle().undoing();
+    }
+
     private void buildUi() {
         JTabbedPane tabs = AppTheme.makeCompactTabs();
         tabs.addTab(getText("bindings.aliasDesigner.editor.tab.device"), deviceTab());
@@ -148,13 +160,19 @@ final class DeviceEditorDialog extends JDialog {
         save.addActionListener(e -> save());
         JButton back = makeButtonSubtle(getText("button.back"));
         back.addActionListener(e -> leave());
-        // WHY: laid out now, wired by the Actions slice (A10) - so the footer is final and A10 only connects it. On a
+        // WHY: in the middle, so the destructive button is beside neither of the ones reached for by habit. On a
         // built-in, RESET LABELS takes CLEAR's place, since CLEAR would remove Frontier's entry.
-        JButton clear = makeButtonSubtle(getText(opening.device().builtIn()
-                ? "bindings.aliasDesigner.editor.button.resetLabels"
-                : "bindings.aliasDesigner.editor.button.clear"));
-        clear.setEnabled(false);
-        clear.setToolTipText(getText("bindings.aliasDesigner.editor.button.notYet"));
+        DeviceEditorMiddle rule = opening.middle();
+        middle = makeButtonSubtle(getText(switch (rule.kind()) {
+            case CLEAR -> "bindings.aliasDesigner.editor.button.clear";
+            case RESET_LABELS -> "bindings.aliasDesigner.editor.button.resetLabels";
+            case UNDO_CLEAR -> "bindings.aliasDesigner.editor.button.undoClear";
+            case UNDO_RESET -> "bindings.aliasDesigner.editor.button.undoReset";
+        }));
+        middle.setEnabled(rule.enabled());
+        String why = whyText(rule);
+        if (why != null) middle.setToolTipText(why);
+        middle.addActionListener(e -> middleAction());
 
         HudModalSpec spec = HudModalSpec.builder()
                 .title(getText("bindings.aliasDesigner.editor.title", titleName()))
@@ -162,7 +180,7 @@ final class DeviceEditorDialog extends JDialog {
                 .body(body)
                 .scrollBody(false)
                 .dismiss(back)
-                .middle(clear)
+                .middle(middle)
                 .unsavedHint(unsavedHint)
                 .primary(save)
                 .build();
@@ -182,7 +200,7 @@ final class DeviceEditorDialog extends JDialog {
     /** An input tab, disabled while the device has no name: there is nothing yet for its labels to be saved under. */
     private void addInputTab(JTabbedPane tabs, String titleKey, JComponent content) {
         tabs.addTab(getText(titleKey), content);
-        tabs.setEnabledAt(tabs.getTabCount() - 1, named());
+        tabs.setEnabledAt(tabs.getTabCount() - 1, editable());
     }
 
     // ------------------------------------------------------------------ DEVICE
@@ -197,6 +215,14 @@ final class DeviceEditorDialog extends JDialog {
                 : device.builtIn() && device.alias() == null
                 ? "bindings.aliasDesigner.editor.builtIn"
                 : "bindings.aliasDesigner.editor.name.readOnly"), HudPalette.HUD_COLOR_ROLE_SECONDARY_TEXT);
+        DeviceEditorMiddle rule = opening.middle();
+        if (rule.undoing()) {
+            row = line(panel, row, getText(rule.kind() == DeviceEditorMiddle.Kind.UNDO_RESET
+                    ? "bindings.aliasDesigner.editor.reset"
+                    : "bindings.aliasDesigner.editor.cleared"), HudPalette.HUD_COLOR_ROLE_WARNING);
+        } else if (rule.why() == DeviceEditorMiddle.Why.NAMED_IN_BINDS) {
+            row = line(panel, row, whyText(rule), HudPalette.HUD_COLOR_ROLE_WARNING);
+        }
         row = field(panel, row, "bindings.aliasDesigner.editor.field.vid", device.vid());
         row = field(panel, row, "bindings.aliasDesigner.editor.field.pid", device.pid());
         row = readout(panel, row, "bindings.aliasDesigner.editor.field.windowsName",
@@ -335,7 +361,7 @@ final class DeviceEditorDialog extends JDialog {
         sized(box, FIELD_COLUMNS);
         ((AbstractDocument) box.getDocument()).setDocumentFilter(new LengthLimit());
         box.setText(starting.get(token));
-        box.setEditable(named());
+        box.setEditable(editable());
         box.getDocument().addDocumentListener(new DocumentListener() {
             @Override public void insertUpdate(DocumentEvent e) { refreshDirty(); }
             @Override public void removeUpdate(DocumentEvent e) { refreshDirty(); }
@@ -364,7 +390,7 @@ final class DeviceEditorDialog extends JDialog {
     }
 
     private boolean dirty() {
-        return named() && DeviceEditorInputs.changed(starting, boxValues());
+        return editable() && DeviceEditorInputs.changed(starting, boxValues());
     }
 
     private void refreshDirty() {
@@ -429,6 +455,78 @@ final class DeviceEditorDialog extends JDialog {
                 onSaved.run();
             });
         }, "BindForge-DeviceEditorSave").start();
+    }
+
+    // ------------------------------------------------------------------ the middle button
+
+    /** Why the middle button cannot be pressed, as its tooltip - or {@code null} when it can. */
+    private String whyText(DeviceEditorMiddle rule) {
+        return switch (rule.why()) {
+            case NONE -> null;
+            case NO_NAME -> getText("bindings.aliasDesigner.editor.why.noName");
+            case NOT_ADDED -> getText("bindings.aliasDesigner.editor.why.notAdded");
+            case NOTHING_TO_RESET -> getText("bindings.aliasDesigner.editor.why.nothingToReset");
+            case NAMED_IN_BINDS -> getText("bindings.aliasDesigner.editor.namedInBinds", rule.bindings(),
+                    opening.deviceName());
+        };
+    }
+
+    /**
+     * CLEAR and RESET LABELS ask first, naming how many installations Apply will reach; the undo does not, since it
+     * puts back what the master already holds. Each writes the draft alone, then closes.
+     */
+    private void middleAction() {
+        DeviceEditorMiddle rule = opening.middle();
+        if (saving || !rule.enabled()) return;
+        String name = opening.deviceName();
+        BindForgeDeviceDraftManager draft = BindForgeDeviceDraftManager.getInstance();
+        if (rule.undoing()) {
+            runAndClose(() -> draft.restoreFromMaster(name));
+            return;
+        }
+        boolean reset = rule.kind() == DeviceEditorMiddle.Kind.RESET_LABELS;
+        if (!HudConfirmDialog.confirm(this, getText("bindings.aliasDesigner.editor.heading"),
+                getText(reset
+                        ? "bindings.aliasDesigner.editor.reset.confirm"
+                        : "bindings.aliasDesigner.editor.clear.confirm", name, opening.strip().size()),
+                getText(reset
+                        ? "bindings.aliasDesigner.editor.button.resetLabels"
+                        : "bindings.aliasDesigner.editor.button.clear"),
+                getText("button.back"))) {
+            return;
+        }
+        runAndClose(() -> draft.removeByName(name));
+    }
+
+    /** Writes the draft off the EDT, then closes and has the screen read everything again - as SAVE does. */
+    private void runAndClose(Runnable work) {
+        saving = true;
+        middle.setEnabled(false);
+        refreshDirty();
+        new Thread(() -> {
+            String failure = null;
+            try {
+                work.run();
+            } catch (RuntimeException e) {
+                // WHY: broad on purpose - a thread boundary, and the user pressed the button and must be told.
+                log.warn("The Device Editor could not change {}", opening.deviceName(), e);
+                failure = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+            }
+            String loadedFailure = failure;
+            SwingUtilities.invokeLater(() -> {
+                saving = false;
+                if (loadedFailure != null) {
+                    middle.setEnabled(opening.middle().enabled());
+                    refreshDirty();
+                    HudConfirmDialog.info(this, getText("bindings.aliasDesigner.editor.heading"),
+                            getText("bindings.aliasDesigner.editor.actionFailed", loadedFailure),
+                            getText("bindings.aliasDesigner.firstSetup.close"));
+                    return;
+                }
+                dispose();
+                onSaved.run();
+            });
+        }, "BindForge-DeviceEditorAction").start();
     }
 
     // ------------------------------------------------------------------ live highlighting

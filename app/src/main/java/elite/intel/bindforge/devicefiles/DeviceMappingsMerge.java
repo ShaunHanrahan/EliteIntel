@@ -8,6 +8,7 @@ import org.w3c.dom.NodeList;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -92,6 +93,38 @@ public final class DeviceMappingsMerge {
         for (int i = leading.size() - 1; i >= 0; i--) {
             root.insertBefore(leading.get(i), root.getFirstChild());
         }
+        return new Result(DeviceFileXml.write(document), true);
+    }
+
+    /**
+     * Takes the named elements out of the file - CLEAR, applied (Alan, 2026-10-11, A10). Every element with one of
+     * those tags goes, a second copy further down included: the name has left the user's set, so no copy of it is
+     * the master's to keep.
+     * <p>
+     * The caller passes only the user's names. Frontier's elements are never removed - on a built-in, RESET LABELS
+     * removes a {@code .buttonMap}, never the entry.
+     *
+     * @param existing the installation's current file
+     * @param names    element tags to remove, matched exactly as the game matches them
+     * @throws IOException if {@code existing} is not a {@code DeviceMappings.xml}
+     */
+    public static Result remove(byte[] existing, Collection<String> names) throws IOException {
+        Document document = DeviceFileXml.parse(existing);
+        Element root = document.getDocumentElement();
+        if (root == null || !ROOT.equals(root.getTagName())) {
+            throw new IOException("Not a DeviceMappings.xml: its root element is <"
+                    + (root == null ? "" : root.getTagName()) + ">, not <" + ROOT + ">");
+        }
+
+        List<Node> gone = new ArrayList<>();
+        NodeList children = root.getChildNodes();
+        for (int i = 0; i < children.getLength(); i++) {
+            Node child = children.item(i);
+            if (child.getNodeType() == Node.ELEMENT_NODE && names.contains(child.getNodeName())) gone.add(child);
+        }
+        // WHY: untouched when nothing matched, as merge does - no write, no Edit History entry, no new timestamp.
+        if (gone.isEmpty()) return new Result(existing, false);
+        gone.forEach(root::removeChild);
         return new Result(DeviceFileXml.write(document), true);
     }
 

@@ -447,7 +447,7 @@ row shows its ways out as buttons, as first setup shows its choices; each asks b
 | An entry the master does not hold | **Adopt** from one installation. Revert would leave it where it is: the push never removes |
 | Labels differ | **Compare labels** — the re-merge — or **revert** |
 | `DeviceMappings.xml` unreadable | **None.** The push cannot read it either; the row says to restore it or fix it by hand |
-| Orphan `.buttonMap` | **None.** Removing a file is [CLEAR](#actions-and-what-each-one-reaches)'s; the row says so |
+| Orphan `.buttonMap` | **None.** ~~Removing a file is [CLEAR](#actions-and-what-each-one-reaches)'s; the row says so~~ CLEAR acts on a device, and an orphan has none: the row says to remove it by hand or restore it (2026-10-11, [A10](#built--2026-10-11-alan-a10)) |
 
 - **Adopt from a row takes that device and nothing else.** Adopting the whole installation, as the startup check's
   adopt does, would also drop from the master every entry that installation lacks — fixing one stick's PID could
@@ -1155,7 +1155,7 @@ removes the files (CLEAR) works from that list. **A rename does not:** its old `
 `previous_name`, which Apply carries into the master. **Master ids change on every Apply**, because the
 master is emptied and refilled, so a device is identified by name across one.
 
-*Half settled 2026-10-10: the dialog's DISCARD is the first of the two below — BACK throws away the edits made
+*Settled 2026-10-11 ([A10](#built--2026-10-11-alan-a10)): the screen's DISCARD is the second, the whole draft.* *Half settled 2026-10-10: the dialog's DISCARD is the first of the two below — BACK throws away the edits made
 since the dialog opened. Whether anything puts the whole draft back to the master is still the Actions slice's.*
 **DISCARD is still two things in this spec**, and which the button does is the Actions slice's to settle:
 throwing away edits not yet saved ([Unsaved Work on Exit](overview.md#unsaved-work-on-exit)), or putting the
@@ -1209,6 +1209,68 @@ RHVCAPDirection from all 3 installations?"* — using
 
 This also replaces the old "delete and recreate to fix a wrong VID/PID" repair path, which never worked as
 written: automatic registration would re-add a connected device immediately.
+
+#### An edit `.binds` depends on updates `.binds` — 2026-10-11 (Alan)
+
+**When the user changes a `DeviceMappings.xml` entry, or its `.buttonMap`, that the shared `.binds` depends on,
+Alias Designer must update `.binds` to match**, so that no edit of the user's leaves bindings pointing at a device
+the game no longer knows. Recorded while building A10; it had never been stated before. **Undecided:** whether
+Alias Designer writes `.binds` itself or hands the change to the Bind Editor as a task.
+
+What it reaches today:
+
+- **CLEAR** on a device `.binds` names: without the entry, `.binds` must name the device by its hardware ID
+  instead, as the game itself writes a device with no entry ([format §4.0](domain-knowledge/EliteDangerous-BindsFileFormat.md#40-the-rule-confirmed-2026-09-08)).
+  That rewrite is `bindforge.io` and not built, so CLEAR is **refused** for such a device until it is, and says how
+  many bindings name it. When it exists, CLEAR does both, `.binds` last, as a [rename](#binds-goes-last-and-only-if-every-installation-succeeded) does.
+- **RESET LABELS and every label edit** are not reached: `.binds` names a device by its element and its inputs by
+  token (`Joy_5`), never by label.
+- **A rename** already carries its `.binds` rewrite ([below](#renaming-a-device)); **a retarget** keeps the name,
+  so `.binds` does not change.
+
+#### Built — 2026-10-11 (Alan, A10)
+
+Built as the Device Editor's middle button (`bindforge.devices.DeviceEditorMiddle`, pure), APPLY and DISCARD on
+the Alias Designer screen, `bindforge.devicefiles.DeviceApply` (now with its first caller), removals in
+`DeviceFilesPush.push(Set)` and `DeviceMappingsMerge.remove`, and `bindforge.devicefiles.DraftChanges` (pure).
+Alan answered five questions, one at a time:
+
+- **CLEAR is refused while `.binds` names the device** — the rule above — with the count: *"142 bindings name
+  LVWAP. Clearing it means moving them to its hardware ID, which is not built yet."* Compared ignoring case.
+  **The Apply cleanup never removes an entry `.binds` names either**, whoever made it pending — first setup's
+  shadowed and losing names included: it stays pending, and the report says so. When `.binds` cannot be read,
+  nothing is removed.
+- **RESET LABELS on `VPCPanel` or `VPCThrottle` puts Frontier's map back**, byte for byte from the jar
+  (`FrontierStockButtonMaps.shippedContent`), since a `.buttonMap` Frontier shipped is never removed. On any other
+  built-in it deletes the file in every installation, and [startup generation](#at-elite-intel-startup-a-buttonmap-for-every-connected-named-controller)
+  makes a fresh one the next time the controller connects. Frontier's element is never touched.
+- **A device cleared or reset in the draft, not yet applied, says so** — *"Cleared. Apply removes it from every
+  installation."* — its input tabs are disabled, and the middle button becomes **UNDO CLEAR** (or **UNDO RESET**),
+  which puts it back as the master holds it. The undo asks nothing: it changes no game file.
+- **APPLY and DISCARD are in the screen's footer.** APPLY is the primary, on the right, and is offered whenever the
+  master exists — with nothing saved it still pushes the master, which is the retry after a partial Apply. It asks
+  first, naming the installation count, and reports per installation: *"Updated 2 of 3"*, each failure's reason,
+  what was removed, what was held back and why. **DISCARD throws the whole draft away** — the second DISCARD
+  [above](#one-record-and-where-it-lands--reworked-2026-09-26), now settled; the dialog's BACK is the first. It is
+  offered only when the draft changes something, asks first naming the devices, and touches no installation.
+  Beside it, *"Saved, not applied: LVWAP, T-Rudder"*.
+- **An orphan `.buttonMap` no device owns is left alone.** Apply's cleanup removes the ones BindForge recorded as
+  pending; a stray file nobody recorded stays a yellow row that says to remove it by hand or restore from a backup.
+  A **Remove** way out for it is for a later slice.
+
+*Also settled while building it:*
+
+- **"The draft changes something" is one definition** (`DraftChanges`): a device added, removed, or with a
+  different name, hardware or label. A started draft that matches the master changes nothing — which the
+  [unsaved-work prompt](#exit-prompt) will need too.
+- **A removal leaves every installation in the same unit as Apply's updates** — one installation's
+  `DeviceMappings.xml` and `.buttonMap` files change together or not at all, and each removed file is kept in
+  [Edit History](file-manager.md#edit-history) first. Every element with the name goes, a second copy included.
+- **A name stays pending until every installation has lost it**, so one on an unplugged drive is removed by the
+  next Apply. Revert removes nothing.
+- **Found:** a device cleared and then saved again came back as a new draft row, and Apply would have stored it as a
+  pending removal while it was in the master. A name the draft holds is now never pending.
+- **CLEAR and RESET LABELS confirm, naming the installation count**; both write the draft only.
 
 ## Renaming a Device
 

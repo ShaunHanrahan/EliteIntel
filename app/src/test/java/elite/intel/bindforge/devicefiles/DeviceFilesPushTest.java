@@ -17,6 +17,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.assertArrayEquals;
@@ -229,8 +230,81 @@ class DeviceFilesPushTest {
         assertEquals(DEVICE_MAPPINGS, read(steam.controlSchemes().resolve("DeviceMappings.xml")));
     }
 
+    /** CLEAR, applied: the entry and its {@code .buttonMap} leave every installation, and both are kept first. */
+    @Test
+    void aClearedDeviceLosesItsEntryAndButtonMapInEveryInstallation() throws IOException {
+        Target steam = installation(1, "STEAM");
+        Target epic = installation(2, "EPIC");
+        push(List.of(steam, epic), List.of(RVWAP));
+
+        Report report = pusher(List.of(steam, epic), List.of()).push(Set.of("RVWAP"));
+
+        assertEquals(2, report.matchingCount());
+        for (Target target : List.of(steam, epic)) {
+            String deviceMappings = read(target.controlSchemes().resolve("DeviceMappings.xml"));
+            assertFalse(deviceMappings.contains("RVWAP"), deviceMappings);
+            assertTrue(deviceMappings.contains("<!-- XB1 Controller -->"), "everything else in the file is kept");
+            assertFalse(Files.exists(buttonMap(target, "RVWAP")));
+        }
+        assertTrue(historyFiles().stream().anyMatch(file -> file.toString().contains("RVWAP")),
+                "the removed .buttonMap is in Edit History");
+    }
+
+    /** RESET LABELS on a built-in: its {@code .buttonMap} goes, and Frontier's element stays exactly where it was. */
+    @Test
+    void aResetBuiltInLosesOnlyItsButtonMap() throws IOException {
+        Target steam = installation(1, "STEAM");
+        writeButtonMap(steam, "T-Rudder", "<Root><Joy_XAxis>RUDDER</Joy_XAxis></Root>");
+
+        InstallationResult result = resultFor(pusher(List.of(steam), List.of()).push(Set.of("T-Rudder")), steam);
+
+        assertEquals(Outcome.WRITTEN, result.outcome());
+        assertEquals(DEVICE_MAPPINGS, read(steam.controlSchemes().resolve("DeviceMappings.xml")));
+        assertFalse(Files.exists(buttonMap(steam, "T-Rudder")));
+    }
+
+    /** A map Frontier ships is never removed: RESET LABELS puts Frontier's file back (Alan, 2026-10-11). */
+    @Test
+    void resettingAMapFrontierShipsPutsFrontiersFileBack() throws IOException {
+        Target steam = installation(1, "STEAM");
+        writeButtonMap(steam, "VPCPanel", "<Root><Joy_1>MY LABEL</Joy_1></Root>");
+
+        pusher(List.of(steam), List.of()).push(Set.of("VPCPanel"));
+
+        assertArrayEquals(FrontierStockButtonMaps.getInstance().shippedContent("VPCPanel").orElseThrow(),
+                Files.readAllBytes(buttonMap(steam, "VPCPanel")));
+    }
+
+    @Test
+    void aRemovalAlreadyDoneWritesNothing() throws IOException {
+        Target steam = installation(1, "STEAM");
+
+        InstallationResult result = resultFor(pusher(List.of(steam), List.of()).push(Set.of("RVWAP")), steam);
+
+        assertEquals(Outcome.UNCHANGED, result.outcome());
+        assertEquals(0, historyCopies());
+    }
+
+    /** Revert removes nothing: an entry the master no longer holds stays until Apply removes it. */
+    @Test
+    void revertRemovesNothing() throws IOException {
+        Target steam = installation(1, "STEAM");
+        push(List.of(steam), List.of(RVWAP));
+
+        pusher(List.of(steam), List.of()).push(1);
+
+        assertTrue(read(steam.controlSchemes().resolve("DeviceMappings.xml")).contains("<RVWAP>"));
+        assertTrue(Files.exists(buttonMap(steam, "RVWAP")));
+    }
+
     private Report push(List<Target> targets, List<MasterDevice> master) {
         return pusher(targets, master).push();
+    }
+
+    private static void writeButtonMap(Target target, String device, String content) throws IOException {
+        Path file = buttonMap(target, device);
+        Files.createDirectories(file.getParent());
+        Files.writeString(file, content);
     }
 
     private DeviceFilesPush pusher(List<Target> targets, List<MasterDevice> master) {
