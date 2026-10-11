@@ -103,18 +103,23 @@ public class LocationDto implements ToJsonConvertible {
     private String parentBodyName;
     private Long parentBodyId; // in-game bodyID of parent body (set for moons: the parent planet's bodyID)
 
+    // WHY the constructors assign bodyId directly instead of going through setBodyId: the field starts at 0, and
+    // setBodyId never lets a lower id overwrite a higher one, so the -1 every "not found" lookup passes in was
+    // silently dropped and the empty record came back as body 0 - indistinguishable from a primary star. A home
+    // system with no record was then plotted to as a blank name, with nothing said (bundle 2026-10-11).
+
     public LocationDto(long bodiId) {
-        setBodyId(bodiId);
+        this.bodyId = bodiId;
     }
 
     public LocationDto(Long bodyId, Long systemAddress) {
-        setBodyId(bodyId == null ? -1L : bodyId);
+        this.bodyId = bodyId == null ? -1L : bodyId;
         setSystemAddress(systemAddress == null ? -1L : systemAddress);
     }
 
 
     public LocationDto(long id, String starName) {
-        setBodyId(id);
+        this.bodyId = id;
         setStarName(starName);
     }
 

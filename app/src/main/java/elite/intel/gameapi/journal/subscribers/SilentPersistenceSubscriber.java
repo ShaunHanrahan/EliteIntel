@@ -92,7 +92,7 @@ public class SilentPersistenceSubscriber {
         // Only when the journal's body type maps to something: determineType answers null for "Planet", and
         // assigning that erases the classification a scan established.
         String bodyType = event.getBodyType() != null ? event.getBodyType().toLowerCase(Locale.ROOT) : "";
-        LocationDto.LocationType type = LocationDto.determineType(bodyType, event.getDistFromStarLS() > 0);
+        LocationDto.LocationType type = LocationDto.determineType(bodyType, event.getDistFromStarLS() == 0);
         if (type != null) {
             dto.setLocationType(type);
         }

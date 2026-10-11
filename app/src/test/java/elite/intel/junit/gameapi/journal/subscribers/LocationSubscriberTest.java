@@ -173,6 +173,67 @@ class LocationSubscriberTest {
     }
 
     /**
+     * A login at a system's main star reports it as BodyType Star with no DistFromStarLS. The distance test was
+     * inverted, so every such login relabelled the PRIMARY_STAR record as STAR, and "navigate to home system",
+     * which asks for the PRIMARY_STAR record, found nothing (bundle 2026-10-11).
+     */
+    @Test
+    void aLoginAtTheMainStarKeepsItThePrimaryStar() throws InterruptedException {
+        long sysAddr = 7268024264097L;
+        String star = "Synuefuae PD-J b42-3";
+        LocationDto primary = new LocationDto(0L, sysAddr);
+        primary.setStarName(star);
+        primary.setPlanetName(star);
+        primary.setLocationType(LocationDto.LocationType.PRIMARY_STAR);
+        locationManager.save(primary);
+
+        subscriber.onLocationEvent(starLocationEvent(star, sysAddr, star, 0L, 0.0));
+
+        awaitTrue(() -> locationManager.findBySystemAddress(sysAddr, star).getTrafficDto() != null);
+
+        assertEquals(LocationDto.LocationType.PRIMARY_STAR,
+                locationManager.findBySystemAddress(sysAddr, star).getLocationType());
+        assertEquals(star, locationManager.findBySystemAddress(sysAddr).getStarName(),
+                "the system's primary-star lookup must still find it");
+    }
+
+    @Test
+    void aLoginAtACompanionStarDoesNotMakeItThePrimaryStar() throws InterruptedException {
+        long sysAddr = 7268024264098L;
+        String star = "Synuefuae PD-J b42-4";
+        String companion = star + " B";
+
+        subscriber.onLocationEvent(starLocationEvent(star, sysAddr, companion, 2L, 1520.75));
+
+        awaitTrue(() -> locationManager.findBySystemAddress(sysAddr, companion).getTrafficDto() != null);
+
+        assertEquals(LocationDto.LocationType.STAR,
+                locationManager.findBySystemAddress(sysAddr, companion).getLocationType());
+    }
+
+    private static LocationEvent starLocationEvent(String starSystem, long systemAddress, String body,
+                                                   long bodyId, double distFromStarLs) {
+        JsonObject j = new JsonObject();
+        j.addProperty("timestamp", Instant.now().plusSeconds(1).toString());
+        j.addProperty("event", "Location");
+        j.addProperty("StarSystem", starSystem);
+        j.addProperty("SystemAddress", systemAddress);
+        j.addProperty("Body", body);
+        j.addProperty("BodyID", bodyId);
+        j.addProperty("BodyType", "Star");
+        if (distFromStarLs > 0) j.addProperty("DistFromStarLS", distFromStarLs);
+        j.addProperty("SystemAllegiance", "");
+        j.addProperty("SystemSecurity", "$GAlAXY_MAP_INFO_state_anarchy;");
+        j.addProperty("Population", 0L);
+        JsonArray starPos = new JsonArray();
+        starPos.add(5068.6875);
+        starPos.add(-104.65625);
+        starPos.add(-13.28125);
+        j.add("StarPos", starPos);
+        return new LocationEvent(j);
+    }
+
+    /**
      * Shaped after a verbatim docked Location line: the Body is the moon, the station is the carrier on it.
      */
     private static LocationEvent dockedAtCarrier(String starSystem, long systemAddress, String body,
