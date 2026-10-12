@@ -652,6 +652,11 @@ therefore done as one change on `V1.1-Release` and merged up.
 **A new class here that only V1.2 calls is built on `V1.2-BindForge`** (Alan, 2026-10-11). It edits no file V1.1
 ships, so the conflict the rule above guards against cannot arise — the watcher below is the first.
 
+**A V1.2 feature that must change an existing file here, or in `bindforge.io` and `.rules`, goes on
+`V1.1-Release-bf-foundation`** (Krondor, 2026-10-12): a branch off `V1.1-Release` that he checks and merges, so it
+merges up like his fixes. What goes on it adds only and changes nothing V1.1 does —
+[the terms](../05-build-plan/README.md#the-foundation-branch--how-a-v12-feature-changes-a-file-v11-ships-krondor-2026-10-12).
+
 **Watching: `io.FilePoller` — built 2026-10-11 (C5).** It says which of a set of files changed since the last look,
 by last-modified plus size, and holds no thread. It polls rather than using `WatchService`, as
 `AuxiliaryFilesMonitor` does, because notifications for files another process writes arrive late, get merged, or

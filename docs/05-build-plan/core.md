@@ -76,8 +76,9 @@ Growing it touches `bindforge.io` — see C4.
 
 - **New BindForge code** goes under `elite.intel.bindforge` — `devicefiles` (C1 writes device files), `devices`, `install`, or a new package if Apply
   wants one. Decide in the sources table.
-- **`bindforge.io`, `bindforge.rules`, `elite.intel.io`, `AppPaths`** are shared with V1.1. Slices that need them
-  are blocked until the question in [the README](README.md#one-question-to-settle-with-krondor-before-sections-3-5-and-6) is answered.
+- **`bindforge.io`, `bindforge.rules`, `elite.intel.io`, `AppPaths`** are shared with V1.1. Changes to them
+  go on [the foundation branch](README.md#the-foundation-branch--how-a-v12-feature-changes-a-file-v11-ships-krondor-2026-10-12)
+  (Krondor, 2026-10-12); a slice that needs one waits until that change has merged up.
 - **`ai.hands`** — never.
 
 ## Slices
@@ -87,12 +88,12 @@ Growing it touches `bindforge.io` — see C4.
 | C1 | **Device-file write** — merge the master's elements into each installation's `DeviceMappings.xml` and `.buttonMap`; keep unique prior content; atomic replace; prune; per installation, reported | **done 2026-10-04** |
 | C2 | **Device draft** — where unapplied device edits live; SAVE writes the draft, APPLY promotes it | **done 2026-10-04** |
 | C3 | **Startup check for device files** — each installation against the master: unchanged, wiped (matches the stock reference), or edited; adopt or revert | **done 2026-10-05** |
-| C4 | **`.binds` and `StartPreset`** — whole-file master, Edit History on apply, the version-bump merge | blocked — `bindforge.io` |
+| C4 | **`.binds` and `StartPreset`** — whole-file master, Edit History on apply, the version-bump merge | waiting — its file-level part goes on the foundation branch, scoped first ([README](README.md#the-foundation-branch--how-a-v12-feature-changes-a-file-v11-ships-krondor-2026-10-12)) |
 | C5 | **Change detection for the install folders** | **done 2026-10-11** |
 | C6 | **Unsaved work on exit** — Save or Discard, never Apply | **done 2026-10-12** — a ruling, no code |
 | C7 | **First-time startup** | after Preset Editor can read all four `StartPreset` lines |
 
-**No Core slice is next.** C4 is blocked on `bindforge.io`, C7 waits on Preset Editor.
+**No Core slice is next.** C4 waits on the foundation branch, C7 on Preset Editor.
 
 ### C1 in detail — designed 2026-10-03, built 2026-10-04
 

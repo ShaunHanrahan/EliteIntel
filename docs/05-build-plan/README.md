@@ -30,8 +30,9 @@ Krondor's work is not reviewed as ours.
 
 - **`CLAUDE.md`**, and [WORKING-RULES.md](../../WORKING-RULES.md) — spec first, sources table, terminology.
 - **Shared code changes on `V1.1-Release`, via Krondor, and merges up.** That covers `bindforge.io`,
-  `bindforge.rules`, `elite.intel.io` and `AppPaths` — anything both release lines call. A slice that needs one
-  of them is **blocked** until it is settled with him, not worked around. **A new class only V1.2 calls is
+  `bindforge.rules`, `elite.intel.io` and `AppPaths` — anything both release lines call. A V1.2 feature that
+  needs one of them is built on [the foundation branch](#the-foundation-branch--how-a-v12-feature-changes-a-file-v11-ships-krondor-2026-10-12),
+  never worked around, and the slice waits until it has merged up. **A new class only V1.2 calls is
   not a change to shared code** and is built on `V1.2-BindForge` (Alan, 2026-10-11 — [the platform map](../01-host-integration/elite-intel-platform-map.md#the-shared-write-path-is-eliteintelio--built-2026-10-03)).
 - **`elite.intel.ai.hands` is keystroke execution only.** BindForge code never goes there.
 - **Migrations:** the next free number in BindForge's band, `12000–12499`. Never edit an applied one.
@@ -49,6 +50,7 @@ it is the machinery every tab writes through, so it comes first and is built onl
 
 | # | Section | Brief | Spec | State |
 |---|---|---|---|---|
+| 0 | **Foundation** — the additions to shared V1.1 files that later slices need, on `V1.1-Release-bf-foundation`; built off `V1.1-Release`, merged by Krondor | *not yet written* | the specs of the slices it unblocks | nothing built; branch not yet created |
 | 1 | **Core** — master and draft, Apply, Edit History filling, startup check | [core.md](core.md) | [overview.md](../02-features/bindforge/overview.md) | C1–C3, C5 and C6 done; C4 blocked; C7 waits on Preset Editor |
 | 2 | **Alias Designer** | [alias-designer.md](alias-designer.md) | [alias-designer.md](../02-features/bindforge/alias-designer.md) | device list, naming rule, startup `.buttonMap`, first setup, the label merge, divergence against the master and its ways out, the Installations markers, the Built-in Devices tab, which axes and hats a controller has, the Device Editor, the actions (CLEAR, RESET LABELS, APPLY, DISCARD), the missing-controller warning built; nothing unblocked — A6b and A11 wait on the `.binds` rewrite |
 | 3 | **Preset Editor** | *not yet written* | [preset-editor.md](../02-features/bindforge/preset-editor.md) | nothing built |
@@ -62,13 +64,31 @@ first slice. Written the week its section starts, it is accurate; written months
 
 **The Bind Editor is two sections** because its spec is longer than the other three combined.
 
-## One question to settle with Krondor before sections 3, 5 and 6
+## The foundation branch — how a V1.2 feature changes a file V1.1 ships (Krondor, 2026-10-12)
 
-Preset Editor's first job is reading all four lines of `StartPreset` — `BindingsLoader.getActivePresetName()`
-reads only the first — and the Bind Editor widens `BindingsWriter` and consolidates the conflict scanner. All of
-that is `bindforge.io` and `bindforge.rules`, which V1.1 also ships to. These are V1.2 features, not V1.1 fixes,
-so the shared-code rule does not obviously cover them. **How a V1.2 feature changes a file V1.1 also ships**
-needs his answer before the first conflict, not after. Core C4 and C5 wait on the same answer.
+**The question was:** Preset Editor's first job is reading all four lines of `StartPreset` —
+`BindingsLoader.getActivePresetName()` reads only the first — and the Bind Editor widens `BindingsWriter` and
+consolidates the conflict scanner. All of that is `bindforge.io` and `bindforge.rules`, which V1.1 also ships.
+These are V1.2 features, not V1.1 fixes, so the shared-code rule did not cover them.
+
+**The answer:** such changes are made on **`V1.1-Release-bf-foundation`**, a branch off `V1.1-Release`. Krondor
+checks it and merges it into `V1.1-Release`, and it reaches V1.2 by the same merge-up as his fixes — so nobody
+resolves a conflict in his files without knowing what he has in flight.
+
+**What goes on it must be invisible to V1.1 users**, because it ships in his weekly releases (the terms it was
+proposed on):
+
+- **Additions only.** Existing methods do exactly what they did; a widened behaviour is a new method beside the
+  old one, never a change to it.
+- **No migrations, no UI, no strings, no new startup work.**
+- **Nothing that depends on V1.2-only code** — `bindforge.devicefiles`, `bindforge.devices` and the rest do not
+  exist there.
+- **Tested on its own**, and V1.1's own tests still pass.
+
+**What it unblocks**, each once its change has merged up to `V1.2-BindForge`: the four-line `StartPreset` read
+(Preset Editor, Core C7); the `.binds` device rewrite (Alias Designer A6b, A11, and CLEAR on a device `.binds`
+names); the writer's user-edit path (Bind Editor); the file-level part of the whole-file `.binds` master (Core C4),
+scoped first. Its work is planned in its own brief — **section 0 below**.
 
 ## Writing a new brief
 
