@@ -41,7 +41,7 @@ class ExobiologyObjectiveCardTest {
 
         assertEquals("EXOBIOLOGY", card.title());
         assertEquals(HudObjective.PRIORITY_AMBIENT, card.priority());
-        assertEquals(List.of("GENUS", "BACTERIUM", "FONTICULUA"), labels(card));
+        assertEquals(List.of("GENUS", "BACTERIUM (500m)", "FONTICULUA (500m)"), labels(card));
         assertEquals(0, card.rows().getFirst().current());
         assertEquals(2, card.rows().getFirst().max());
     }
@@ -54,9 +54,27 @@ class ExobiologyObjectiveCardTest {
         HudObjective card = ExobiologyObjectiveSource.card(
                 body, List.of(completed("Bacterium", "$Codex_Ent_Bacterial_Genus_Name;")), ID).orElseThrow();
 
-        assertEquals(List.of("GENUS", "FONTICULUA"), labels(card));
+        assertEquals(List.of("GENUS", "FONTICULUA (500m)"), labels(card));
         assertEquals(1, card.rows().getFirst().current(), "one of two genuses is done");
         assertEquals(2, card.rows().getFirst().max());
+    }
+
+    @Test
+    void theColonyRangeFollowsTheSymbolNotTheClientLanguage() {
+        LocationDto body = bodyWith(genus("Conque", "$Codex_Ent_Conchas_Genus_Name;"));
+
+        HudObjective card = ExobiologyObjectiveSource.card(body, List.of(), ID).orElseThrow();
+
+        assertEquals(List.of("GENUS", "CONQUE (150m)"), labels(card));
+    }
+
+    @Test
+    void aGenusWithNoKnownRangeShowsItsNameAlone() {
+        LocationDto body = bodyWith(genus("Mystery", "$Codex_Ent_Mystery_Genus_Name;"));
+
+        HudObjective card = ExobiologyObjectiveSource.card(body, List.of(), ID).orElseThrow();
+
+        assertEquals(List.of("GENUS", "MYSTERY"), labels(card));
     }
 
     @Test

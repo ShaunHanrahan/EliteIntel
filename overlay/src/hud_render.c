@@ -173,7 +173,13 @@ int hud_render(cairo_t *cr, int width, int draw) {
                     int tw, th;
                     pango_layout_set_text(body, readout, -1);
                     pango_layout_get_pixel_size(body, &tw, &th);
+                    // The bar starts at a fixed column so bars on one card line
+                    // up, but never over a label too long to end before it.
+                    int lw, lh;
+                    pango_layout_set_text(body, r->label, -1);
+                    pango_layout_get_pixel_size(body, &lw, &lh);
                     double bx = pad + sz(150);
+                    if (pad + lw + sz(12) > bx) bx = pad + lw + sz(12);
                     double bw = right - bx - tw - sz(12);
                     if (bw > 0) {
                         double bh = sz(7), by = y + body_h * 0.5 - bh * 0.5;

@@ -2,6 +2,7 @@ package elite.intel.ui.overlay;
 
 import elite.intel.db.managers.BioSamplesManager;
 import elite.intel.db.managers.LocationManager;
+import elite.intel.gameapi.data.BioForms;
 import elite.intel.gameapi.journal.events.dto.BioSampleDto;
 import elite.intel.gameapi.journal.events.dto.GenusDto;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
@@ -241,10 +242,19 @@ public class ExobiologyObjectiveSource implements HudObjectiveSource {
         return keys;
     }
 
+    /**
+     * The genus name followed by the distance its colonies must be apart, e.g. {@code CONCHA (150m)}: the
+     * one number the commander needs while walking between samples. The range is looked up by the FDev
+     * symbol, so it holds on any game client language; a genus the table does not know shows the name alone.
+     */
     private static String displayName(GenusDto genus) {
         String name = genus.getGenusLocalised();
         if (name == null || name.isBlank()) name = genus.getGenusSymbol();
-        return name == null ? HudText.get("overlay.card.row.unknownGenus") : name.toUpperCase(Locale.ROOT);
+        if (name == null) return HudText.get("overlay.card.row.unknownGenus");
+        Integer range = BioForms.colonyRangeOrNull(
+                genus.getGenusSymbol() == null || genus.getGenusSymbol().isBlank() ? name : genus.getGenusSymbol());
+        String label = name.toUpperCase(Locale.ROOT);
+        return range == null ? label : label + " (" + range + "m)";
     }
 
     /**
