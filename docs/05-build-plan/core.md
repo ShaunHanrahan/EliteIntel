@@ -89,8 +89,10 @@ Growing it touches `bindforge.io` — see C4.
 | C3 | **Startup check for device files** — each installation against the master: unchanged, wiped (matches the stock reference), or edited; adopt or revert | **done 2026-10-05** |
 | C4 | **`.binds` and `StartPreset`** — whole-file master, Edit History on apply, the version-bump merge | blocked — `bindforge.io` |
 | C5 | **Change detection for the install folders** | **done 2026-10-11** |
-| C6 | **Unsaved work on exit** — Save or Discard, never Apply | **next** — A10 done 2026-10-11; "has edits" is `DraftChanges.stored()`; see the 2026-10-06 note |
+| C6 | **Unsaved work on exit** — Save or Discard, never Apply | **done 2026-10-12** — a ruling, no code |
 | C7 | **First-time startup** | after Preset Editor can read all four `StartPreset` lines |
+
+**No Core slice is next.** C4 is blocked on `bindforge.io`, C7 waits on Preset Editor.
 
 ### C1 in detail — designed 2026-10-03, built 2026-10-04
 
@@ -138,6 +140,14 @@ Growing it touches `bindforge.io` — see C4.
 
 *Newest first. Two or three lines each: what was decided and where it is recorded, what was found, what the
 next slice needs.*
+
+- **2026-10-12 — C6 done as a ruling, no code (Alan).** Recorded in
+  [overview.md](../02-features/bindforge/overview.md#built-as-a-ruling-not-code--2026-10-12-alan-core-c6) and
+  alias-designer.md's Exit Prompt. **Saved but not applied is not unsaved**, so `DraftChanges.stored()` is *not* the
+  prompt's test (the earlier note here was wrong). The only unsaved state is the modal Device Editor, whose own
+  Save / Discard / Keep editing is the prompt; nothing else can close the app while it is open. **Later screens
+  owe:** Preset Editor and the Bind Editor bring the prompt with them if they hold edits outside a modal dialog,
+  hooked on the tab switch and `AppView`'s close. The `.binds` close prompt stays a known issue.
 
 - **2026-10-11 — C5 review fixes** (`code-integrity-review.md`, all but #7). **Every dropped refresh fixed, not
   only file changes (Alan):** `ui.screen.bindings.RefreshCoalescer` replaces `filesChanged` — any request made

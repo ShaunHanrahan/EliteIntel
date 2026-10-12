@@ -1455,6 +1455,10 @@ answer exists because the user is still on the screen and may only have pressed 
 modal, so it cannot be left open while the user navigates away; the prompt above covers what is left after it
 closes.
 
+**Nothing is left after it closes — 2026-10-12 (Alan, Core C6).** Every action on this screen writes the draft as it
+is pressed, and saved-but-not-applied is not unsaved, so the editor's prompt is the whole of the exit prompt here
+and the screen adds none. [The ruling](overview.md#built-as-a-ruling-not-code--2026-10-12-alan-core-c6).
+
 ## Deferred
 
 - **Recalibrate** — a feature to fix axis centre-point drift during live highlighting. Out of scope for this iteration.

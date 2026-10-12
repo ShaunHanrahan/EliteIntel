@@ -112,8 +112,8 @@ installations with each other before then. Once the master exists, each row offe
 | A12 | **When hardware changes** — a missing device, the identity question, retarget, one missing device at a time | A11 | waiting |
 | A13 | **The missing-controller warning**, once per run | — | **done 2026-10-11** |
 
-**No slice here is next.** A6b and A11 wait on the `.binds` rewrite, and A7 and A12 wait on them. The unblocked work
-is [Core C6](core.md#slices), the exit prompt, which A10 unblocked.
+**No slice here is next.** A6b and A11 wait on the `.binds` rewrite, and A7 and A12 wait on them. Core C6, the exit
+prompt A10 unblocked, was settled 2026-10-12 as a ruling with no code — the Device Editor's own prompt is it.
 
 **One `.binds` rewrite unblocks three slices:** A6b's hex case, A11's rename, and CLEAR on a device `.binds` names
 (refused until then — [the rule](../02-features/bindforge/alias-designer.md#an-edit-binds-depends-on-updates-binds--2026-10-11-alan)).

@@ -738,6 +738,23 @@ An earlier revision of this section specified a three-option dialog (Apply to Ga
 Discard). It put the only irreversible option first, in a dialog raised because the player was already
 leaving. Recorded here because the wording survives in older notes.
 
+### Built as a ruling, not code — 2026-10-12 (Alan, Core C6)
+
+**Saved but not applied is not unsaved.** A draft that differs from the master (`DraftChanges.stored()`) is work
+already saved: offering Save on it would do nothing, and Discard would throw away saved work. The prompt never
+fires on it — the same flaw recorded against the `.binds` close prompt in
+[core.md's known issues](../../05-build-plan/core.md#known-issues).
+
+**Today the only unsaved state in BindForge is the Device Editor's open label boxes**, and its own close prompt —
+Save, Discard, Keep editing, on BACK, the close glyph and Esc — is this prompt for Alias Designer. The Alias
+Designer screen holds no edits of its own: SAVE, CLEAR, RESET LABELS and their undo each write the draft as they
+are pressed. The editor is modal, so neither a tab switch nor the main window's close can be reached while it is
+open, and the only other exit (`SystemShutDownEvent`, from the update button on the Settings tab) is blocked behind
+it too. So nothing was built for C6.
+
+**When a later screen holds edits outside a modal dialog** — Preset Editor's dropdowns, the Bind Editor — it brings
+this prompt with it, on the tab switch and on the close in `AppView`, guarding only its own unsaved edits.
+
 ## Document Map
 
 - [Alias Designer](alias-designer.md)
