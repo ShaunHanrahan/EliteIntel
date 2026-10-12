@@ -1,7 +1,6 @@
 package elite.intel.ai;
 
 import elite.intel.ai.mouth.TtsProvider;
-import elite.intel.ai.mouth.edge.EdgeTTSImpl;
 import elite.intel.ai.mouth.google.GoogleTTSImpl;
 import elite.intel.ai.mouth.kokoro.KokoroTTS;
 import elite.intel.ai.mouth.supertonic.SupertonicTTS;
@@ -16,18 +15,9 @@ class ApiFactoryTest {
 
     @Test
     void theStoredProviderSelectsTheMouth() {
-        assertSame(EdgeTTSImpl.getInstance(), ApiFactory.selectMouth(TtsProvider.EDGE, null, Language.EN, Language.EN));
         assertSame(GoogleTTSImpl.getInstance(), ApiFactory.selectMouth(TtsProvider.GOOGLE, GOOGLE_KEY, Language.EN, Language.EN));
         assertSame(KokoroTTS.getInstance(), ApiFactory.selectMouth(TtsProvider.KOKORO, GOOGLE_KEY, Language.EN, Language.EN));
         assertSame(SupertonicTTS.getInstance(), ApiFactory.selectMouth(TtsProvider.SUPERTONIC, GOOGLE_KEY, Language.EN, Language.EN));
-    }
-
-    /**
-     * Edge is keyless, so a stored Google key must not pull the selection away from it.
-     */
-    @Test
-    void edgeIsUnaffectedByAStoredGoogleKey() {
-        assertSame(EdgeTTSImpl.getInstance(), ApiFactory.selectMouth(TtsProvider.EDGE, GOOGLE_KEY, Language.EN, Language.EN));
     }
 
     /**
@@ -63,8 +53,6 @@ class ApiFactoryTest {
                     "stored Kokoro under " + language);
             assertSame(SupertonicTTS.getInstance(), ApiFactory.selectMouth(TtsProvider.GOOGLE, null, language, Language.EN),
                     "keyless Google under " + language);
-            assertSame(EdgeTTSImpl.getInstance(), ApiFactory.selectMouth(TtsProvider.EDGE, null, language, Language.EN),
-                    "a chosen Edge is kept under " + language);
             assertSame(GoogleTTSImpl.getInstance(), ApiFactory.selectMouth(TtsProvider.GOOGLE, GOOGLE_KEY, language, Language.EN),
                     "Google speaks Cyrillic and stays selectable under " + language);
         }
@@ -73,7 +61,7 @@ class ApiFactoryTest {
     /**
      * A Russian game client writes its radio chatter in Cyrillic, which needs Supertonic resident - and the
      * rule is that Supertonic is then the session's local engine, narration included, whatever language the
-     * commander speaks to us. The cloud engines read every script and are kept.
+     * commander speaks to us. The cloud engine reads every script and is kept.
      */
     @Test
     void aRussianGameClientMakesSupertonicTheLocalEngineForEveryCommander() {
@@ -82,7 +70,6 @@ class ApiFactoryTest {
                     "stored Kokoro, Russian client, commander speaking " + commander);
             assertSame(SupertonicTTS.getInstance(), ApiFactory.selectMouth(TtsProvider.GOOGLE, null, commander, Language.RU),
                     "keyless Google, Russian client, commander speaking " + commander);
-            assertSame(EdgeTTSImpl.getInstance(), ApiFactory.selectMouth(TtsProvider.EDGE, null, commander, Language.RU));
             assertSame(GoogleTTSImpl.getInstance(), ApiFactory.selectMouth(TtsProvider.GOOGLE, GOOGLE_KEY, commander, Language.RU));
         }
     }

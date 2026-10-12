@@ -549,14 +549,14 @@ public class AppController {
 
     /**
      * The engine that voices radio, in its radio role. The cloud engines are deliberately absent: Google is
-     * the paid main mouth, and radio chatter is not worth a commander's per-character bill; Edge is keyless
-     * but not local, and a local engine can now read every script (see {@link RadioVoicing}).
+     * the paid main mouth, and radio chatter is not worth a commander's per-character bill, while a local
+     * engine can read every script (see {@link RadioVoicing}).
      */
     private static ManagedService radioEngine(TtsProvider provider) {
         return switch (provider) {
             case KOKORO -> radioLocal(KokoroTTS.getInstance());
             case SUPERTONIC -> radioLocal(SupertonicTTS.getInstance());
-            case EDGE, GOOGLE -> throw new IllegalArgumentException(provider + " never voices radio transmissions");
+            case GOOGLE -> throw new IllegalArgumentException(provider + " never voices radio transmissions");
         };
     }
 

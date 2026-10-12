@@ -1,7 +1,7 @@
 # `elite.intel.ai.mouth` - Developer Reference
 
 The mouth package owns everything from a
-`VocalisationRequestEvent` to speaker output. It normalises the various vox event types produced by other packages, synthesises speech via offline Kokoro or Supertonic 3, Google Cloud, or the Edge consumer Read Aloud service, and publishes an authoritative playback lifecycle while STT remains active for barge-in.
+`VocalisationRequestEvent` to speaker output. It normalises the various vox event types produced by other packages, synthesises speech via offline Kokoro or Supertonic 3, or Google Cloud, and publishes an authoritative playback lifecycle while STT remains active for barge-in.
 
 ---
 
@@ -41,9 +41,6 @@ AiVoxResponseEvent  AiVoxDemoEvent  RadioTransmissionEvent  …
                                    Speaker
                           handle completion updates shared IsSpeakingEvent state
 ```
-
-`EdgeTTSImpl` is a third main-mouth branch with the same synthesis/playback queue shape as Google. Its transport
-returns MPEG, which is decoded and validated before the shared PCM sanitation, volume, and playback stages.
 
 ---
 
@@ -106,7 +103,7 @@ An eligible running backend must call `event.handle().claimForPlayback()` before
 `ManagedService` provides `start()` and `stop()`. Implementations initialize their engine/workers and register
 on `GameEventBus` during `start()`, then unregister and settle owned handles during `stop()`.
 
-Current implementations: `KokoroTTS` and `SupertonicTTS` (offline), `GoogleTTSImpl` (cloud), and `EdgeTTSImpl` (cloud).
+Current implementations: `KokoroTTS` and `SupertonicTTS` (offline), and `GoogleTTSImpl` (cloud).
 
 ---
 
@@ -293,18 +290,10 @@ Published after each sentence via
 
 ---
 
-## 5A. Edge Read Aloud Backend (`edge/`)
+## 5A. Microsoft Edge Read Aloud (removed)
 
-`EdgeTTSImpl` follows the same two-queue and `VocalisationHandle` contract as the other mouths. The transport
-uses the consumer Read Aloud HTTP voice-list endpoint and WebSocket synthesis protocol. Escaped text is capped
-at 4096 UTF-8 bytes per request, MPEG frames are assembled before `EdgeMp3Decoder` converts them to 24 kHz,
-mono, signed PCM-16 little endian, and only that decoded PCM reaches `AudioDeClicker`.
-
-Application speech speed drives Edge's SSML prosody rate. SSML volume remains `+0%`; the application volume is
-applied exactly once to decoded PCM through `AudioDeClicker.applyVolume`. Edge is a main-mouth provider only; radio stays on the local-engine route.
-
-The integration is unofficial and is not supported or endorsed by Microsoft. `dev.mccue:jlayer-decoder` is
-packaged under its own LGPL terms; see the repository's `THIRD_PARTY_NOTICES.md`.
+The `edge/` backend was removed in v1.1.0026. It reached Microsoft's consumer Read Aloud service, which is built for the Edge browser and not offered to third parties, by presenting itself as that browser. Migration
+`11007` moved its commanders to Kokoro. Do not bring back a mouth that calls a private service by pretending to be its client. A Microsoft voice belongs behind Azure Speech and the commander's own key.
 
 ---
 
@@ -466,9 +455,6 @@ The `SPEAK` custom command blocks the command executor thread on the handle's `C
 | `google/GoogleTTSImpl` | Cloud backend; Google Cloud TTS API |
 | `google/GoogleVoices` | 11 Google voice enum with gender and Chirp3-HD character |
 | `google/GoogleVoiceProvider` | Voice selection + non-EN language override |
-| `edge/EdgeTTSImpl` | Edge Read Aloud queueing, decoded-PCM volume, playback, and request lifecycle |
-| `edge/EdgeReadAloudClient` | HTTP/WebSocket protocol, clock-skew retry, timeouts, and cancellation |
-| `edge/EdgeMp3Decoder` | MPEG to validated 24 kHz mono PCM-16 LE decoding |
 | `google/VoiceProvider<T>` | Interface for voice provider implementations |
 | `AudioDeClicker` | Fade-in + volume scaling on PCM-16 LE |
 | `RadioFilter` | Existing radio bandpass without synthetic static |
@@ -477,7 +463,7 @@ The `SPEAK` custom command blocks the command executor thread on the handle's `C
 | `subscribers/events/VocalisationRequestEvent` | Normalised TTS event (origin, voice, flags, handle) |
 | `subscribers/events/AiVoxResponseEvent` | LLM spoken answer; carries optional CompletableFuture |
 | `subscribers/events/TTSInterruptEvent` | Global or request-id-targeted interrupt signal |
-| `subscribers/events/VocalisationSuccessfulEvent` | Per-sentence completion event (Google and Edge) |
+| `subscribers/events/VocalisationSuccessfulEvent` | Per-sentence completion event (Google) |
 
 ## Key Constants
 
@@ -487,8 +473,6 @@ The `SPEAK` custom command blocks the command executor thread on the handle's `C
 | Default Kokoro voice | `ISABELLA` | `KokoroVoices.DEFAULT_VOICE` |
 | Default Supertonic voice | `F1` (sid=0) | `SupertonicVoices.DEFAULT_VOICE` |
 | Default Google voice | `JENNIFER` | `GoogleVoiceProvider` |
-| Edge escaped-text limit | `4096` UTF-8 bytes | `EdgeSentenceSplitter` |
-| Default Edge voice | `en-US-EmmaMultilingualNeural` | `EdgeVoices` |
 | `GAIN` | `1.4f` | `RadioFilter` |
 | HP cutoff | `300 Hz` | `RadioFilter` |
 | LP cutoff | `5500 Hz` | `RadioFilter` |

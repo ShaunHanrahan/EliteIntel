@@ -15,7 +15,6 @@ import elite.intel.ai.ears.parakeet.ParakeetSTTImpl;
 import elite.intel.ai.mouth.MouthInterface;
 import elite.intel.ai.mouth.RadioVoicing;
 import elite.intel.ai.mouth.TtsProvider;
-import elite.intel.ai.mouth.edge.EdgeTTSImpl;
 import elite.intel.ai.mouth.google.GoogleTTSImpl;
 import elite.intel.ai.mouth.kokoro.KokoroTTS;
 import elite.intel.ai.mouth.sherpa.SherpaOnnxTTS;
@@ -94,7 +93,6 @@ public class ApiFactory {
     static MouthInterface selectMouth(TtsProvider provider, String ttsApiKey, Language language, Language transmissions) {
         return switch (resolveProvider(provider, ttsApiKey, language, transmissions)) {
             case GOOGLE -> GoogleTTSImpl.getInstance();
-            case EDGE -> EdgeTTSImpl.getInstance();
             case KOKORO -> mainLocal(KokoroTTS.getInstance());
             case SUPERTONIC -> mainLocal(SupertonicTTS.getInstance());
         };

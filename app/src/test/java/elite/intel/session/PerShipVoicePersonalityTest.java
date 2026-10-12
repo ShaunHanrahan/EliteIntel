@@ -3,7 +3,6 @@ package elite.intel.session;
 import elite.intel.ai.brain.ShipPersonality;
 import elite.intel.ai.mouth.TtsProvider;
 import elite.intel.ai.mouth.VoiceGender;
-import elite.intel.ai.mouth.edge.EdgeVoices;
 import elite.intel.ai.mouth.google.GoogleVoices;
 import elite.intel.ai.mouth.kokoro.KokoroVoices;
 import elite.intel.db.dao.ShipDao;
@@ -105,10 +104,6 @@ class PerShipVoicePersonalityTest {
             session.setTtsProvider(TtsProvider.GOOGLE);
             assertEquals(VoiceGender.MALE, session.getVoiceGender());
 
-            // The same stored name is an Edge voice too (the enums are twins), so Edge hears the same gender.
-            session.setTtsProvider(TtsProvider.EDGE);
-            assertEquals(VoiceGender.MALE, session.getVoiceGender());
-
             // Kokoro has no voice by that name: it falls back to its default, and so does the gender.
             session.setTtsProvider(TtsProvider.KOKORO);
             assertEquals(VoiceGender.FEMALE, session.getVoiceGender());
@@ -127,26 +122,5 @@ class PerShipVoicePersonalityTest {
 
         assertEquals(KokoroVoices.NOVA, session.getKokoroVoice());
         assertEquals(GoogleVoices.DEFAULT_VOICE, session.getGoogleVoice());
-        assertEquals(EdgeVoices.DEFAULT_VOICE.defaultShortName(), session.getEdgeVoiceName());
-    }
-
-    @Test
-    void edgeUsesTheExistingCloudVoiceNameWithoutNewShipState() {
-        SystemSession session = SystemSession.getInstance();
-
-        saveShip(401, EdgeVoices.JENNIFER.name(), ShipPersonality.CASUAL.name());
-        makeActive(401);
-
-        assertEquals(EdgeVoices.JENNIFER.defaultShortName(), session.getEdgeVoiceName());
-    }
-
-    @Test
-    void edgePreservesAnArbitraryProviderShortNameInTheExistingShipField() {
-        SystemSession session = SystemSession.getInstance();
-
-        saveShip(402, "en-US-AvaNeural", ShipPersonality.CASUAL.name());
-        makeActive(402);
-
-        assertEquals("en-US-AvaNeural", session.getEdgeVoiceName());
     }
 }

@@ -5,7 +5,6 @@ import elite.intel.ai.brain.ShipPersonality;
 import elite.intel.ai.mouth.RadioVoicing;
 import elite.intel.ai.mouth.TtsProvider;
 import elite.intel.ai.mouth.VoiceGender;
-import elite.intel.ai.mouth.edge.EdgeVoices;
 import elite.intel.ai.mouth.google.GoogleVoices;
 import elite.intel.ai.mouth.kokoro.KokoroVoices;
 import elite.intel.ai.mouth.supertonic.SupertonicVoices;
@@ -76,12 +75,6 @@ public class SystemSession {
     }
 
 
-    public String getEdgeVoiceName() {
-        ShipDao.Ship ship = shipManager.getShip();
-        return EdgeVoices.shortNameOrDefault(ship == null ? null : ship.getVoice());
-    }
-
-
     public KokoroVoices getKokoroVoice() {
         ShipDao.Ship ship = shipManager.getShip();
         return KokoroVoices.voiceOrDefault(ship == null ? null : ship.getVoice());
@@ -104,9 +97,6 @@ public class SystemSession {
      * <p>
      * A name the active engine does not know has no gender to read and resolves to that engine's default
      * voice, which is female. For a voice belonging to another engine that is also the voice actually spoken.
-     * For an unrecognised Edge ShortName (one a commander stored directly) Edge still synthesises the stored
-     * ShortName, and only the roster it fetches at runtime knows that voice's gender - which is why the
-     * fleet grid stores logical names.
      */
     public VoiceGender getVoiceGender() {
         ShipDao.Ship ship = shipManager.getShip();

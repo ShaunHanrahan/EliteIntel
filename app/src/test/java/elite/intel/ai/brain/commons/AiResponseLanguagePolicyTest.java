@@ -31,12 +31,12 @@ class AiResponseLanguagePolicyTest {
     }
 
     @Test
-    void edgeCloudTtsKeepsTheConfiguredCyrillicLanguage() {
+    void googleCloudTtsKeepsTheConfiguredCyrillicLanguage() {
         SystemSession session = SystemSession.getInstance();
         TtsProvider previousProvider = session.getTtsProvider();
         Language previousLanguage = session.getLanguage();
         try {
-            session.setTtsProvider(TtsProvider.EDGE);
+            session.setTtsProvider(TtsProvider.GOOGLE);
             session.setLanguage(Language.UK);
 
             assertEquals(Language.UK, AiResponseLanguagePolicy.resolveEffectiveAiResponseLanguage(session));

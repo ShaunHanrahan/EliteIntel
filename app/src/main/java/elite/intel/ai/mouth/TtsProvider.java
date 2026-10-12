@@ -1,6 +1,5 @@
 package elite.intel.ai.mouth;
 
-import elite.intel.ai.mouth.edge.EdgeVoices;
 import elite.intel.ai.mouth.google.GoogleVoices;
 import elite.intel.ai.mouth.kokoro.KokoroVoices;
 import elite.intel.ai.mouth.supertonic.SupertonicVoices;
@@ -17,14 +16,16 @@ import java.util.stream.Stream;
  * fallback for an unreadable stored value, so a commander with no cloud account still has a voice; and
  * {@link #SUPERTONIC}, the alternative local engine, which is the one local engine that can read Cyrillic and
  * therefore stands in for Kokoro wherever Kokoro cannot speak (see {@link #forLanguage}). {@link #GOOGLE} is
- * the only engine that needs an API key. {@link #EDGE} is Microsoft's online Read Aloud service, which is
- * keyless but not local - it still talks to Microsoft over the network.
+ * the only engine that needs an API key and the only one that is not local.
+ * <p>
+ * A stored {@code EDGE} is an engine this build no longer has: Microsoft Edge Read Aloud was removed in
+ * v1.1.0026, and migration {@code 11007} moved its commanders to Kokoro. {@link #fromStored} reads anything
+ * it does not recognise as Kokoro too, so a row the migration missed still has a voice.
  */
 public enum TtsProvider {
     KOKORO,
     SUPERTONIC,
-    GOOGLE,
-    EDGE;
+    GOOGLE;
 
     /**
      * Resolves a stored setting value, falling back to {@link #KOKORO} for anything this build does not
@@ -51,7 +52,6 @@ public enum TtsProvider {
         return switch (this) {
             case KOKORO -> KokoroVoices.DEFAULT_VOICE.name();
             case SUPERTONIC -> SupertonicVoices.DEFAULT_VOICE.name();
-            case EDGE -> EdgeVoices.DEFAULT_VOICE.name();
             case GOOGLE -> GoogleVoices.DEFAULT_VOICE.name();
         };
     }
@@ -65,7 +65,6 @@ public enum TtsProvider {
         return switch (this) {
             case KOKORO -> KokoroVoices.voiceOrDefault(voiceName).name();
             case SUPERTONIC -> SupertonicVoices.voiceOrDefault(voiceName).name();
-            case EDGE -> EdgeVoices.voiceOrDefault(voiceName).name();
             case GOOGLE -> GoogleVoices.voiceOrDefault(voiceName).name();
         };
     }
@@ -78,7 +77,6 @@ public enum TtsProvider {
         return switch (this) {
             case KOKORO -> VoiceGender.of(KokoroVoices.voiceOrDefault(voiceName).isMale());
             case SUPERTONIC -> VoiceGender.of(SupertonicVoices.voiceOrDefault(voiceName).isMale());
-            case EDGE -> VoiceGender.of(EdgeVoices.voiceOrDefault(voiceName).male());
             case GOOGLE -> VoiceGender.of(GoogleVoices.voiceOrDefault(voiceName).isMale());
         };
     }
@@ -90,7 +88,6 @@ public enum TtsProvider {
         return switch (this) {
             case KOKORO -> Arrays.stream(KokoroVoices.values()).map(Enum::name);
             case SUPERTONIC -> Arrays.stream(SupertonicVoices.values()).map(Enum::name);
-            case EDGE -> Arrays.stream(EdgeVoices.values()).map(Enum::name);
             case GOOGLE -> Arrays.stream(GoogleVoices.values()).map(Enum::name);
         };
     }
@@ -102,7 +99,7 @@ public enum TtsProvider {
     public Stream<String> radioVoiceRoster() {
         return switch (this) {
             case KOKORO -> Arrays.stream(KokoroVoices.radioCast()).map(Enum::name);
-            case SUPERTONIC, EDGE, GOOGLE -> voiceRoster();
+            case SUPERTONIC, GOOGLE -> voiceRoster();
         };
     }
 
@@ -119,7 +116,7 @@ public enum TtsProvider {
      * Only {@link #KOKORO} ever answers no: its phonemizer has no Cyrillic front end, so Russian and
      * Ukrainian text is not spoken with an accent, it is not spoken (see {@link Language#isCyrillicScript()}).
      * {@link #SUPERTONIC} is one multilingual model with Russian and Ukrainian among its languages, and
-     * {@link #GOOGLE} and {@link #EDGE} carry every language this app ships.
+     * {@link #GOOGLE} carries every language this app ships.
      */
     public boolean canVoice(Language language) {
         return this != KOKORO || !language.isCyrillicScript();
@@ -131,8 +128,8 @@ public enum TtsProvider {
      * <p>
      * Supertonic is the stand-in rather than a cloud engine because it is what the commander asked for in every
      * respect but the name: local, keyless, nothing leaving the machine. A Cyrillic commander did not choose to
-     * be in this position - Kokoro is the shipped default - and until Supertonic existed the stand-in was Edge,
-     * which cost them a network round trip they never opted into. Google stays selectable - this only decides
+     * be in this position - Kokoro is the shipped default - and a cloud stand-in would cost them a network
+     * round trip they never opted into. Google stays selectable - this only decides
      * what happens to a selection that cannot speak.
      */
     public static TtsProvider forLanguage(TtsProvider selected, Language language) {
@@ -156,7 +153,7 @@ public enum TtsProvider {
      * English commander perfectly well over a Russian client: because that client's chatter needs Supertonic
      * resident anyway, and the rule the commander set is that wherever anything in the session is Cyrillic,
      * Supertonic is the local engine - the one already loaded narrates too, rather than Kokoro loading beside
-     * it for narration alone. Edge and Google stay selectable: they read every script.
+     * it for narration alone. Google stays selectable: it reads every script.
      */
     public static TtsProvider forSession(TtsProvider selected, Language commander, Language transmissions) {
         return selected.canVoiceSession(commander, transmissions) ? selected : SUPERTONIC;
