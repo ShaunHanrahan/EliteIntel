@@ -30,8 +30,10 @@ file*. Recorded in the [platform map](../01-host-integration/elite-intel-platfor
 `V1.1-Release` holds none of BindForge's docs — no `docs/05-build-plan/`, no specs. So the work is split across two
 checkouts:
 
-- **Code and tests** on `V1.1-Release-bf-foundation`, in a git worktree of its own, so the main checkout stays on
-  `V1.2-BindForge`. Alan creates the branch and the worktree when F1 starts; it does not exist yet.
+- **Code and tests** on `V1.1-Release-bf-foundation`, in its own git worktree at
+  **`E:\EliteIntelProject\EliteIntel-bf-foundation`**, so the main checkout stays on `V1.2-BindForge`. Branch and
+  worktree created by Alan 2026-10-12, from `V1.1-Release` at `7a3c51d26`, and pushed. Run step 1 of
+  `/next-slice` (fetch, behind or not) in the worktree too: `git -C ../EliteIntel-bf-foundation status -sb`.
 - **This brief and every spec decision** in the main checkout, on `V1.2-BindForge`, as for every other section.
 - **Tests:** `.\gradlew app:test` run **in the worktree**, against V1.1's own suite.
 - **A slice is done when Krondor has merged it**, not when its tests pass. Until then it is *with Krondor*, and
@@ -141,5 +143,5 @@ next slice needs.*
 - **2026-10-12 — brief written.** Five slices from the specs of what Foundation unblocks; F1 next, as the
   smallest first change for Krondor to check. **Found:** `V1.1-Release` has no BindForge docs, so a foundation
   session works in a worktree (above); `PlayerBackupService` already diverges between the lines (Known issues);
-  `ButtonInputMapper`'s U/V fix is a V1.1 file too, so it became F5. **F1 needs:** the branch and its worktree,
-  created by Alan.
+  `ButtonInputMapper`'s U/V fix is a V1.1 file too, so it became F5. **F1 needs:** the branch and its worktree —
+  created the same day, at `E:\EliteIntelProject\EliteIntel-bf-foundation`.

@@ -50,7 +50,7 @@ it is the machinery every tab writes through, so it comes first and is built onl
 
 | # | Section | Brief | Spec | State |
 |---|---|---|---|---|
-| 0 | **Foundation** — the additions to shared V1.1 files that later slices need, on `V1.1-Release-bf-foundation`; built off `V1.1-Release`, merged by Krondor | [foundation.md](foundation.md) | the specs of the slices it unblocks | brief written 2026-10-12; F1 (four-line `StartPreset` read) next; branch not yet created |
+| 0 | **Foundation** — the additions to shared V1.1 files that later slices need, on `V1.1-Release-bf-foundation`; built off `V1.1-Release`, merged by Krondor | [foundation.md](foundation.md) | the specs of the slices it unblocks | brief written 2026-10-12; F1 (four-line `StartPreset` read) next; branch and worktree created 2026-10-12 |
 | 1 | **Core** — master and draft, Apply, Edit History filling, startup check | [core.md](core.md) | [overview.md](../02-features/bindforge/overview.md) | C1–C3, C5 and C6 done; C4 blocked; C7 waits on Preset Editor |
 | 2 | **Alias Designer** | [alias-designer.md](alias-designer.md) | [alias-designer.md](../02-features/bindforge/alias-designer.md) | device list, naming rule, startup `.buttonMap`, first setup, the label merge, divergence against the master and its ways out, the Installations markers, the Built-in Devices tab, which axes and hats a controller has, the Device Editor, the actions (CLEAR, RESET LABELS, APPLY, DISCARD), the missing-controller warning built; nothing unblocked — A6b and A11 wait on the `.binds` rewrite |
 | 3 | **Preset Editor** | *not yet written* | [preset-editor.md](../02-features/bindforge/preset-editor.md) | nothing built |
