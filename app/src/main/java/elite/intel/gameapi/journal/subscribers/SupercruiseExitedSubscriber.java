@@ -2,6 +2,7 @@ package elite.intel.gameapi.journal.subscribers;
 
 import com.google.common.eventbus.Subscribe;
 import elite.intel.db.managers.LocationManager;
+import elite.intel.gameapi.StationName;
 import elite.intel.gameapi.journal.events.SupercruiseExitEvent;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
 import elite.intel.session.PlayerSession;
@@ -28,7 +29,7 @@ public class SupercruiseExitedSubscriber {
         Thread.ofVirtual().start(() -> {
             Long bodyId = event.getBodyId();
             if (bodyId == null) return;
-            playerSession.setCurrentLocationId(bodyId, event.getSystemAddress());
+            playerSession.moveWithinSystem(event.getSystemAddress(), bodyId);
 
             String name = event.getBody();
             if (name == null || name.isBlank()) return;
@@ -37,8 +38,10 @@ public class SupercruiseExitedSubscriber {
             if (droppedAt == null) return;
 
             // Addressed by name: a station docked at this body is stored under the same BodyID, so an ID
-            // lookup can return the station's record and rename it to the body on save.
-            locationManager.updateNamedBody(event.getSystemAddress(), bodyId, name, here -> {
+            // lookup can return the station's record and rename it to the body on save. A station goes under
+            // its display name, the one its record is saved by (a colonisation ship's raw name is decorated).
+            String recordName = STATION == droppedAt ? StationName.display(name) : name;
+            locationManager.updateNamedBody(event.getSystemAddress(), bodyId, recordName, here -> {
                 here.setSystemAddress(event.getSystemAddress());
                 here.setBodyId(bodyId);
                 here.setStarName(event.getStarSystem());
@@ -73,10 +76,11 @@ public class SupercruiseExitedSubscriber {
     static LocationDto.LocationType classify(SupercruiseExitEvent event) {
         String bodyType = event.getBodyType() == null ? "" : event.getBodyType().toLowerCase(Locale.ROOT);
         if (bodyType.isBlank() || BARYCENTRE.equals(bodyType)) return null;
-        String body = event.getBody() == null ? "" : event.getBody();
         return switch (bodyType) {
-            // Only the star a system is named after is claimed as primary; a companion keeps its distance.
-            case "star" -> body.equalsIgnoreCase(event.getStarSystem()) ? PRIMARY_STAR : STAR;
+            // WHY: never PRIMARY_STAR. A name cannot tell: the primary is "<system> A" in hundreds of systems, and
+            // six stars named exactly after their system were not the entry point (LP 772-72's is NN 3229 B).
+            // STAR only fills a blank; the FSDJump arrival and the Scan at 0 Ls, which can prove it, overwrite it.
+            case "star" -> STAR;
             case "planet" -> PLANET;
             case "station" -> STATION;
             case "planetaryring", "stellarring" -> PLANETARY_RING;

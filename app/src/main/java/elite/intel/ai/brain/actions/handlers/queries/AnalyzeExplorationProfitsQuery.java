@@ -87,7 +87,7 @@ public class AnalyzeExplorationProfitsQuery extends BaseQueryAnalyzer implements
      * the maybe it is.
      */
     private Projection calculatePotentialProfit() {
-        Collection<LocationDto> stellarObjects = locationManager.findAllBySystemAddress(playerSession.getLocationData().getSystemAddress());
+        Collection<LocationDto> stellarObjects = locationManager.findAllBySystemAddress(playerSession.currentSystemAddress());
         long certain = 0;
         long unconfirmedBonus = 0;
         for (LocationDto dto : stellarObjects) {

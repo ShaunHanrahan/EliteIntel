@@ -49,6 +49,8 @@ public class EventRegistry {
         registerEvent("Synthesis", SynthesisEvent.class);
         registerEvent("TechnologyBroker", TechnologyBrokerEvent.class);
         registerEvent("ScientificResearch", ScientificResearchEvent.class);
+        // WHY: kept registered for the event stream, though nothing records it. A barycentre has no name, and a
+        // location record needs one - the subscriber that wrote it could only corrupt the record it landed on.
         registerEvent("ScanBaryCentre", ScanBaryCentreEvent.class);
         registerEvent("Docked", DockedEvent.class);
         registerEvent("Undocked", UndockedEvent.class);

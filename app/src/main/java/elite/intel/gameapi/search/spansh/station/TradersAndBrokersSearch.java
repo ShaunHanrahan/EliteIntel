@@ -89,7 +89,7 @@ public class TradersAndBrokersSearch {
                 traderType, brokerType, distanceInLightYears, ShipManager.getInstance().requireLargePad()
         );
         List<TraderAndBrokerSearchDto.Result> results = SearchForMaterialBrokerOrTrader.findMaterialTrader(criteria);
-        TraderAndBrokerSearchDto.Result result = nearest(results, playerSession.getPrimaryStarName());
+        TraderAndBrokerSearchDto.Result result = nearest(results, playerSession.currentStarSystem());
 
         if (result == null) {
             GameEventBus.publish(new AiVoxResponseEvent(localizedEvent("event.search.noMatch")));

@@ -5,24 +5,18 @@ import elite.intel.ai.mouth.kokoro.KokoroVoices;
 import elite.intel.db.dao.ShipDao;
 import elite.intel.db.managers.*;
 import elite.intel.gameapi.PreScanOnly;
-import elite.intel.gameapi.SignalName;
 import elite.intel.gameapi.journal.ScanBodyClassifier;
 import elite.intel.gameapi.journal.events.*;
 import elite.intel.gameapi.journal.events.dto.CarrierDataDto;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
-import elite.intel.gameapi.journal.events.dto.MaterialDto;
 import elite.intel.gameapi.journal.events.dto.shiploadout.LoadoutConverter;
 import elite.intel.gameapi.journal.events.dto.shiploadout.ShipLoadOutDto;
 import elite.intel.session.PlayerSession;
-import elite.intel.util.GravityCalculator;
+import elite.intel.session.Position;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-
-import static elite.intel.gameapi.journal.events.dto.LocationDto.LocationType.*;
+import static elite.intel.gameapi.journal.events.dto.LocationDto.LocationType.BELT_CLUSTER;
 
 /**
  * Registered only on the pre-scan private EventBus. Never on the main bus!
@@ -70,83 +64,24 @@ public class SilentPersistenceSubscriber {
 
     @Subscribe
     public void onLocation(LocationEvent event) {
-        LocationDto dto = locationManager.findBySystemAddress(event.getSystemAddress(), event.getBody());
-        dto.setX(event.getStarPos()[0]);
-        dto.setY(event.getStarPos()[1]);
-        dto.setZ(event.getStarPos()[2]);
-        dto.setBodyId(event.getBodyID());
-        dto.setStarName(event.getStarSystem());
-        dto.setPlanetName(event.getBody());
-        dto.setAllegiance(event.getSystemAllegiance());
-        dto.setBodyType(event.getBodyType());
-        dto.setControllingPower(event.getControllingPower());
-        dto.setGovernment(event.getSystemGovernmentLocalised());
-        dto.setPopulation(event.getPopulation());
-        dto.setSecurity(event.getSystemSecurity());
-        dto.setStarName(event.getStarSystem());
-        dto.setDistance(event.getDistFromStarLS());
-        dto.setEconomy(event.getSystemEconomyLocalised());
-        dto.setSecondEconomy(event.getSystemSecondEconomyLocalised());
-
-        // Mirrors LocationSubscriber exactly - the pre-scan and live writers must not disagree about a body.
-        // Only when the journal's body type maps to something: determineType answers null for "Planet", and
-        // assigning that erases the classification a scan established.
-        String bodyType = event.getBodyType() != null ? event.getBodyType().toLowerCase(Locale.ROOT) : "";
-        LocationDto.LocationType type = LocationDto.determineType(bodyType, event.getDistFromStarLS() == 0);
-        if (type != null) {
-            dto.setLocationType(type);
+        LocationDto body = LocationEventMapper.record(event, record -> {
+        });
+        // The station standing here is not the body this event names, so it gets a record of its own -
+        // written after the body, for the same reason as in LocationSubscriber.
+        if (event.isDocked()) {
+            DockedStationRecord.of(event).store();
         }
-
-        dto.setPopulation(event.getPopulation());
-        dto.setPowerplayState(event.getPowerplayState());
-        dto.setPowerplayStateControlProgress(event.getPowerplayStateControlProgress());
-        dto.setPowerplayStateReinforcement(event.getPowerplayStateReinforcement());
-        dto.setPowerplayStateUndermining(event.getPowerplayStateUndermining());
-        dto.setSecurity(event.getSystemSecurityLocalised());
-        if (event.getSystemFaction() != null) dto.setSystemFaction(event.getSystemFaction().getName());
-
-        if (dto.getStarName() != null && !dto.getStarName().isEmpty()) {
-            locationManager.save(dto);
-            // The station standing here is not the body this event names, so it gets a record of its own -
-            // written after the body, for the same reason as in LocationSubscriber.
-            if (event.isDocked()) {
-                DockedStationRecord.of(event).store();
-            }
-            // Update the player's current-location pointer so queries like
-            // "where are we" resolve correctly on a fresh DB.
-            playerSession.setCurrentPrimaryStarName(event.getStarSystem());
-            if (event.getBodyID() != null) {
-                playerSession.setCurrentLocationId(event.getBodyID(), event.getSystemAddress());
-            }
-            log.debug("PreScan: saved location {}", dto.getStarName());
-        }
+        // WHY: point at the id the row actually holds, as LocationSubscriber and the carrier jump do.
+        // LocationDto.setBodyId ignores a lower id, so the journal's 0 for an already identified body
+        // would leave the pointer aimed at nothing.
+        Long bodyId = body == null ? event.getBodyID() : Long.valueOf(body.getBodyId());
+        playerSession.moveTo(new Position(event.getSystemAddress(), event.getStarSystem(), bodyId));
+        log.debug("PreScan: saved location {}", event.getStarSystem());
     }
 
     @Subscribe
     public void onFSDJump(FSDJumpEvent event) {
-        // WHY: keyed on the arrival body name, which is the unique column LocationDao.upsert conflicts
-        // on. Keying on bodyId can miss a row that the upsert then replaces wholesale, losing its scan
-        // data whenever the journal reports a different BodyID for the same body.
-        LocationDto primaryStar = locationManager.findBySystemAddress(event.getSystemAddress(), event.getBody());
-        primaryStar.setBodyId(event.getBodyId());
-        primaryStar.setSystemAddress(event.getSystemAddress());
-        primaryStar.setStationGovernment(event.getSystemGovernmentLocalised());
-        primaryStar.setAllegiance(event.getSystemAllegiance());
-        primaryStar.setSecurity(event.getSystemSecurityLocalised());
-        primaryStar.setStarName(event.getStarSystem());
-        primaryStar.setPlanetName(event.getBody());
-        primaryStar.setLocationType(PRIMARY_STAR);
-        primaryStar.setX(event.getStarPos()[0]);
-        primaryStar.setY(event.getStarPos()[1]);
-        primaryStar.setZ(event.getStarPos()[2]);
-        primaryStar.setPopulation(event.getPopulation());
-        primaryStar.setPowerplayState(event.getPowerplayState());
-        primaryStar.setPowerplayStateControlProgress(event.getPowerplayStateControlProgress());
-        primaryStar.setPowerplayStateReinforcement(event.getPowerplayStateReinforcement());
-        primaryStar.setPowerplayStateUndermining(event.getPowerplayStateUndermining());
-        locationManager.save(primaryStar);
-        playerSession.setCurrentPrimaryStarName(event.getStarSystem());
-        playerSession.setCurrentLocationId(event.getBodyId(), event.getSystemAddress());
+        FsdJumpArrival.record(event);
         log.debug("PreScan: saved jump destination {}", event.getStarSystem());
     }
 
@@ -169,12 +104,10 @@ public class SilentPersistenceSubscriber {
             return;
         }
 
-        LocationDto arrival = CarrierJumpLocationMapper.toArrivalLocation(event, locationManager);
-        locationManager.save(arrival);
-        playerSession.setCurrentPrimaryStarName(event.getStarSystem());
+        LocationDto arrival = CarrierJumpLocationMapper.recordArrival(event, locationManager);
         // WHY: point at the id the row actually holds. LocationDto.setBodyId ignores a lower id, so
         // an event reporting BodyID 0 for an already identified body would leave the pointer stale.
-        playerSession.setCurrentLocationId(arrival.getBodyId(), event.getSystemAddress());
+        playerSession.moveTo(new Position(event.getSystemAddress(), event.getStarSystem(), arrival.getBodyId()));
         lastReplayedCarrierSystem = event.getStarSystem();
         playerSession.setLastKnownCarrierLocation(event.getStarSystem());
         log.debug("PreScan: saved carrier jump destination {}", event.getStarSystem());
@@ -214,8 +147,8 @@ public class SilentPersistenceSubscriber {
         carrierData.setStarName(starSystem);
         carrierData.setSystemAddress(event.getSystemAddress());
 
-        LocationDto known = locationManager.findPrimaryStar(starSystem);
-        if (known.getX() != 0 || known.getY() != 0 || known.getZ() != 0) {
+        LocationDto known = locationManager.findSystemRecord(event.getSystemAddress());
+        if (known.getBodyId() != -1) {
             CarrierCoordinates.apply(carrierData, known.getX(), known.getY(), known.getZ());
         } else if (!coordinatesAreThisSystems) {
             // WHY only then: the journal is replayed on every start, and coordinates already resolved
@@ -271,66 +204,12 @@ public class SilentPersistenceSubscriber {
 
     @Subscribe
     public void onScan(ScanEvent event) {
-        if (event.getBodyID() == null) return;
+        if (event.getBodyName() == null || event.getBodyID() == null) return;
+        if (BELT_CLUSTER.equals(ScanBodyClassifier.classify(event))) return;
 
-        LocationDto.LocationType locationType = ScanBodyClassifier.classify(event);
-        if (BELT_CLUSTER.equals(locationType)) return;
-
-        LocationDto location = locationManager.findBySystemAddress(event.getSystemAddress(), event.getBodyID());
-        LocationDto primaryStar = locationManager.findPrimaryStar(event.getStarSystem());
-
-        location.setX(primaryStar.getX());
-        location.setY(primaryStar.getY());
-        location.setZ(primaryStar.getZ());
-        location.setStarName(event.getStarSystem());
-        location.setBodyId(event.getBodyID());
-        location.setSystemAddress(event.getSystemAddress());
-        location.setLocationType(locationType);
-        location.setPlanetName(event.getBodyName());
-        location.setPlanetShortName(subtractBodyName(event.getBodyName(), event.getStarSystem()));
-        location.setStarClass(event.getStarType());
-        location.setVolcanism(event.getVolcanism());
-        location.setMassEM(event.getMassEM());
-        location.setRadius(event.getRadius());
-        location.setSurfaceTemperature(event.getSurfaceTemperature());
-        location.setLandable(event.isLandable());
-        location.setPlanetClass(event.getPlanetClass());
-        location.setTerraformable("Terraformable".equalsIgnoreCase(event.getTerraformState()));
-        location.setTidalLocked(event.isTidalLock());
-        location.setAtmosphere(event.getAtmosphereType());
-        location.setDistance(event.getDistanceFromArrivalLS());
-        // Same guard the live path applies: a nav beacon's discovery flags describe how this scan
-        // learned about the body, not who charted it, and a populated system reports WasDiscovered:false
-        // on every scan type. See ScanEventSubscriber#carriesNoDiscoveryInformation.
-        if (!ScanEventSubscriber.carriesNoDiscoveryInformation(event, primaryStar.getPopulation())) {
-            location.setOurDiscovery(!event.isWasDiscovered());
-            location.setWeMappedIt(!event.isWasMapped());
-        }
-        location.setOrbitalPeriod(event.getOrbitalPeriod());
-        location.setRotationPeriod(event.getRotationPeriod());
-        location.setAxialTilt(event.getAxialTilt());
-
-        Double gravity = GravityCalculator.calculateSurfaceGravity(event.getMassEM(), event.getRadius());
-        if (gravity != null) location.setGravity(gravity);
-
-        if (MOON.equals(locationType) && event.getParents() != null && !event.getParents().isEmpty()) {
-            ScanEvent.Parent first = event.getParents().get(0);
-            if (first.getPlanet() != null) location.setParentBodyId(first.getPlanet());
-        }
-
-        if (PLANETARY_RING.equals(locationType)) {
-            location.setParentBodyName(event.getBodyName().replaceAll(" [A-Z] Ring$", ""));
-        }
-
-        if (event.getMaterials() != null) {
-            List<MaterialDto> materials = new ArrayList<>();
-            for (ScanEvent.Material m : event.getMaterials()) {
-                materials.add(new MaterialDto(m.getName(), m.getPercent()));
-            }
-            location.setMaterials(materials);
-        }
-
-        locationManager.save(location);
+        LocationDto system = locationManager.findSystemRecord(event.getSystemAddress());
+        locationManager.updateNamedBody(event.getSystemAddress(), event.getBodyID(), event.getBodyName(),
+                body -> ScanRecord.describe(body, event, system));
         log.debug("PreScan: saved scan {}", event.getBodyName());
     }
 
@@ -353,53 +232,15 @@ public class SilentPersistenceSubscriber {
      */
     @Subscribe
     public void onFSSBodySignals(FSSBodySignalsEvent event) {
-        if (event.getBodyID() == null) return;
-
-        LocationDto location = locationManager.findBySystemAddress(event.getSystemAddress(), event.getBodyID());
-        LocationDto primaryStar = locationManager.findBySystemAddress(event.getSystemAddress());
-        location.setX(primaryStar.getX());
-        location.setY(primaryStar.getY());
-        location.setZ(primaryStar.getZ());
-        if (FSSBodySignalsSubscriber.file(location, event, locationManager.findStarName(event.getSystemAddress())) == null)
-            return;
-
-        locationManager.save(location);
-        log.debug("PreScan: saved FSS body signals {}", event.getBodyName());
+        if (FSSBodySignalsSubscriber.record(event) != null) {
+            log.debug("PreScan: saved FSS body signals {}", event.getBodyName());
+        }
     }
 
     @Subscribe
     public void onSAASignalsFound(SAASignalsFoundEvent event) {
-        if (event.getBodyName() == null) return;
-
-        LocationDto location = locationManager.findBySystemAddress(event.getSystemAddress(), event.getBodyID());
-        LocationDto primaryStar = locationManager.findBySystemAddress(event.getSystemAddress());
-        location.setBodyId(event.getBodyID());
-        location.setSystemAddress(event.getSystemAddress());
-        location.setPlanetName(event.getBodyName());
-        location.setStarName(locationManager.findStarName(event.getSystemAddress()));
-        location.setX(primaryStar.getX());
-        location.setY(primaryStar.getY());
-        location.setZ(primaryStar.getZ());
-        location.addSaaSignals(event.getSignals());
-
-        // Rings are bodies: classify, record the parent, and keep the mining reserves. Without this
-        // the pre-scan drops ring signals entirely (no SAA handler previously existed here).
-        if (event.getBodyName().matches(".* [A-Z] Ring")) {
-            location.setLocationType(PLANETARY_RING);
-            location.setParentBodyName(event.getBodyName().replaceAll(" [A-Z] Ring$", ""));
-            if (event.getSignals() != null && !event.getSignals().isEmpty()) {
-                List<MaterialDto> materials = new ArrayList<>();
-                for (SAASignalsFoundEvent.Signal signal : event.getSignals()) {
-                    // Mirrors SAASignalsFoundSubscriber.toMaterials - the two must not disagree about a name.
-                    String reserve = SignalName.display(signal.getTypeLocalised(), signal.getType());
-                    if (reserve != null) materials.add(new MaterialDto(reserve, 100, true));
-                }
-                location.setMaterials(materials);
-            }
-        }
-
-        if (location.getStarName() != null && !location.getStarName().isEmpty()) {
-            locationManager.save(location);
+        if (SaaSignalsRecord.record(event, body -> {
+        }) != null) {
             log.debug("PreScan: saved SAA signals {}", event.getBodyName());
         }
     }
@@ -428,9 +269,4 @@ public class SilentPersistenceSubscriber {
         log.debug("PreScan: saved ship {} ({})", shipName, event.getShipId());
     }
 
-    private static String subtractBodyName(String bodyName, String starSystem) {
-        if (bodyName == null || starSystem == null) return bodyName;
-        String trimmed = bodyName.replace(starSystem, "").trim();
-        return trimmed.isEmpty() ? bodyName : trimmed;
-    }
 }

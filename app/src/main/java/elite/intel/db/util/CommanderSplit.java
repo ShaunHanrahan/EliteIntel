@@ -93,6 +93,15 @@ final class CommanderSplit {
             "cartographic_system"
     );
 
+    /**
+     * Columns the commander tree has renamed since the split, by table: the commander tree's name to the name the
+     * shared file still has in a database that has not been split yet. Without this the copy, which matches columns
+     * by name, would leave a renamed column's value behind.
+     */
+    static final Map<String, Map<String, String>> RENAMED_SINCE_SPLIT = Map.of(
+            "player", Map.of("current_system", "current_primary_star")
+    );
+
     private CommanderSplit() {
     }
 
@@ -222,15 +231,25 @@ final class CommanderSplit {
             throw new IllegalStateException("Commander tree does not create " + table + ", so it cannot be moved");
         }
         // Only the columns both sides have: the commander tree may have grown a column since, which takes its
-        // default, and the shared table keeps columns that moved elsewhere (the user's half of player).
-        Set<String> columns = new LinkedHashSet<>(columnsOf(handle, SCHEMA, table));
-        columns.retainAll(columnsOf(handle, "main", table));
-        String list = String.join(", ", columns.stream().map(c -> '"' + c + '"').toList());
+        // default, and the shared table keeps columns that moved elsewhere (the user's half of player). A column
+        // renamed since the split is matched by its old name.
+        Map<String, String> renamed = RENAMED_SINCE_SPLIT.getOrDefault(table, Map.of());
+        Set<String> sourceColumns = new HashSet<>(columnsOf(handle, "main", table));
+        List<String> targets = new ArrayList<>();
+        List<String> sources = new ArrayList<>();
+        for (String column : columnsOf(handle, SCHEMA, table)) {
+            String source = renamed.getOrDefault(column, column);
+            if (!sourceColumns.contains(source)) continue;
+            targets.add('"' + column + '"');
+            sources.add('"' + source + '"');
+        }
+        String targetList = String.join(", ", targets);
+        String sourceList = String.join(", ", sources);
 
         handle.useTransaction(tx -> {
             // The baseline seeds some rows (player, player_status). The moved data replaces them.
             tx.execute("DELETE FROM " + SCHEMA + "." + table);
-            tx.execute("INSERT INTO " + SCHEMA + "." + table + " (" + list + ") SELECT " + list + " FROM main." + table);
+            tx.execute("INSERT INTO " + SCHEMA + "." + table + " (" + targetList + ") SELECT " + sourceList + " FROM main." + table);
         });
 
         long source = count(handle, "main", table);

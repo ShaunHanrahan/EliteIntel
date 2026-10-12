@@ -51,7 +51,7 @@ final class ShipModuleSearch {
         // WHY: same pad rule the trade route and trader searches apply - a large ship is only shown ports it
         // can dock at, otherwise the route ends at an outpost it has to turn around and leave.
         List<OutfittingHit> found = OutfittingSearch.find(wanted, coordinates.x(), coordinates.y(), coordinates.z(),
-                PlayerSession.getInstance().getPrimaryStarName(), distance,
+                PlayerSession.getInstance().currentStarSystem(), distance,
                 ShipManager.getInstance().requireLargePad(), returnClosest);
         if (found.isEmpty()) {
             // How far it actually looked, not what was asked for: the search widens on its own, and reporting

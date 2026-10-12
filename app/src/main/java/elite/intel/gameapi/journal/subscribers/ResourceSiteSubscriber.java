@@ -36,7 +36,7 @@ public class ResourceSiteSubscriber {
         ResourceSiteGrade grade = ResourceSiteGrade.fromSymbol(event.getTypeSymbol());
         if (grade == null) return;
 
-        resourceSite.droppedIn(playerSession.getLocationData().getSystemAddress(), grade, event.getThreat());
+        resourceSite.droppedIn(playerSession.currentSystemAddress(), grade, event.getThreat());
     }
 
     @Subscribe

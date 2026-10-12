@@ -38,8 +38,8 @@ public class ConflictZoneObjectiveSource implements HudObjectiveSource {
 
     public ConflictZoneObjectiveSource() {
         this(ConflictZone.getInstance(), CombatBondManager.getInstance(),
-                () -> PlayerSession.getInstance().getLocationData().getSystemAddress(),
-                () -> PlayerSession.getInstance().getPrimaryStarName(),
+                () -> PlayerSession.getInstance().currentSystemAddress(),
+                () -> PlayerSession.getInstance().currentStarSystem(),
                 () -> Status.getInstance().isInMainShip());
     }
 

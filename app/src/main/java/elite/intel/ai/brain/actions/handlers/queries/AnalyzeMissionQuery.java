@@ -3,10 +3,8 @@ package elite.intel.ai.brain.actions.handlers.queries;
 import com.google.gson.JsonObject;
 import elite.intel.ai.brain.actions.handlers.queries.struct.AiDataStruct;
 import elite.intel.ai.brain.vega.SpokenAmounts;
-import elite.intel.db.managers.LocationManager;
 import elite.intel.db.managers.MissionManager;
 import elite.intel.gameapi.MissionType;
-import elite.intel.gameapi.journal.events.dto.LocationDto;
 import elite.intel.gameapi.journal.events.dto.MissionDto;
 import elite.intel.session.PlayerSession;
 import elite.intel.util.StringUtls;
@@ -32,7 +30,6 @@ public class AnalyzeMissionQuery extends BaseQueryAnalyzer implements IntelQuery
 
 
     private final MissionManager missionManager = MissionManager.getInstance();
-    private final LocationManager locationManager = LocationManager.getInstance();
     private final PlayerSession playerSession = PlayerSession.getInstance();
 
     @Override
@@ -50,7 +47,6 @@ public class AnalyzeMissionQuery extends BaseQueryAnalyzer implements IntelQuery
                 )
         );
 
-        LocationDto playerLocation = locationManager.findByLocationData(playerSession.getLocationData());
         String instructions = """
                 Answer the user's question about active missions.
                 
@@ -75,7 +71,7 @@ public class AnalyzeMissionQuery extends BaseQueryAnalyzer implements IntelQuery
                 - If the user names a specific system: show only missions relevant to that system.
                 - Do not filter by current system unless the user explicitly asks about it.
                 """ + SpokenAmounts.RULE;
-        return process(new AiDataStruct(instructions, new DataDto(missions, playerLocation.getStarName())), originalUserInput);
+        return process(new AiDataStruct(instructions, new DataDto(missions, playerSession.currentStarSystem())), originalUserInput);
     }
 
     record DataDto(Map<String, Collection<MissionDto>> missions,

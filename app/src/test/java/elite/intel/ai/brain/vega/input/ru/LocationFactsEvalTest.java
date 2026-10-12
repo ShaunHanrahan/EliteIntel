@@ -6,14 +6,11 @@ import elite.intel.ai.brain.vega.memory.facts.MemoryFactSourceRegistry;
 import elite.intel.ai.brain.vega.memory.facts.MergedFactCandidates;
 import elite.intel.ai.brain.vega.memory.facts.sources.CurrentSystemFactSource;
 import elite.intel.ai.brain.vega.prompt.Fact;
-import elite.intel.db.managers.LocationManager;
+import elite.intel.db.managers.LocationFixtures;
 import elite.intel.gameapi.gamestate.dtos.GameEvents;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
 import elite.intel.i18n.Language;
-import elite.intel.session.PlayerSession;
-import elite.intel.session.PlayerSituation;
-import elite.intel.session.Status;
-import elite.intel.session.StatusFlags;
+import elite.intel.session.*;
 import org.junit.jupiter.api.*;
 
 import java.util.List;
@@ -78,7 +75,7 @@ class LocationFactsEvalTest {
     }
 
     private void seedSol() {
-        PlayerSession.getInstance().setCurrentPrimaryStarName("Sol");
+        PlayerSession.getInstance().moveTo(new Position(9999L, "Sol", 1L));
         LocationDto sol = new LocationDto(1L);
         sol.setStarName("Sol");
         sol.setPlanetName("Sol");
@@ -89,7 +86,7 @@ class LocationFactsEvalTest {
         sol.setEconomy("Refinery");
         sol.setPopulation(22_700_000_000L);
         sol.setControllingPower("Zachary Hudson");
-        LocationManager.getInstance().save(sol);
+        LocationFixtures.store(sol);
     }
 
     private void seedSituation(PlayerSituation situation) {

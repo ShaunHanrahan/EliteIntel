@@ -5,8 +5,8 @@ import elite.intel.db.managers.LocationManager;
 import elite.intel.gameapi.journal.events.dto.BioSampleDto;
 import elite.intel.gameapi.journal.events.dto.GenusDto;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
-import elite.intel.session.LocationData;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import elite.intel.util.ExoBio;
 
 import java.util.*;
@@ -72,9 +72,9 @@ public class ExobiologyObjectiveSource implements HudObjectiveSource {
     public Optional<HudObjective> currentObjective() {
         if (!Boolean.TRUE.equals(playerSession.isDiscoveryAnnouncementOn())) return Optional.empty();
 
-        LocationData<Long, Long> here = playerSession.getLocationData();
-        Long systemAddress = here == null ? null : here.getSystemAddress();
-        if (systemAddress == null || systemAddress == 0) return Optional.empty();
+        Optional<Position> here = playerSession.position();
+        if (here.isEmpty()) return Optional.empty();
+        long systemAddress = here.get().systemAddress();
 
         // Scoped to the current system, which is also what clears the card: bodies
         // in the system just left are not read at all.
@@ -82,7 +82,7 @@ public class ExobiologyObjectiveSource implements HudObjectiveSource {
         if (bioBodies == null || bioBodies.isEmpty()) return Optional.empty();
 
         return bioBodies.stream()
-                .sorted(byRelevance(here.getInGameId()))
+                .sorted(byRelevance(here.get().bodyId()))
                 .map(body -> card(body, completedSamplesOn(body), "exobiology:" + systemAddress + ":" + body.getBodyId()))
                 .flatMap(Optional::stream)
                 .findFirst();
@@ -120,7 +120,7 @@ public class ExobiologyObjectiveSource implements HudObjectiveSource {
      */
     List<BioSampleDto> completedSamplesOn(LocationDto body) {
         String primaryStar = body.getStarName() == null || body.getStarName().isBlank()
-                ? playerSession.getPrimaryStarName()
+                ? playerSession.currentStarSystem()
                 : body.getStarName();
         if (primaryStar == null || primaryStar.isBlank()) return List.of();
         return bioSamplesManager.findByPlanetName(primaryStar, body.getPlanetName());

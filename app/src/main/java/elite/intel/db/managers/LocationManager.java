@@ -7,10 +7,12 @@ import elite.intel.gameapi.gamestate.status_events.BioSurveyCompletedEvent;
 import elite.intel.gameapi.journal.ScanBodyClassifier;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
 import elite.intel.session.DockedMarket;
-import elite.intel.session.LocationData;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import elite.intel.util.NavigationUtils;
 import elite.intel.util.json.GsonFactory;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.util.*;
 import java.util.function.Consumer;
@@ -21,13 +23,14 @@ import java.util.stream.Collectors;
  * Use getInstance() to access the single instance of this class.
  */
 public class LocationManager {
+    private static final Logger log = LogManager.getLogger(LocationManager.class);
     private static LocationManager instance;
 
     /**
-     * Striped locks that serialize read-modify-write of a single body across subscribers.
-     * Journal events for the same body (e.g. SAASignalsFound + Scan) fire on separate virtual
-     * threads within the same instant; without this they race and the later writer overwrites the
-     * earlier writer's fields (blind whole-JSON upsert). See {@link #updateBody}.
+     * Striped locks that serialize read-modify-write of one record across subscribers, keyed by the record's name.
+     * Journal events for the same body (e.g. SAASignalsFound + Scan) fire on separate virtual threads within the
+     * same instant; without this they race and the later writer overwrites the earlier writer's fields (blind
+     * whole-JSON upsert). See {@link #updateNamedBody}.
      */
     private static final int WRITE_LOCK_STRIPES = 64;
     private final Object[] writeLocks = new Object[WRITE_LOCK_STRIPES];
@@ -45,56 +48,67 @@ public class LocationManager {
         return instance;
     }
 
-    private Object lockFor(long systemAddress, long bodyId) {
-        int hash = Long.hashCode(systemAddress * 31 + bodyId);
-        return writeLocks[Math.floorMod(hash, WRITE_LOCK_STRIPES)];
-    }
-
     /**
-     * Atomically read-modify-write the body identified by {@code (systemAddress, bodyId)}: reads the
-     * current record, applies {@code mutator}, and persists it, all under a per-body lock so a
-     * concurrent {@code updateBody} for the same body cannot interleave and clobber fields. Callers
-     * that must not lose fields to a racing subscriber should go through this instead of a bare
-     * find/save pair.
+     * WHY the name: it is the record's identity - the table's unique key, and the one a record is saved under - so
+     * two writers of the same record always take the same lock, whichever BodyID each of their events reported.
      */
-    public void updateBody(long systemAddress, long bodyId, Consumer<LocationDto> mutator) {
-        boolean surveyWasComplete;
-        boolean surveyIsComplete;
-        synchronized (lockFor(systemAddress, bodyId)) {
-            LocationDto location = findBySystemAddress(systemAddress, bodyId);
-            surveyWasComplete = location.isBioScansCompleted();
-            mutator.accept(location);
-            surveyIsComplete = location.isBioScansCompleted();
-            save(location);
-        }
-        // Every writer of the survey-complete latch comes through here, so this is where a flip is
-        // announced - after the lock is released, since a listener may well read this body back.
-        if (surveyWasComplete != surveyIsComplete) {
-            GameEventBus.publish(new BioSurveyCompletedEvent(systemAddress, bodyId, surveyIsComplete));
-        }
+    private Object lockFor(String locationName) {
+        return writeLocks[Math.floorMod(locationName.hashCode(), WRITE_LOCK_STRIPES)];
     }
 
     /**
-     * Atomically read-modify-write the record stored under {@code locationName} - the table's own unique key,
-     * and the one {@link #save} upserts on - while holding the body's write lock.
+     * The one way a location record is written: read the record stored under {@code locationName}, apply
+     * {@code mutator}, and save it, all under that record's lock, so a concurrent writer of the same record cannot
+     * interleave and clobber fields.
      * <p>
-     * WHY by name rather than by BodyID: docking stores a station under the BodyID of the body we dropped at,
-     * so a system with a station (or a fleet carrier parked at a body) has two records answering to the same
-     * BodyID, and an ID lookup can hand back the wrong one. A caller that knows the place's name - the journal
-     * always reports it - can address exactly the record its save will land on.
+     * WHY by name rather than by BodyID: a body is identified by the system it is in and the name the journal gives
+     * it, a station by its MarketID (see {@code DockedStationRecord}). A BodyID is unique only within a system, and
+     * stations used to be filed under the BodyID of the body we dropped at, so an ID lookup can hand back the wrong
+     * record.
      * <p>
      * A record found under that name but belonging to another system is not adopted: station names are unique
      * per system, not across the galaxy, and merging a namesake's gravity and materials into this one would be
      * worse than starting a fresh record.
+     * <p>
+     * The record is saved under {@code locationName} whatever the mutator does to its name fields, so a write can
+     * never move a record onto another one's key.
+     *
+     * @return the record as saved, whose body id may differ from {@code bodyId} (see {@link LocationDto#setBodyId})
      */
-    public void updateNamedBody(long systemAddress, long bodyId, String locationName, Consumer<LocationDto> mutator) {
-        synchronized (lockFor(systemAddress, bodyId)) {
+    public LocationDto updateNamedBody(long systemAddress, long bodyId, String locationName, Consumer<LocationDto> mutator) {
+        if (locationName == null || locationName.isBlank()) {
+            throw new IllegalArgumentException("A location record needs a name (body " + bodyId + ", system " + systemAddress + ")");
+        }
+        LocationDto location;
+        boolean surveyWasComplete;
+        synchronized (lockFor(locationName)) {
             LocationDto stored = findByLocationName(locationName);
             boolean sameSystem = stored != null && (stored.getSystemAddress() == 0 || stored.getSystemAddress() == systemAddress);
-            LocationDto location = sameSystem ? stored : new LocationDto(bodyId, systemAddress);
+            location = sameSystem ? stored : new LocationDto(bodyId, systemAddress);
+            surveyWasComplete = location.isBioScansCompleted();
             mutator.accept(location);
-            save(location);
+            save(location, locationName);
         }
+        // Every writer of the survey-complete latch comes through here, so this is where a flip is
+        // announced - after the lock is released, since a listener may well read this body back.
+        if (surveyWasComplete != location.isBioScansCompleted()) {
+            GameEventBus.publish(new BioSurveyCompletedEvent(systemAddress, location.getBodyId(), location.isBioScansCompleted()));
+        }
+        return location;
+    }
+
+    /**
+     * {@link #updateNamedBody} for the events that name a body only by BodyID (a codex entry, an organic scan, the
+     * body the commander is at). The record is found by that id - a body's before a station's - and written under
+     * its name. With no record known by that id there is nothing to write to: a record needs a name to be stored.
+     */
+    public void updateBody(long systemAddress, long bodyId, Consumer<LocationDto> mutator) {
+        String locationName = Database.withDao(LocationDao.class, dao -> dao.findBodyName(systemAddress, bodyId));
+        if (locationName == null) {
+            log.debug("No record of body {} in system {} to write to; left unwritten", bodyId, systemAddress);
+            return;
+        }
+        updateNamedBody(systemAddress, bodyId, locationName, mutator);
     }
 
     private LocationDto findByLocationName(String locationName) {
@@ -104,54 +118,31 @@ public class LocationManager {
         });
     }
 
-    public void save(LocationDto location) {
+    /**
+     * WHY a record with no system name is not stored: every reader finds records through their system, and one
+     * without it would sit in the table unreachable.
+     */
+    private void save(LocationDto location, String locationName) {
         if (location.getStarName() == null) return;
-
-        // WHY blank rather than null: planetName starts out as "" and setPlanetName(null) is a no-op, so a
-        // station's record never had a null planet name to fall through on. Every one of them was written
-        // under the empty name instead, and locationName is the table's unique key - so they all landed on
-        // one row, each station overwriting the last. A record with no name at all is not stored: there is
-        // nothing to find it by, and the row it used to occupy belonged to whatever was saved before it.
-        String locationName = hasText(location.getPlanetName()) ? location.getPlanetName() : location.getStationName();
-        if (!hasText(locationName)) return;
-
         Database.withDao(LocationDao.class, dao -> {
             dao.save(location.getBodyId(), locationName, location.getStarName(), location.getSystemAddress(), location.toJson());
             return null;
         });
     }
 
-    private static boolean hasText(String value) {
-        return value != null && !value.isBlank();
-    }
-
     /**
      * Where the ship is, for a distance search, or null when the app cannot fix a position at all.
      * <p>
-     * WHY the fallback: the row query skips any row with a zero coordinate, because a location saved
-     * before its coordinates were known carries zeroes - but a real system sits at each of those zeroes
-     * too, and Sol is at the origin. When no non-zero row exists, the current location record is taken
-     * as it is, so a search asked in one of the busiest systems in the bubble does not answer "I do not
-     * know where you are". Every caller gets this, not only the ones written after the Sol case was found.
+     * WHY from the system's record: every arrival event carries the system's StarPos and files it there, so the
+     * coordinates are exact - zeroes included, which is Sol. The query this replaced looked the system up by name
+     * and skipped zero coordinates, and needed a fallback for Sol.
      */
     public LocationDao.Coordinates getGalacticCoordinates() {
-        LocationDao.Coordinates coordinates = Database.withDao(LocationDao.class, LocationDao::currentCoordinates);
-        if (coordinates != null) return coordinates;
-
-        LocationDto here = findByLocationData(PlayerSession.getInstance().getLocationData());
-        if (here.getStarName() == null || here.getStarName().isBlank()) return null;
-        return new LocationDao.Coordinates(here.getStarName(), here.getX(), here.getY(), here.getZ());
-    }
-
-
-    public LocationDto getLocation(String primaryStar, Long locationId) {
-        return Database.withDao(LocationDao.class, dao -> {
-            LocationDao.Location entity = dao.findByInGameIdAndPrimaryStar(locationId, primaryStar);
-            if (entity == null) {
-                return new LocationDto(locationId, primaryStar);
-            }
-            return GsonFactory.getGson().fromJson(entity.getJson(), LocationDto.class);
-        });
+        Optional<Position> position = PlayerSession.getInstance().position();
+        if (position.isEmpty()) return null;
+        LocationDto system = findSystemRecord(position.get().systemAddress());
+        if (system.getBodyId() == -1) return null;
+        return new LocationDao.Coordinates(position.get().starSystem(), system.getX(), system.getY(), system.getZ());
     }
 
     public LocationDto findBySystemAddress(long systemAddress, String planetName) {
@@ -161,7 +152,54 @@ public class LocationManager {
         });
     }
 
-    public LocationDto findBySystemAddress(long systemAddress) {
+    /**
+     * Where the commander is, the record of the body they are at, and the record holding their system's facts.
+     * Empty before any journal event has placed them.
+     */
+    public Optional<Whereabouts> here() {
+        return PlayerSession.getInstance().position().map(position ->
+                new Whereabouts(position, bodyAt(position), findSystemRecord(position.systemAddress())));
+    }
+
+    /**
+     * The record of the body the commander is at; the not-found marker (body id -1) when no journal event has placed
+     * them, or placed them at no body.
+     */
+    public LocationDto currentBody() {
+        return PlayerSession.getInstance().position().map(this::bodyAt).orElseGet(() -> new LocationDto(-1L));
+    }
+
+    /**
+     * The record of the commander's system's facts - security, allegiance, factions, coordinates (see
+     * {@link #findSystemRecord}); the not-found marker (body id -1) when no journal event has placed them.
+     */
+    public LocationDto currentSystem() {
+        return PlayerSession.getInstance().position().map(position -> findSystemRecord(position.systemAddress()))
+                .orElseGet(() -> new LocationDto(-1L));
+    }
+
+    private LocationDto bodyAt(Position position) {
+        return position.bodyId() == null ? new LocationDto(-1L, position.systemAddress())
+                : findBySystemAddress(position.systemAddress(), position.bodyId());
+    }
+
+    /**
+     * The record of a system's own facts (see {@link LocationDao#findSystemRecord}), or the not-found marker -
+     * body id -1 - when no arrival in that system is on record.
+     */
+    public LocationDto findSystemRecord(long systemAddress) {
+        return Database.withDao(LocationDao.class, dao -> {
+            LocationDao.Location location = dao.findSystemRecord(systemAddress);
+            return location == null ? new LocationDto(-1L, systemAddress) : GsonFactory.getGson().fromJson(location.getJson(), LocationDto.class);
+        });
+    }
+
+    /**
+     * The record of a system's primary star, or the not-found marker (body id -1). Only an FSDJump arrival or a Scan
+     * at 0 Ls marks one, so a system entered by carrier has none until its star is scanned; for the system's facts
+     * ask {@link #findSystemRecord}.
+     */
+    public LocationDto findPrimaryStar(long systemAddress) {
         return Database.withDao(LocationDao.class, dao -> {
             LocationDao.Location location = dao.findPrimaryBySystemAddress(systemAddress);
             return location == null ? new LocationDto(-1L, systemAddress) : GsonFactory.getGson().fromJson(location.getJson(), LocationDto.class);
@@ -175,20 +213,17 @@ public class LocationManager {
      * WHY not the primary star's record: a system entered by carrier, or one the session started docked in,
      * never gets a PRIMARY_STAR record - only a jump writes that - yet every record filed there carries the
      * system's name in its own column. A writer that took the name from the primary star alone came away
-     * with null in exactly those systems, and {@link #save} then dropped its record without a word: this is how
-     * six moons' FSS bio signals went unrecorded. The session's current system is the last resort, for the
-     * first body filed in a system nothing else has written to yet.
+     * with null in exactly those systems, and a record with no system name is not stored: this is how six
+     * moons' FSS bio signals went unrecorded without a word. The commander's current system is the last
+     * resort, for the first body filed in a system nothing else has written to yet.
      */
     public String findStarName(long systemAddress) {
         String filed = Database.withDao(LocationDao.class, dao -> dao.findStarName(systemAddress));
         if (filed != null && !filed.isBlank()) return filed;
-        PlayerSession session = PlayerSession.getInstance();
-        Long currentSystem = session.getLocationData().getSystemAddress();
-        if (currentSystem != null && currentSystem == systemAddress) {
-            String current = session.getPrimaryStarName();
-            if (current != null && !current.isBlank()) return current;
-        }
-        return null;
+        return PlayerSession.getInstance().position()
+                .filter(here -> here.isIn(systemAddress))
+                .map(Position::starSystem)
+                .orElse(null);
     }
 
     public LocationDto findBySystemAddress(Long systemAddress, Long bodyId) {
@@ -213,30 +248,15 @@ public class LocationManager {
             LocationDto station = findByMarketId(marketId);
             if (station.getSystemAddress() > 0) return station;
         }
-        return findByLocationData(PlayerSession.getInstance().getLocationData());
+        return currentBody();
     }
 
-    public LocationDto findByLocationData(LocationData<Long, Long> locationData) {
-        return findBySystemAddress(locationData.getSystemAddress(), locationData.getInGameId());
-    }
-
-
-    public Map<Long, LocationDto> findByPrimaryStar(String primaryStar) {
-        return Database.withDao(LocationDao.class, dao -> {
-            List<LocationDao.Location> byPrimaryStar = dao.findByPrimaryStar(primaryStar);
-            Map<Long, LocationDto> result = new HashMap<>();
-            for (LocationDao.Location entity : byPrimaryStar) {
-                result.put(entity.getInGameId(), GsonFactory.getGson().fromJson(entity.getJson(), LocationDto.class));
-            }
-            return result;
-        });
-    }
-
-    public LocationDto findPrimaryStar(String starSystem) {
-        return Database.withDao(LocationDao.class, dao -> {
-            LocationDao.Location primaryStar = dao.findPrimaryStar(starSystem);
-            return primaryStar == null ? new LocationDto(-1L) : GsonFactory.getGson().fromJson(primaryStar.getJson(), LocationDto.class);
-        });
+    /**
+     * Whether anything is on record for the system of this name. By name, because it answers for systems a search
+     * names - those come with no address; for the commander's own system, ask by address.
+     */
+    public boolean isSystemOnRecord(String starSystem) {
+        return Database.withDao(LocationDao.class, dao -> dao.isSystemOnRecord(starSystem));
     }
 
 

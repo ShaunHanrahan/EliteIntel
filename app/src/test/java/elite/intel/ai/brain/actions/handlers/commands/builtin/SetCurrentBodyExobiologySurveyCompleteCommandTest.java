@@ -1,17 +1,19 @@
 package elite.intel.ai.brain.actions.handlers.commands.builtin;
 
 import com.google.gson.JsonObject;
+import elite.intel.db.managers.LocationFixtures;
 import elite.intel.db.managers.LocationManager;
 import elite.intel.gameapi.journal.events.dto.GenusDto;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
-import elite.intel.session.LocationData;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import elite.intel.session.Status;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -40,7 +42,7 @@ class SetCurrentBodyExobiologySurveyCompleteCommandTest {
     private long system;
     private String star;
     private String planet;
-    private LocationData<Long, Long> previousLocation;
+    private Optional<Position> previousPosition;
 
     @BeforeEach
     void setUp() {
@@ -49,19 +51,15 @@ class SetCurrentBodyExobiologySurveyCompleteCommandTest {
         system = 581167680000L + run;
         planet = star + " " + BODY;
 
-        previousLocation = session.getLocationData();
+        previousPosition = session.position();
         saveBody(BODY, planet, "Bacterium");
         saveBody(BARREN_BODY, star + " " + BARREN_BODY);
-        session.setCurrentLocationId(BODY, system);
+        session.moveTo(new Position(system, star, BODY));
     }
 
     @AfterEach
     void restoreSession() {
-        if (previousLocation != null && previousLocation.getSystemAddress() != null) {
-            session.setCurrentLocationId(
-                    previousLocation.getInGameId() == null ? 0 : previousLocation.getInGameId(),
-                    previousLocation.getSystemAddress());
-        }
+        previousPosition.ifPresent(session::moveTo);
     }
 
     @Test
@@ -90,7 +88,7 @@ class SetCurrentBodyExobiologySurveyCompleteCommandTest {
      */
     @Test
     void aBodyWithNoBiologyDoesNotOfferTheCommand() {
-        session.setCurrentLocationId(BARREN_BODY, system);
+        session.moveTo(new Position(system, star, BARREN_BODY));
 
         assertFalse(command.isVisibleForLLM(Status.getInstance()));
     }
@@ -116,7 +114,7 @@ class SetCurrentBodyExobiologySurveyCompleteCommandTest {
      */
     @Test
     void aBodyWithNoBiologyIsNotRecordedEvenIfTheCommandIsReached() {
-        session.setCurrentLocationId(BARREN_BODY, system);
+        session.moveTo(new Position(system, star, BARREN_BODY));
 
         command.execute(state(true), null);
 
@@ -144,6 +142,6 @@ class SetCurrentBodyExobiologySurveyCompleteCommandTest {
             genus.setPlanetName(planetName);
             return genus;
         }).toList());
-        locations.save(body);
+        LocationFixtures.store(body);
     }
 }

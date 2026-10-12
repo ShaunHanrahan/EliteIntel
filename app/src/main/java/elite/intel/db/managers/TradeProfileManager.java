@@ -151,7 +151,7 @@ public class TradeProfileManager {
             // No coordinates recorded for the systems we know - fall back to the system we are standing in,
             // which is identified by its address and so needs no coordinates at all.
             candidates = locationManager.findStationsInCurrentStarSystem(
-                    playerSession.getLocationData().getSystemAddress()
+                    playerSession.currentSystemAddress()
             );
         }
 
@@ -215,7 +215,7 @@ public class TradeProfileManager {
      */
     private boolean setStartingStationFromSpansh(TradeRouteSearchCriteria criteria) {
         LocationDao.Coordinates galacticCoordinates = LocationManager.getInstance().getGalacticCoordinates();
-        if (!hasKnownPosition(galacticCoordinates)) {
+        if (galacticCoordinates == null) {
             GameEventBus.publish(new MissionCriticalAnnouncementEvent("Galactic coordinates are not available."));
             return false;
         }
@@ -247,16 +247,6 @@ public class TradeProfileManager {
         log.debug("Starting trade station taken from Spansh: {} in {} ({} ly out)", station.getName(), station.getSystemName(), station.getDistance());
         announceAnchorDistance(station);
         return true;
-    }
-
-    /**
-     * Sol really does sit at 0,0,0 - and so does a location we have recorded no coordinates for, because
-     * the unset value and the real one are the same three zeroes. Only the star's name separates them.
-     */
-    private boolean hasKnownPosition(LocationDao.Coordinates galacticCoordinates) {
-        if (galacticCoordinates == null) return false;
-        boolean atOrigin = galacticCoordinates.x() == 0 && galacticCoordinates.y() == 0 && galacticCoordinates.z() == 0;
-        return !atOrigin || "Sol".equalsIgnoreCase(playerSession.getPrimaryStarName());
     }
 
     /**

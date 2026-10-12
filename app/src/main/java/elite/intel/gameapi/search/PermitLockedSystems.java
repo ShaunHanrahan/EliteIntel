@@ -232,7 +232,7 @@ public final class PermitLockedSystems {
      * subscriber reporting where the ship actually is.
      */
     private static boolean visited(String systemName) {
-        return !LocationManager.getInstance().findByPrimaryStar(systemName).isEmpty();
+        return LocationManager.getInstance().isSystemOnRecord(systemName);
     }
 
     private static String key(String systemName) {

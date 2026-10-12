@@ -96,7 +96,7 @@ public class ScanOrganicSubscriber {
             LocationDto currentLocation = locationManager.findBySystemAddress(event.getSystemAddress(), event.getBody());
             String starName = locationManager.findStarName(event.getSystemAddress());
             currentLocation.setStarName(starName);
-            playerSession.setCurrentLocationId(event.getBody(), event.getSystemAddress());
+            playerSession.moveWithinSystem(event.getSystemAddress(), event.getBody());
 
             boolean isOurDiscovery = currentLocation.isOurDiscovery();
             BioForms.ProjectedPayment paymentData = BioForms.getProjectedPayment(speciesSymbol);
@@ -214,9 +214,9 @@ public class ScanOrganicSubscriber {
 
     private BioSampleDto createBioSampleDto(String genus, String species, String genusSymbol, String speciesSymbol, boolean isOurDiscovery) {
 
-        LocationDto currentLocation = locationManager.findByLocationData(playerSession.getLocationData());
+        LocationDto currentLocation = locationManager.currentBody();
         BioSampleDto bioSampleDto = new BioSampleDto();
-        bioSampleDto.setPrimaryStar(playerSession.getPrimaryStarName());
+        bioSampleDto.setPrimaryStar(playerSession.currentStarSystem());
         bioSampleDto.setPlanetName(currentLocation.getPlanetName());
         bioSampleDto.setPlanetShortName(currentLocation.getPlanetShortName());
         bioSampleDto.setScanLatitude(status.getStatus().getLatitude());

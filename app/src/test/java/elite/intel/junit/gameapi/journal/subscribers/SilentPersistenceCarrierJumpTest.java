@@ -9,8 +9,8 @@ import elite.intel.gameapi.journal.events.CarrierLocationEvent;
 import elite.intel.gameapi.journal.events.FSDJumpEvent;
 import elite.intel.gameapi.journal.events.dto.CarrierDataDto;
 import elite.intel.gameapi.journal.subscribers.SilentPersistenceSubscriber;
-import elite.intel.session.LocationData;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -41,14 +41,14 @@ class SilentPersistenceCarrierJumpTest {
 
         // Commander flies to a system under his own power...
         privateBus.post(fsdJump("Phylurn CW-S c18-0", fsdSysAddr, 2L, 4674.31, 441.25, 2300.5));
-        assertEquals(fsdSysAddr, session.getLocationData().getSystemAddress());
+        assertEquals(fsdSysAddr, session.currentSystemAddress());
 
         // ...then his carrier jumps while he is on foot on the deck. Docked is false here.
         privateBus.post(onFootCarrierJump("Pro Eurl FV-M c21-1", carrierSysAddr, 1L, 2492.40, 279.65, 1144.5));
 
-        LocationData<Long, Long> loc = session.getLocationData();
-        assertEquals(carrierSysAddr, loc.getSystemAddress(), "pre-scan must follow the carrier, not the last FSD jump");
-        assertEquals(1L, loc.getInGameId());
+        Position loc = session.position().orElseThrow();
+        assertEquals(carrierSysAddr, loc.systemAddress(), "pre-scan must follow the carrier, not the last FSD jump");
+        assertEquals(1L, loc.bodyId());
     }
 
     @Test
@@ -64,7 +64,7 @@ class SilentPersistenceCarrierJumpTest {
         j.addProperty("OnFoot", false);
         privateBus.post(new CarrierJumpEvent(j));
 
-        assertEquals(fsdSysAddr, session.getLocationData().getSystemAddress());
+        assertEquals(fsdSysAddr, session.currentSystemAddress());
     }
 
     /**

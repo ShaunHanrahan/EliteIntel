@@ -75,17 +75,8 @@ public interface LocationDao {
     );
 
 
-    @SqlQuery(WITH_VISITS + "select * from location where inGameId = 1 and json like '%\":systemId\"%'")
-    LocationDao.Location findBySystemAddressAndInGameId(@Bind("systemId") Long systemId, @Bind("inGameId") Long inGameId);
-
-    @SqlQuery(WITH_VISITS + "SELECT * FROM location WHERE inGameId = :inGameId AND :primaryStar = primaryStar")
-    LocationDao.Location findByInGameIdAndPrimaryStar(@Bind("inGameId") Long inGameId, @Bind("primaryStar") String primaryStar);
-
-    @SqlQuery(WITH_VISITS + "SELECT * FROM location WHERE primaryStar = :primaryStar")
-    List<Location> findByPrimaryStar(@Bind("primaryStar") String primaryStar);
-
-    @SqlQuery(WITH_VISITS + "select * from location where primaryStar = :starSystem and json like '%\"PRIMARY_STAR\"%'")
-    Location findPrimaryStar(@Bind("starSystem") String starSystem);
+    @SqlQuery("SELECT EXISTS (SELECT 1 FROM location WHERE primaryStar = :starSystem)")
+    boolean isSystemOnRecord(@Bind("starSystem") String starSystem);
 
     /**
      * The name of the system at this address, read from the record's own starName rather than the primaryStar
@@ -95,24 +86,43 @@ public interface LocationDao {
     @SqlQuery("select json->>'$.starName' from location where systemAddress = :systemAddress and json->>'$.starName' is not null and json->>'$.starName' != '' limit 1")
     String findStarName(@Bind("systemAddress") long systemAddress);
 
-    @SqlQuery("""
-            SELECT location.primaryStar,
-                json ->> '$.X' AS x,
-                json ->> '$.Y' AS y,
-                json ->> '$.Z' AS z
-            from location where primaryStar = (select current_primary_star from player) and json ->> '$.X' != 0 and json ->> '$.Y' !=0 and json ->> '$.Z' !=0 LIMIT 1;
-            """)
-    @RegisterConstructorMapper(Coordinates.class)
-    Coordinates currentCoordinates();
-
     @SqlQuery(WITH_VISITS + "select * from location where systemAddress = :systemAddress and json->> '$.planetName' = :planetName")
     Location findPrimaryBySystemAddress(@Bind("systemAddress") long systemAddress, @Bind("planetName") String planetName);
 
-    @SqlQuery(WITH_VISITS + "select * from location where systemAddress = :systemAddress and json->> '$.bodyId' = :bodyId")
+    /**
+     * Places, not bodies: a station or carrier may still sit under a body's BodyID in a database written before
+     * stations were filed under their MarketID, so a BodyID lookup puts the body first.
+     */
+    String PLACES_LAST = """
+             order by json like '%"locationType": "STATION"%' or json like '%"locationType": "FLEET_CARRIER"%'
+             limit 1
+            """;
+
+    @SqlQuery(WITH_VISITS + "select * from location where systemAddress = :systemAddress and json->> '$.bodyId' = :bodyId" + PLACES_LAST)
     Location findPrimaryBySystemAddress(@Bind("systemAddress") long systemAddress, @Bind("bodyId") Long bodyId);
+
+    /**
+     * The name of the record a BodyID refers to in this system, a body's before a station's (see {@link #PLACES_LAST}).
+     */
+    @SqlQuery("select locationName from location where systemAddress = :systemAddress and json->> '$.bodyId' = :bodyId" + PLACES_LAST)
+    String findBodyName(@Bind("systemAddress") long systemAddress, @Bind("bodyId") long bodyId);
 
     @SqlQuery(WITH_VISITS + "select * from location where systemAddress = :systemAddress and json like '%\"locationType\": \"PRIMARY_STAR\"%'")
     Location findPrimaryBySystemAddress(@Bind("systemAddress") long systemAddress);
+
+    /**
+     * The row carrying the system's own facts - security, allegiance, population, coordinates - which the arrival
+     * events (FSDJump, Location, CarrierJump) copy onto the body they arrive at. The primary star's row is preferred
+     * when it has them, but a system entered by carrier has no primary star on record until the star is scanned,
+     * and its facts sit on whatever orbit the carrier parked at.
+     */
+    @SqlQuery(WITH_VISITS + """
+            select * from location
+             where systemAddress = :systemAddress and json ->> '$.security' is not null and json ->> '$.security' != ''
+             order by json like '%"locationType": "PRIMARY_STAR"%' desc
+             limit 1
+            """)
+    Location findSystemRecord(@Bind("systemAddress") long systemAddress);
 
     /**
      * Bodies in one system whose surface scan turned up biological genuses.
@@ -199,7 +209,7 @@ public interface LocationDao {
         }
     }
 
-    record Coordinates(String primaryStar,  double x, double y, double z) {
+    record Coordinates(String starSystem, double x, double y, double z) {
 
     }
 

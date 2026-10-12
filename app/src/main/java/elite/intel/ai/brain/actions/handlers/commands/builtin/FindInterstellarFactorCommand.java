@@ -62,7 +62,7 @@ public final class FindInterstellarFactorCommand implements IntelCommand {
         );
 
         results = PermitLockedSystems.reachable(
-                CurrentSystemFilter.exclude(results, PlayerSession.getInstance().getPrimaryStarName()));
+                CurrentSystemFilter.exclude(results, PlayerSession.getInstance().currentStarSystem()));
         if (results.isEmpty()) {
             return StringUtls.localizedResponse("handler.interstellarFactors.notFound");
         }

@@ -3,12 +3,14 @@ package elite.intel.ai.brain.actions.handlers.commands.builtin;
 import com.google.gson.JsonObject;
 import elite.intel.ai.brain.actions.handlers.commands.IntelCommand;
 import elite.intel.ai.brain.actions.handlers.commands.RegisterCommand;
-import elite.intel.db.dao.LocationDao;
 import elite.intel.db.managers.LocationManager;
+import elite.intel.db.managers.Whereabouts;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
 import elite.intel.session.PlayerSession;
 import elite.intel.session.Status;
 import elite.intel.util.StringUtls;
+
+import java.util.Optional;
 
 /**
  * Owns its own execution: body migrated 1:1 from the legacy SetCurrentStarAsHomeSystem,
@@ -48,16 +50,16 @@ public final class SetHomeSystemCommand implements IntelCommand {
 
     @Override
     public String execute(JsonObject params, String responseText) {
-        LocationDao.Coordinates coordinates = LocationManager.getInstance().getGalacticCoordinates();
-        if (coordinates == null) {
+        Optional<Whereabouts> here = locationManager.here();
+        if (here.isEmpty()) {
             return StringUtls.localizedResponse("handler.homeSystem.noCoords");
         }
-        LocationDto newHome = locationManager.findPrimaryStar(coordinates.primaryStar());
-        if (newHome == null || newHome.getSystemAddress() < 1) {
-            return StringUtls.localizedResponse("handler.homeSystem.primaryStarNotFound", coordinates.primaryStar());
+        LocationDto newHome = here.get().system();
+        if (newHome.getBodyId() == -1) {
+            return StringUtls.localizedResponse("handler.homeSystem.primaryStarNotFound", here.get().starSystem());
         }
 
         playerSession.setHomeSystem(newHome);
-        return StringUtls.localizedResponse("handler.homeSystem.setting", coordinates.primaryStar());
+        return StringUtls.localizedResponse("handler.homeSystem.setting", here.get().starSystem());
     }
 }

@@ -8,7 +8,6 @@ import elite.intel.db.managers.LocationManager;
 import elite.intel.gameapi.i18n.EventsTextProvider;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
 import elite.intel.i18n.Language;
-import elite.intel.session.PlayerSession;
 import elite.intel.session.PlayerSituation;
 import elite.intel.session.Status;
 
@@ -59,8 +58,7 @@ public final class CurrentSituationFactSource implements MemoryFactSource {
         }
 
         try {
-            LocationDto location = LocationManager.getInstance()
-                    .findByLocationData(PlayerSession.getInstance().getLocationData());
+            LocationDto location = LocationManager.getInstance().currentBody();
             return status.getSituation(location);
         } catch (RuntimeException ignored) {
             // Location only refines normal-space flight into a planetary ring; flags still give a truthful fallback.

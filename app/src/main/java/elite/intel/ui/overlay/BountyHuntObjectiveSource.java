@@ -45,8 +45,8 @@ public class BountyHuntObjectiveSource implements HudObjectiveSource {
 
     public BountyHuntObjectiveSource() {
         this(ResourceSite.getInstance(), BountyManager.getInstance(), MissionManager.getInstance(),
-                () -> PlayerSession.getInstance().getLocationData().getSystemAddress(),
-                () -> PlayerSession.getInstance().getPrimaryStarName(),
+                () -> PlayerSession.getInstance().currentSystemAddress(),
+                () -> PlayerSession.getInstance().currentStarSystem(),
                 () -> Status.getInstance().isInMainShip());
     }
 

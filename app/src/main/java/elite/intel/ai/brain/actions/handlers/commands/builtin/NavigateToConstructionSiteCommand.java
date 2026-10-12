@@ -71,7 +71,7 @@ public final class NavigateToConstructionSiteCommand implements IntelCommand {
         // system than from outside it. There is no route to plot to the system you are standing in: the
         // galaxy map would be opened only to type the name of the system it is already centred on. The
         // answer is which pad to head for, which matters all the more because a system can hold several.
-        String currentSystem = PlayerSession.getInstance().getPrimaryStarName();
+        String currentSystem = PlayerSession.getInstance().currentStarSystem();
         if (currentSystem != null && currentSystem.equalsIgnoreCase(system)) {
             return StringUtls.localizedResponse("handler.construction.siteInThisSystem",
                     siteName(site), (int) Math.round(site.getProgress() * 100));

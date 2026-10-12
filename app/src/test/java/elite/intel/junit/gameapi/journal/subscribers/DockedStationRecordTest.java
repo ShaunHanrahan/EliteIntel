@@ -3,6 +3,7 @@ package elite.intel.junit.gameapi.journal.subscribers;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import elite.intel.db.managers.LocationFixtures;
 import elite.intel.db.managers.LocationManager;
 import elite.intel.gameapi.journal.events.ApproachSettlementEvent;
 import elite.intel.gameapi.journal.events.DockedEvent;
@@ -41,7 +42,7 @@ class DockedStationRecordTest {
         body.setStarName(star);
         body.setPlanetName(moon);
         body.setLocationType(LocationDto.LocationType.MOON);
-        locations.save(body);
+        LocationFixtures.store(body);
 
         DockedStationRecord.of(approachSettlement(settlement, marketId, sysAddr, bodyId, "Alliance"), star).store();
 

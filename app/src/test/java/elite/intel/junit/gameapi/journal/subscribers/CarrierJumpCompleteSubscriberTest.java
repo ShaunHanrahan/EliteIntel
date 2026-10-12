@@ -10,8 +10,8 @@ import elite.intel.gameapi.journal.events.CarrierJumpEvent;
 import elite.intel.gameapi.journal.events.dto.CarrierDataDto;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
 import elite.intel.gameapi.journal.subscribers.CarrierJumpCompleteSubscriber;
-import elite.intel.session.LocationData;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import elite.intel.session.Status;
 import elite.intel.util.json.GsonFactory;
 import org.junit.jupiter.api.AfterEach;
@@ -42,14 +42,14 @@ class CarrierJumpCompleteSubscriberTest {
     void dockedWithBodyIdUpdatesLocationId() throws InterruptedException {
         long sysAddr = 70001000L;
         long bodyId = 7L;
-        session.setCurrentLocationId(999L, sysAddr);
+        session.moveTo(new Position(sysAddr, "Test System", 999L));
         setDockedStatus();
 
         subscriber.onCarrierJumpCompleteEvent(carrierJumpEvent("CarrierTestSystem", sysAddr, bodyId));
 
-        awaitTrue(() -> Long.valueOf(bodyId).equals(session.getLocationData().getInGameId()));
+        awaitTrue(() -> Long.valueOf(bodyId).equals(session.position().orElseThrow().bodyId()));
 
-        assertEquals(bodyId, session.getLocationData().getInGameId());
+        assertEquals(bodyId, session.position().orElseThrow().bodyId());
     }
 
     /**
@@ -60,22 +60,22 @@ class CarrierJumpCompleteSubscriberTest {
     void onFootAboardCarrierUpdatesLocationId() throws InterruptedException {
         long sysAddr = 70003000L;
         long bodyId = 3L;
-        session.setCurrentLocationId(999L, 12345L);
+        session.moveTo(new Position(12345L, "Test System", 999L));
         // Status left undocked on purpose: flags = 0
 
         subscriber.onCarrierJumpCompleteEvent(onFootCarrierJumpEvent("CarrierOnFootSystem", sysAddr, bodyId));
 
-        awaitTrue(() -> Long.valueOf(bodyId).equals(session.getLocationData().getInGameId()));
+        awaitTrue(() -> Long.valueOf(bodyId).equals(session.position().orElseThrow().bodyId()));
 
-        assertEquals(bodyId, session.getLocationData().getInGameId());
-        assertEquals(sysAddr, session.getLocationData().getSystemAddress());
+        assertEquals(bodyId, session.position().orElseThrow().bodyId());
+        assertEquals(sysAddr, session.currentSystemAddress());
     }
 
     @Test
     void notAboardDoesNotUpdateLocationId() throws InterruptedException {
         long knownSysAddr = 70004000L;
         long knownBodyId = 55L;
-        session.setCurrentLocationId(knownBodyId, knownSysAddr);
+        session.moveTo(new Position(knownSysAddr, "Test System", knownBodyId));
         session.setFleetCarrierData(new CarrierDataDto());
 
         // Docked and OnFoot both false — the carrier moved without the commander.
@@ -83,8 +83,8 @@ class CarrierJumpCompleteSubscriberTest {
 
         awaitHandlerPastLocationBlock();
 
-        assertEquals(knownBodyId, session.getLocationData().getInGameId());
-        assertEquals(knownSysAddr, session.getLocationData().getSystemAddress());
+        assertEquals(knownBodyId, session.position().orElseThrow().bodyId());
+        assertEquals(knownSysAddr, session.currentSystemAddress());
     }
 
     /**
@@ -120,13 +120,14 @@ class CarrierJumpCompleteSubscriberTest {
 
         // PlayerSession is a singleton shared across tests, so wait on the values this test owns
         // rather than on "some row is reachable", which a previous test's pointer would satisfy.
-        awaitTrue(() -> sysAddr == session.getLocationData().getSystemAddress()
+        awaitTrue(() -> sysAddr == session.currentSystemAddress()
                 && locationManager.findBySystemAddress(sysAddr, bodyId).getStarName() != null);
 
-        LocationDto saved = locationManager.findByLocationData(session.getLocationData());
+        LocationDto saved = locationManager.currentBody();
         assertEquals(starSystem, saved.getStarName());
         assertEquals(sysAddr, saved.getSystemAddress());
-        assertEquals(LocationDto.LocationType.PRIMARY_STAR, saved.getLocationType());
+        // A carrier parks at whichever orbit is free, so the body it parks at is not claimed as the primary star.
+        assertEquals(LocationDto.LocationType.UNCLASSIFIED, saved.getLocationType());
     }
 
     /**
@@ -164,30 +165,30 @@ class CarrierJumpCompleteSubscriberTest {
         // LocationDto.setBodyId refuses to lower an id, so the row keeps bodyId 1. The location
         // pointer has to agree with the row, or "where am I" resolves to nothing.
         assertEquals(1L, after.getBodyId(), "the stored id must not be lowered to the journal's 0");
-        assertEquals(Long.valueOf(1L), session.getLocationData().getInGameId(),
+        assertEquals(Long.valueOf(1L), session.position().orElseThrow().bodyId(),
                 "the location pointer must match the id the row actually holds");
-        assertEquals(starSystem, locationManager.findByLocationData(session.getLocationData()).getStarName(),
+        assertEquals(starSystem, locationManager.currentBody().getStarName(),
                 "the saved row must be reachable through the current-location pointer");
     }
 
     /**
-     * A missing BodyID must not move the location pointer, and must not abort the handler either:
-     * the jump still has to be announced and the carrier's own position recorded.
+     * A missing BodyID still moves the commander to the new system - with the body unknown, never the previous
+     * system's body paired with the new system's name - and must not abort the handler either: the jump still has
+     * to be announced and the carrier's own position recorded.
      */
     @Test
-    void dockedWithNullBodyIdDoesNotUpdateLocationIdButHandlerCompletes() throws InterruptedException {
-        long sysAddr = 70002000L;
-        long knownBodyId = 42L;
-        session.setCurrentLocationId(knownBodyId, sysAddr);
+    void dockedWithNullBodyIdMovesToTheSystemWithNoBodyAndHandlerCompletes() throws InterruptedException {
+        long previousSystem = 70002000L;
+        long newSystem = 70002001L;
+        session.moveTo(new Position(previousSystem, "Test System", 42L));
         session.setFleetCarrierData(new CarrierDataDto());
         setDockedStatus();
 
-        subscriber.onCarrierJumpCompleteEvent(carrierJumpEventNullBodyId("CarrierNullSystem", sysAddr));
+        subscriber.onCarrierJumpCompleteEvent(carrierJumpEventNullBodyId("CarrierNullSystem", newSystem));
 
         awaitHandlerPastLocationBlock();
 
-        LocationData<Long, Long> loc = session.getLocationData();
-        assertEquals(knownBodyId, loc.getInGameId(), "null BodyID must not overwrite current_location_id");
+        assertEquals(new Position(newSystem, "CarrierNullSystem", null), session.position().orElseThrow());
     }
 
     /**

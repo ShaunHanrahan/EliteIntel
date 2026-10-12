@@ -5,7 +5,6 @@ import elite.intel.ai.brain.actions.handlers.commands.IntelCommand;
 import elite.intel.ai.brain.actions.handlers.commands.RegisterCommand;
 import elite.intel.db.dao.ExoMasteryDao.Body;
 import elite.intel.db.managers.ExoMasteryManager;
-import elite.intel.session.LocationData;
 import elite.intel.session.PlayerSession;
 import elite.intel.session.Status;
 import elite.intel.util.StringUtls;
@@ -83,8 +82,8 @@ public final class FlagExoMasterySystemHarvestedCommand implements IntelCommand 
      */
     private Long currentCataloguedSystem() {
         if (!exoMastery.isEnabled()) return null;
-        LocationData<Long, Long> here = playerSession.getLocationData();
-        if (here == null || here.getSystemAddress() == null || here.getSystemAddress() == 0) return null;
-        return exoMastery.hasRemaining(here.getSystemAddress()) ? here.getSystemAddress() : null;
+        long systemAddress = playerSession.currentSystemAddress();
+        if (systemAddress == 0) return null;
+        return exoMastery.hasRemaining(systemAddress) ? systemAddress : null;
     }
 }

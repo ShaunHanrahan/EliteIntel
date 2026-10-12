@@ -2,12 +2,14 @@ package elite.intel.junit.gameapi.journal.subscribers;
 
 import com.google.gson.JsonObject;
 import elite.intel.db.dao.LocationDao;
+import elite.intel.db.managers.LocationFixtures;
 import elite.intel.db.managers.LocationManager;
 import elite.intel.db.util.Database;
 import elite.intel.gameapi.journal.events.SupercruiseEntryEvent;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
 import elite.intel.gameapi.journal.subscribers.SupercruiseEntryEventSubscriber;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import elite.intel.util.json.GsonFactory;
 import org.junit.jupiter.api.Test;
 
@@ -48,10 +50,9 @@ class SupercruiseEntryEventSubscriberTest {
         body.setStationFaction("Pilots Federation");
         body.setStationEconomy("High Tech");
         body.setStationGovernment("Democracy");
-        locationManager.save(body);
+        LocationFixtures.store(body);
 
-        session.setCurrentLocationId(bodyId, sysAddr);
-        session.setCurrentPrimaryStarName(star);
+        session.moveTo(new Position(sysAddr, star, bodyId));
 
         subscriber.onSuperCruiseEntryEvent(supercruiseEntryEvent(star, sysAddr));
 
@@ -79,10 +80,9 @@ class SupercruiseEntryEventSubscriberTest {
         station.setStationType("Coriolis");
         station.setStationFaction("Pilots Federation");
         station.setLocationType(LocationDto.LocationType.STATION);
-        locationManager.save(station);
+        LocationFixtures.store(station);
 
-        session.setCurrentLocationId(bodyId, sysAddr);
-        session.setCurrentPrimaryStarName(star);
+        session.moveTo(new Position(sysAddr, star, bodyId));
 
         subscriber.onSuperCruiseEntryEvent(supercruiseEntryEvent(star, sysAddr));
 
@@ -95,8 +95,7 @@ class SupercruiseEntryEventSubscriberTest {
     }
 
     /**
-     * The subscriber reads the system's star name off the PRIMARY_STAR record, and a record with no star name
-     * is never saved - so without one seeded here the handler would appear to do nothing at all.
+     * A system on record around the body, as a real visit leaves it.
      */
     private void seedPrimaryStar(long sysAddr, String star, int run) {
         LocationDto primary = new LocationDto(1L, sysAddr);

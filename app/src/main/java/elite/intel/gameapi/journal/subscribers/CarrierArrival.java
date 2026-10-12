@@ -299,9 +299,10 @@ final class CarrierArrival {
      * the system the carrier left.
      *
      * <p>Three sources, best first. The location table is exact and free whenever the commander has
-     * flown here himself. EDSM is exact for charted space. The SystemAddress is approximate but
-     * always available, and it is the only one of the three that answers in uncharted space — which
-     * is where a carrier arrival the commander was not aboard for usually happens.
+     * been here - by any arrival, since every one files the system's StarPos. EDSM is exact for
+     * charted space. The SystemAddress is approximate but always available, and it is the only one
+     * of the three that answers in uncharted space — which is where a carrier arrival the commander
+     * was not aboard for usually happens.
      *
      * <p>WHY it must write something in every case: coordinates left over from the previous system
      * would be read as this system's, and the distance query would confidently report a figure for a
@@ -309,8 +310,9 @@ final class CarrierArrival {
      * does not know.
      */
     static void resolveCoordinates(CarrierDataDto carrierData, String starSystem, Long systemAddress) {
-        LocationDto location = LocationManager.getInstance().findPrimaryStar(starSystem);
-        if (location.getX() != 0 || location.getY() != 0 || location.getZ() != 0) {
+        LocationDto location = systemAddress == null ? new LocationDto(-1L)
+                : LocationManager.getInstance().findSystemRecord(systemAddress);
+        if (location.getBodyId() != -1) {
             CarrierCoordinates.apply(carrierData, location.getX(), location.getY(), location.getZ());
             return;
         }

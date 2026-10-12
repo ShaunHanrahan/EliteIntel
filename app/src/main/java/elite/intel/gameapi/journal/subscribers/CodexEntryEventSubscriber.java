@@ -45,7 +45,7 @@ public class CodexEntryEventSubscriber {
                 locationManager.updateBody(event.getSystemAddress(), event.getBodyID(),
                         location -> location.setStarName(starName));
             }
-            playerSession.setCurrentLocationId(event.getBodyID(), event.getSystemAddress());
+            playerSession.moveWithinSystem(event.getSystemAddress(), event.getBodyID());
             StringBuilder sb = new StringBuilder();
 
             String nameLocalised = event.getNameLocalised();

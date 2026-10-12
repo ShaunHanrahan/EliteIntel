@@ -6,10 +6,8 @@ import elite.intel.ai.brain.actions.ActionParameterSpec;
 import elite.intel.ai.brain.actions.handlers.commands.IntelCommand;
 import elite.intel.ai.brain.actions.handlers.commands.RegisterCommand;
 import elite.intel.ai.brain.vega.VegaRuntime;
-import elite.intel.db.managers.LocationManager;
 import elite.intel.db.managers.NeutronStarRouteManager;
 import elite.intel.db.managers.ShipLoadoutManager;
-import elite.intel.gameapi.journal.events.dto.LocationDto;
 import elite.intel.gameapi.journal.events.dto.shiploadout.ShipLoadOutDto;
 import elite.intel.gameapi.search.spansh.neutronroute.NeutronStarRoute;
 import elite.intel.gameapi.search.spansh.neutronroute.NeutronStarRouteCalculatorCriteria;
@@ -43,7 +41,6 @@ public final class CalculateNeutronStarRouteCommand implements IntelCommand {
 
 
     private final PlayerSession playerSession = PlayerSession.getInstance();
-    private final LocationManager locationManager = LocationManager.getInstance();
     private final NeutronStarRouteManager neutronStarRouteManager = NeutronStarRouteManager.getInstance();
     private final ShipLoadoutManager shipLoadoutManager = ShipLoadoutManager.getInstance();
 
@@ -107,8 +104,7 @@ public final class CalculateNeutronStarRouteCommand implements IntelCommand {
         // which owns the two numbers it goes out as. Unstated is a no, which is the planner's own default.
         boolean supercharge = readFlag(params, PARAM_SUPERCHARGE);
 
-        LocationDto location = locationManager.findByLocationData(playerSession.getLocationData());
-        String origin = location.getStarName();
+        String origin = playerSession.currentStarSystem();
 
         // The destination is whatever the commander copied out of the galaxy map - there is no other way for
         // them to name a system we have never been to, and a misheard system name is not one Spansh can plot

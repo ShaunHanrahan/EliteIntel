@@ -123,7 +123,7 @@ public final class ExcludeStarSystemFromSearchesCommand implements IntelCommand 
     private static String target(JsonObject params) {
         String starSystem = wantsDestination(params)
                 ? destinationSystem()
-                : PlayerSession.getInstance().getPrimaryStarName();
+                : PlayerSession.getInstance().currentStarSystem();
         return starSystem == null || starSystem.isBlank() ? null : starSystem;
     }
 

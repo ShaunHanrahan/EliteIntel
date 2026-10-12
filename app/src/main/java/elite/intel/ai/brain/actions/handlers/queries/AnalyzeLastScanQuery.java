@@ -32,7 +32,7 @@ public class AnalyzeLastScanQuery extends BaseQueryAnalyzer implements IntelQuer
         PlayerSession playerSession = PlayerSession.getInstance();
         LocationDto lastScan = playerSession.getLastScan();
 
-        LocationDto currentLocation = locationManager.findByLocationData(playerSession.getLocationData());
+        LocationDto currentLocation = locationManager.currentBody();
         List<BioSampleDto> partialScans = currentLocation.getPartialBioSamples();
 
 

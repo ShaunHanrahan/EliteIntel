@@ -30,59 +30,24 @@ public class ApproachBodySubscriber {
     @Subscribe
     public void onApproachBodyEvent(ApproachBodyEvent event) {
         Thread.ofVirtual().start(() -> {
-            Status status = Status.getInstance();
-            double orbitalCruiseEntryAltitude = status.getStatus().getAltitude();
-            StringBuilder sb = new StringBuilder();
-            LocationDto location = findBody(event);
+            if (event.getBody() == null || event.getBodyID() == null) return;
+            double orbitalCruiseEntryAltitude = Status.getInstance().getStatus().getAltitude();
 
-            if (location.getPlanetName() == null || location.getPlanetName().isEmpty()) {
-                location.setPlanetName(event.getBody());
-                location.setPlanetShortName(event.getBody());
-            }
-
-            restoreBodyType(location);
-            sb.append(localizedEvent("event.approach.body.entering", bodyNoun(location.getLocationType()), location.getPlanetName()));
-
-            String currentSystem = event.getStarSystem();
-            location.setStarName(currentSystem);
-
-            location.setOrbitalCruiseEntryAltitude(orbitalCruiseEntryAltitude);
-
-            playerSession.setCurrentPrimaryStarName(event.getStarSystem());
-
-            if (event.getBodyID() == null) return;
-
-            playerSession.setCurrentLocationId(event.getBodyID(), event.getSystemAddress());
-            locationManager.save(location); // record body before early-return so it is in DB even when tracking is on
+            // Recorded before the tracking check, so the body is on record even when tracking is on.
+            LocationDto location = locationManager.updateNamedBody(event.getSystemAddress(), event.getBodyID(), event.getBody(),
+                    body -> recordApproach(body, event, orbitalCruiseEntryAltitude));
+            playerSession.moveWithinSystem(event.getSystemAddress(), event.getBodyID());
 
             if (playerSession.getTracking().isEnabled()) return;
 
-            SystemBodiesDto systemBodiesDto = EdsmApiClient.searchSystemBodies(currentSystem);
-
-            boolean weHaveOurOwnData = location.getGravity() > 0;
-
-            if (weHaveOurOwnData) {
+            StringBuilder sb = new StringBuilder();
+            sb.append(localizedEvent("event.approach.body.entering", bodyNoun(location.getLocationType()), location.getPlanetName()));
+            if (location.getGravity() > 0) {
                 useOurData(location, sb);
             } else {
-                //try EDSM data
-                boolean edsmHasData = systemBodiesDto.getData() != null
-                        && systemBodiesDto.getData().getBodies() != null
-                        && !systemBodiesDto.getData().getBodies().isEmpty();
-
-                if (edsmHasData) {
-                    List<BodyData> edsmData = systemBodiesDto.getData().getBodies();
-                    //we found the planet in EDSM
-                    edsmData.stream().filter(edsmDataItem ->
-                            location.getPlanetName().equalsIgnoreCase(edsmDataItem.getName())).findFirst().ifPresent(bodyData ->
-                            extractDataFromEdsm(bodyData, location, sb)
-                    );
-                } else { // no data available
-                    sb.append(" ").append(localizedEvent("event.approach.body.noData", event.getBody()));
-                    sb.append(" ").append(localizedEvent("event.approach.body.checkData"));
-                }
+                describeFromEdsm(event, sb);
             }
 
-            locationManager.save(location);
             if (!event.isReplay() && playerSession.isPlanetaryApproachAnnouncementOn()) {
                 String instructions = """
                             We are approaching planet/moon. Warn/Notify user with this data.
@@ -95,23 +60,41 @@ public class ApproachBodySubscriber {
         }); // end virtual thread
     }
 
+    private static void recordApproach(LocationDto body, ApproachBodyEvent event, double orbitalCruiseEntryAltitude) {
+        if (body.getPlanetName() == null || body.getPlanetName().isEmpty()) {
+            body.setPlanetName(event.getBody());
+            body.setPlanetShortName(event.getBody());
+        }
+        // A record written before the body was scanned can carry no BodyID; the approach supplies it.
+        if (body.getBodyId() <= 0) body.setBodyId(event.getBodyID());
+        restoreBodyType(body);
+        body.setStarName(event.getStarSystem());
+        body.setOrbitalCruiseEntryAltitude(orbitalCruiseEntryAltitude);
+    }
 
     /**
-     * The record of the body being approached, looked up by NAME first. A station's record - a fleet carrier parked
-     * here, or a port on this very body - is stored under the BodyID we last dropped at, so an ID lookup can hand
-     * back the station instead of the body: that is how a moon came to be narrated as a FLEET_CARRIER. The ID lookup
-     * stays as the fallback for a body we have no record of yet.
+     * For a body we hold no data on: what EDSM knows, filed onto the record and added to the report.
+     * <p>
+     * WHY fetched outside the write and re-checked inside it: the lock is never held across a network call, and a
+     * Scan of this body landing meanwhile is the journal's word, which EDSM must not overwrite.
      */
-    private LocationDto findBody(ApproachBodyEvent event) {
-        LocationDto byName = locationManager.findBySystemAddress(event.getSystemAddress(), event.getBody());
-        boolean found = byName.getPlanetName() != null && !byName.getPlanetName().isEmpty();
-        if (found) {
-            // A record written before the body was scanned can carry no BodyID; the approach supplies it.
-            if (byName.getBodyId() <= 0 && event.getBodyID() != null) byName.setBodyId(event.getBodyID());
-            return byName;
+    private void describeFromEdsm(ApproachBodyEvent event, StringBuilder sb) {
+        SystemBodiesDto systemBodiesDto = EdsmApiClient.searchSystemBodies(event.getStarSystem());
+        List<BodyData> bodies = systemBodiesDto.getData() == null ? null : systemBodiesDto.getData().getBodies();
+        if (bodies == null || bodies.isEmpty()) {
+            sb.append(" ").append(localizedEvent("event.approach.body.noData", event.getBody()));
+            sb.append(" ").append(localizedEvent("event.approach.body.checkData"));
+            return;
         }
-        if (event.getBodyID() == null) return byName;
-        return locationManager.findBySystemAddress(event.getSystemAddress(), event.getBodyID());
+        bodies.stream().filter(bodyData -> event.getBody().equalsIgnoreCase(bodyData.getName())).findFirst()
+                .ifPresent(bodyData -> locationManager.updateNamedBody(event.getSystemAddress(), event.getBodyID(), event.getBody(),
+                        body -> {
+                            if (body.getGravity() > 0) {
+                                useOurData(body, sb);
+                            } else {
+                                extractDataFromEdsm(bodyData, body, sb);
+                            }
+                        }));
     }
 
     /**

@@ -5,15 +5,23 @@ import elite.intel.db.managers.LocationManager;
 import elite.intel.gameapi.journal.events.LocationEvent;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
 import elite.intel.gameapi.search.edsm.EdsmApiClient;
-
-import java.util.Locale;
+import elite.intel.gameapi.search.edsm.dto.DeathsDto;
+import elite.intel.gameapi.search.edsm.dto.TrafficDto;
+import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 
 public class LocationSubscriber {
 
     private final LocationManager locationManager = LocationManager.getInstance();
+    private final PlayerSession playerSession = PlayerSession.getInstance();
 
     @Subscribe
     public void onLocationEvent(LocationEvent event) {
+        // Before the EDSM calls below, so a question asked meanwhile is answered right.
+        pointAt(event);
+        long systemAddress = event.getSystemAddress();
+        Long eventBodyId = event.getBodyID();
+
         Thread.ofVirtual().start(() -> {
             // A jump arrival files EDSM's body list for the system, but a session that starts inside one -
             // the commander logged out docked or landed - never jumped in. Without the list the only bodies
@@ -25,15 +33,19 @@ public class LocationSubscriber {
                 EdsmSystemBodies.fetchAndRecord(event.getStarSystem(), event.getSystemAddress(), event.getStarPos());
             }
 
-            // Read after the fetch, so what EDSM just filed for this body is built on rather than written over.
-            LocationDto dto = fromEvent(event);
-            dto.setTrafficDto(EdsmApiClient.searchTraffic(event.getStarSystem()));
-            dto.setDeathsDto(EdsmApiClient.searchDeaths(event.getStarSystem()));
+            // WHY fetched before the write: the body lock is never held across a network call. The write comes after
+            // the EDSM body fetch above, so what EDSM just filed for this body is built on rather than written over.
+            TrafficDto traffic = EdsmApiClient.searchTraffic(event.getStarSystem());
+            DeathsDto deaths = EdsmApiClient.searchDeaths(event.getStarSystem());
+            LocationDto body = LocationEventMapper.record(event, record -> {
+                record.setTrafficDto(traffic);
+                record.setDeathsDto(deaths);
+            });
 
-            if (dto.getStarName() != null && !dto.getStarName().isEmpty()) {
-                //have to check for star name (primary star of the system). Sometimes the star name is empty.
-                //do not save locations without star name.
-                locationManager.save(dto);
+            // LocationDto.setBodyId ignores a lower id, so the row may hold another id than the event's 0.
+            // Re-point at it, unless a later event (a supercruise exit, an approach) has moved the position.
+            if (body != null && body.getBodyId() != eventBodyId && isStillAt(systemAddress, eventBodyId)) {
+                playerSession.moveWithinSystem(systemAddress, body.getBodyId());
             }
 
             // After the body, never onto it: this is the arrival of a commander who quit on a pad, and the
@@ -46,48 +58,17 @@ public class LocationSubscriber {
         });
     }
 
-    private LocationDto fromEvent(LocationEvent event) {
-        LocationDto dto = findLocation(event);
-        dto.setX(event.getStarPos()[0]);
-        dto.setY(event.getStarPos()[1]);
-        dto.setZ(event.getStarPos()[2]);
-        dto.setBodyId(event.getBodyID());
-        dto.setStarName(event.getStarSystem());
-        dto.setPlanetName(event.getBody());
-        dto.setAllegiance(event.getSystemAllegiance());
-        dto.setBodyType(event.getBodyType());
-        dto.setControllingPower(event.getControllingPower());
-        dto.setGovernment(event.getSystemGovernmentLocalised());
-        dto.setPopulation(event.getPopulation());
-        dto.setSecurity(event.getSystemSecurity());
-        dto.setStarName(event.getStarSystem());
-        dto.setDistance(event.getDistFromStarLS());
-        dto.setEconomy(event.getSystemEconomyLocalised());
-        dto.setSecondEconomy(event.getSystemSecondEconomyLocalised());
-
-        // Only when the journal's body type maps to something: determineType answers null for "Planet", and
-        // assigning that erased the classification a scan had established, on every startup.
-        // The arrival star is the one at distance 0 (the journal omits DistFromStarLS there). This was inverted:
-        // a login at a system's main star relabelled it STAR, and the home-system lookup, which asks for the
-        // PRIMARY_STAR record, then found nothing (bundle 2026-10-11).
-        LocationDto.LocationType bodyType =
-                LocationDto.determineType(event.getBodyType().toLowerCase(Locale.ROOT), event.getDistFromStarLS() == 0);
-        if (bodyType != null) {
-            dto.setLocationType(bodyType);
-        }
-
-        dto.setPopulation(event.getPopulation());
-        dto.setPowerplayState(event.getPowerplayState());
-        dto.setPowerplayStateControlProgress(event.getPowerplayStateControlProgress());
-        dto.setPowerplayStateReinforcement(event.getPowerplayStateReinforcement());
-        dto.setPowerplayStateUndermining(event.getPowerplayStateUndermining());
-        dto.setSecurity(event.getSystemSecurityLocalised());
-
-        if (event.getSystemFaction() != null) dto.setSystemFaction(event.getSystemFaction().getName());
-        return dto;
+    /**
+     * Moves the commander's current-location pointer to where the event says the session starts. The live bus
+     * moved it only on FSDJump and CarrierJump, so a session that started somewhere other than where the last
+     * journal ended - the carrier jumped while the game was closed, which writes no CarrierJump - answered
+     * "where are we" with the old system for the whole session (bundle 2026-10-11).
+     */
+    void pointAt(LocationEvent event) {
+        playerSession.moveTo(new Position(event.getSystemAddress(), event.getStarSystem(), event.getBodyID()));
     }
 
-    private LocationDto findLocation(LocationEvent event) {
-        return locationManager.findBySystemAddress(event.getSystemAddress(), event.getBody());
+    private boolean isStillAt(long systemAddress, long bodyId) {
+        return playerSession.position().map(here -> here.isAt(systemAddress, bodyId)).orElse(false);
     }
 }

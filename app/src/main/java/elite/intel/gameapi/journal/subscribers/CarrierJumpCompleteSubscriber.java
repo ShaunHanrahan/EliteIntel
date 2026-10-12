@@ -11,6 +11,7 @@ import elite.intel.gameapi.journal.events.CarrierJumpEvent;
 import elite.intel.gameapi.journal.events.dto.CarrierDataDto;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import elite.intel.ui.event.AppLogEvent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -68,16 +69,15 @@ public class CarrierJumpCompleteSubscriber {
             // live Status singleton cannot answer "was I aboard". The event's own fields can.
             boolean commanderAboard = event.isDocked() || event.isOnFoot();
             if (commanderAboard) {
-                playerSession.setCurrentPrimaryStarName(starSystem);
                 if (event.getBodyId() == null) {
                     log.warn("CarrierJump for {} carries no BodyID; current location row not saved", starSystem);
+                    playerSession.moveTo(new Position(event.getSystemAddress(), starSystem, null));
                 } else {
-                    LocationDto arrival = CarrierJumpLocationMapper.toArrivalLocation(event, locationManager);
-                    locationManager.save(arrival);
+                    LocationDto arrival = CarrierJumpLocationMapper.recordArrival(event, locationManager);
                     // WHY: point at the id the row actually holds, not the one the event reported.
                     // LocationDto.setBodyId ignores a lower id, so an event reporting BodyID 0 for an
                     // already identified body would otherwise leave the pointer aimed at nothing.
-                    playerSession.setCurrentLocationId(arrival.getBodyId(), event.getSystemAddress());
+                    playerSession.moveTo(new Position(event.getSystemAddress(), starSystem, arrival.getBodyId()));
                 }
             }
 

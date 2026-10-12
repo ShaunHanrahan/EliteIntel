@@ -9,6 +9,7 @@ import elite.intel.gameapi.journal.events.dto.BountyDto;
 import elite.intel.gameapi.journal.subscribers.MissionAcceptedSubscriber;
 import elite.intel.gameapi.journal.subscribers.RedeemVoucherSubscriber;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -28,7 +29,7 @@ class RedeemVoucherSubscriberTest {
     void clearState() {
         session.clearBounties();
         MissionManager.getInstance().clear();
-        session.setCurrentPrimaryStarName("Sol");
+        session.moveTo(new Position(10477373803L, "Sol", null));
     }
 
     @Test

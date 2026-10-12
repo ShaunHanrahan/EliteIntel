@@ -35,7 +35,7 @@ class PreScanPrimaryStarTypeTest {
 
         assertEquals(LocationDto.LocationType.PRIMARY_STAR,
                 locationManager.findBySystemAddress(sysAddr, star).getLocationType());
-        assertEquals(star, locationManager.findBySystemAddress(sysAddr).getStarName());
+        assertEquals(star, locationManager.findPrimaryStar(sysAddr).getStarName());
     }
 
     @Test

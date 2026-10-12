@@ -96,7 +96,7 @@ final class CommodityTradeSearch {
      */
     static String findAndPlot(String commodity, int distance, boolean returnClosest) {
         TradeProfileManager tradeProfileManager = TradeProfileManager.getInstance();
-        String starName = PlayerSession.getInstance().getPrimaryStarName();
+        String starName = PlayerSession.getInstance().currentStarSystem();
 
         String searchMode = StringUtls.localizedResponse(returnClosest ? "handler.commodity.modeNearest" : "handler.commodity.modeBest");
         VegaRuntime.narrator().filler(StringUtls.localizedResponse("handler.commodity.searching", searchMode, commodity, distance), false);
@@ -194,7 +194,7 @@ final class CommodityTradeSearch {
      * route being plotted; null when the answer has already been spoken and the route is under way
      */
     static String findSaleAndPlot(String commodity, int distance, boolean returnClosest) {
-        String starName = PlayerSession.getInstance().getPrimaryStarName();
+        String starName = PlayerSession.getInstance().currentStarSystem();
 
         String searchMode = StringUtls.localizedResponse(
                 returnClosest ? "handler.commodity.modeNearest" : "handler.commodity.modeBest");
@@ -267,7 +267,7 @@ final class CommodityTradeSearch {
      */
     static boolean standingOn(CommoditySearchResult result) {
         if (!DockedMarket.getInstance().isOn(result.getStationName())) return false;
-        String here = PlayerSession.getInstance().getPrimaryStarName();
+        String here = PlayerSession.getInstance().currentStarSystem();
         return here != null && here.equalsIgnoreCase(result.getStarSystem());
     }
 
@@ -382,7 +382,7 @@ final class CommodityTradeSearch {
                 "handler.commodity.searching", searchMode, anchor.commodity(), distance), false);
 
         List<BasketResult> markets = SpanshCommoditySearch.searchBasket(
-                wanted, PlayerSession.getInstance().getPrimaryStarName(), distance, criteria, returnClosest,
+                wanted, PlayerSession.getInstance().currentStarSystem(), distance, criteria, returnClosest,
                 criteria.getMaxCargo());
         if (markets.isEmpty()) {
             return StringUtls.localizedResponse("handler.commodity.noMatch");

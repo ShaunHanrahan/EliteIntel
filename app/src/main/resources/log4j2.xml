@@ -111,6 +111,9 @@
         <!-- info, on purpose: the EDDN relay listener runs silently in the background and nothing else
              says whether it connected, dropped or how much it has learned. A bundle should answer that. -->
         <Logger name="elite.intel.gameapi.eddn" level="info"/>
+        <!-- warn, on purpose: its only warning is an in-system event naming another system than the stored
+             position, which is what a stale "where are we" looks like from inside. One line per such event. -->
+        <Logger name="elite.intel.session.PlayerSession" level="warn"/>
         <Logger name="elite.intel.gameapi.journal.subscribers" level="error"/>
         <!-- info, and louder than its package: one line each time a construction site's manifest
              actually CHANGES (the fingerprint guard means an unchanged republish writes nothing and

@@ -4,16 +4,13 @@ import com.google.common.eventbus.Subscribe;
 import elite.intel.ai.brain.actions.handlers.CommandHandlerFactory;
 import elite.intel.ai.brain.vega.VegaRuntime;
 import elite.intel.ai.mouth.EventNarrator;
-import elite.intel.db.managers.LocationManager;
 import elite.intel.gameapi.journal.events.SupercruiseDestinationDropEvent;
-import elite.intel.gameapi.journal.events.dto.LocationDto;
 import elite.intel.session.PlayerSession;
 import elite.intel.util.StringUtls;
 
 public class SuperCruiseDropSubscriber {
 
     private final PlayerSession playerSession = PlayerSession.getInstance();
-    private final LocationManager locationManager = LocationManager.getInstance();
     private final CommandHandlerFactory commandHandlerFactory = CommandHandlerFactory.getInstance();
 
     @Subscribe
@@ -30,15 +27,6 @@ public class SuperCruiseDropSubscriber {
                 VegaRuntime.narrator().narrate(" Dropped from supercruise. Threat level: " + event.getThreat() + ". ", instructions);
             }
 
-
-            LocationDto location = locationManager.findByMarketId(event.getMarketID());
-            if (location.getBodyId() < 1 && location.getSystemAddress() < 1) {
-                long systemAddress = playerSession.getLocationData().getSystemAddress();
-                location.setLocationType(LocationDto.LocationType.STATION);
-                location.setSystemAddress(systemAddress);
-                location.setStarName(locationManager.findStarName(systemAddress));
-                locationManager.save(location);
-            }
 
             String carrierName = playerSession.getFleetCarrierData().getCarrierName();
             if (carrierName != null && event.getType().toUpperCase().startsWith(carrierName.toUpperCase())) {

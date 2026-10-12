@@ -1,12 +1,12 @@
 package elite.intel.ui.overlay;
 
 import elite.intel.db.managers.BioSamplesManager;
-import elite.intel.db.managers.LocationManager;
+import elite.intel.db.managers.LocationFixtures;
 import elite.intel.gameapi.journal.events.dto.BioSampleDto;
 import elite.intel.gameapi.journal.events.dto.GenusDto;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
-import elite.intel.session.LocationData;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -39,7 +39,6 @@ class ExobiologyObjectiveLifecycleTest {
     private static final AtomicInteger RUN = new AtomicInteger();
 
     private final PlayerSession session = PlayerSession.getInstance();
-    private final LocationManager locations = LocationManager.getInstance();
     private final BioSamplesManager bioSamples = BioSamplesManager.getInstance();
     private final ExobiologyObjectiveSource source = new ExobiologyObjectiveSource();
 
@@ -48,7 +47,7 @@ class ExobiologyObjectiveLifecycleTest {
     private String star;
     private String planet;
     private String otherPlanet;
-    private LocationData<Long, Long> previousLocation;
+    private Optional<Position> previousPosition;
     private Boolean previousDiscoveryToggle;
 
     @BeforeEach
@@ -60,21 +59,17 @@ class ExobiologyObjectiveLifecycleTest {
         planet = star + " " + BODY;
         otherPlanet = star + " " + OTHER_BODY;
 
-        previousLocation = session.getLocationData();
+        previousPosition = session.position();
         previousDiscoveryToggle = session.isDiscoveryAnnouncementOn();
         session.setDiscoveryAnnouncementOn(true);
         saveBodyWithGenuses(BODY, planet, "Bacterium", "Fonticulua");
-        session.setCurrentLocationId(BODY, system);
+        session.moveTo(new Position(system, star, BODY));
     }
 
     @AfterEach
     void restoreSession() {
         session.setDiscoveryAnnouncementOn(previousDiscoveryToggle);
-        if (previousLocation != null && previousLocation.getSystemAddress() != null) {
-            session.setCurrentLocationId(
-                    previousLocation.getInGameId() == null ? 0 : previousLocation.getInGameId(),
-                    previousLocation.getSystemAddress());
-        }
+        previousPosition.ifPresent(session::moveTo);
     }
 
     @Test
@@ -101,7 +96,7 @@ class ExobiologyObjectiveLifecycleTest {
      */
     @Test
     void aScannedBodyShowsEvenWhenNothingPointsAtIt() {
-        session.setCurrentLocationId(0L, system); // arrival star, no biology
+        session.moveTo(new Position(system, star, 0L)); // arrival star, no biology
 
         assertEquals("2", source.currentObjective().orElseThrow().subtitle());
     }
@@ -124,17 +119,17 @@ class ExobiologyObjectiveLifecycleTest {
     void leavingTheSystemClearsTheCard() {
         assertTrue(source.currentObjective().isPresent());
 
-        session.setCurrentLocationId(0L, otherSystem);
+        session.moveTo(new Position(otherSystem, star + " Elsewhere", 0L));
 
         assertTrue(source.currentObjective().isEmpty());
     }
 
     @Test
     void returningToTheSystemBringsTheCardBack() {
-        session.setCurrentLocationId(0L, otherSystem);
+        session.moveTo(new Position(otherSystem, star + " Elsewhere", 0L));
         assertTrue(source.currentObjective().isEmpty());
 
-        session.setCurrentLocationId(0L, system);
+        session.moveTo(new Position(system, star, 0L));
 
         assertTrue(source.currentObjective().isPresent());
     }
@@ -143,7 +138,7 @@ class ExobiologyObjectiveLifecycleTest {
     void flyingToAnotherScannedBodySwitchesTheCard() {
         saveBodyWithGenuses(OTHER_BODY, otherPlanet, "Tussock");
 
-        session.setCurrentLocationId(OTHER_BODY, system);
+        session.moveTo(new Position(system, star, OTHER_BODY));
 
         HudObjective card = source.currentObjective().orElseThrow();
         assertEquals(List.of("GENUS", "TUSSOCK"), card.rows().stream().map(HudRow::label).toList());
@@ -156,7 +151,7 @@ class ExobiologyObjectiveLifecycleTest {
     void aSecondScannedBodyDoesNotDisplaceTheFirst() {
         saveBodyWithGenuses(OTHER_BODY, otherPlanet, "Tussock");
 
-        session.setCurrentLocationId(0L, system);
+        session.moveTo(new Position(system, star, 0L));
 
         assertEquals("2", source.currentObjective().orElseThrow().subtitle());
     }
@@ -189,7 +184,7 @@ class ExobiologyObjectiveLifecycleTest {
             genus.setPlanetName(planetName);
             return genus;
         }).toList());
-        locations.save(body);
+        LocationFixtures.store(body);
     }
 
     private BioSampleDto completedSample(String genusName) {

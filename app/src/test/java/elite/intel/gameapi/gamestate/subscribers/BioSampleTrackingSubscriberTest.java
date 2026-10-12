@@ -1,17 +1,19 @@
 package elite.intel.gameapi.gamestate.subscribers;
 
+import elite.intel.db.managers.LocationFixtures;
 import elite.intel.db.managers.LocationManager;
 import elite.intel.gameapi.gamestate.status_events.PlayerMovedEvent;
 import elite.intel.gameapi.gamestate.subscribers.BioSampleTrackingSubscriber.Separation;
 import elite.intel.gameapi.journal.events.dto.BioSampleDto;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
-import elite.intel.session.LocationData;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -43,7 +45,7 @@ class BioSampleTrackingSubscriberTest {
 
     private long system;
     private String star;
-    private LocationData<Long, Long> previousLocation;
+    private Optional<Position> previousPosition;
 
     @BeforeEach
     void setUp() {
@@ -54,19 +56,15 @@ class BioSampleTrackingSubscriberTest {
         LocationDto body = new LocationDto(BODY, system);
         body.setStarName(star);
         body.setPlanetName(star + " 6 g");
-        locations.save(body);
+        LocationFixtures.store(body);
 
-        previousLocation = session.getLocationData();
-        session.setCurrentLocationId(BODY, system);
+        previousPosition = session.position();
+        session.moveTo(new Position(system, star, BODY));
     }
 
     @AfterEach
     void restoreSession() {
-        if (previousLocation != null && previousLocation.getSystemAddress() != null) {
-            session.setCurrentLocationId(
-                    previousLocation.getInGameId() == null ? 0 : previousLocation.getInGameId(),
-                    previousLocation.getSystemAddress());
-        }
+        previousPosition.ifPresent(session::moveTo);
     }
 
     @Test

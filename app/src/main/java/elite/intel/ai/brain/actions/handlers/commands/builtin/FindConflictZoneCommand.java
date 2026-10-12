@@ -75,7 +75,7 @@ public final class FindConflictZoneCommand implements IntelCommand {
         if (zones.isEmpty()) return StringUtls.localizedResponse("handler.war.noZonesKnown", range);
 
         WarZone best = zones.getFirst();
-        if (best.starSystem().equalsIgnoreCase(here.primaryStar())) {
+        if (best.starSystem().equalsIgnoreCase(here.starSystem())) {
             return StringUtls.localizedResponse("handler.war.alreadyInZone", ConflictZoneSpeech.zones(best));
         }
 

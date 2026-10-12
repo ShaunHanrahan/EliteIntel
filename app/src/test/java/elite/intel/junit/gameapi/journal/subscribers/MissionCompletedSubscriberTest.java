@@ -7,6 +7,7 @@ import elite.intel.gameapi.journal.events.MissionCompletedEvent;
 import elite.intel.gameapi.journal.subscribers.MissionAcceptedSubscriber;
 import elite.intel.gameapi.journal.subscribers.MissionCompletedSubscriber;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -25,7 +26,7 @@ class MissionCompletedSubscriberTest {
     @BeforeEach
     void clearMissions() {
         missionManager.clear();
-        session.setCurrentPrimaryStarName("Sol");
+        session.moveTo(new Position(10477373803L, "Sol", null));
     }
 
     @Test

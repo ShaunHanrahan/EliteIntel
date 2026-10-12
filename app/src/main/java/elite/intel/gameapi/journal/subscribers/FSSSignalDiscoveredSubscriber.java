@@ -13,6 +13,8 @@ import elite.intel.gameapi.missions.ResourceSiteProfile;
 import elite.intel.gameapi.signals.*;
 import elite.intel.session.PlayerSession;
 import elite.intel.session.SystemSession;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -23,6 +25,8 @@ import static elite.intel.util.StringUtls.localizedEventPlural;
 @SuppressWarnings("unused")
 public class FSSSignalDiscoveredSubscriber {
 
+    private static final Logger log = LogManager.getLogger(FSSSignalDiscoveredSubscriber.class);
+
     private static final String USS_TYPE_SALVAGE = "$USS_Type_Salvage";
     private static final String USS_TYPE_VALUABLE_SALVAGE = "$USS_Type_ValuableSalvage";
     private static final String USS_TYPE_VERY_VALUABLE_SALVAGE = "$USS_Type_VeryValuableSalvage";
@@ -32,7 +36,6 @@ public class FSSSignalDiscoveredSubscriber {
     private final PlayerSession playerSession = PlayerSession.getInstance();
     private final HuntingGroundManager huntingGrounds = HuntingGroundManager.getInstance();
     private final ConflictZoneManager conflictZones = ConflictZoneManager.getInstance();
-    private final LocationManager locationManager = LocationManager.getInstance();
     private final SystemSession systemSession = SystemSession.getInstance();
     private final ResourceSiteSweep resourceSites = new ResourceSiteSweep();
     private final ConflictZoneSweep conflictZoneSweep = new ConflictZoneSweep();
@@ -41,8 +44,7 @@ public class FSSSignalDiscoveredSubscriber {
     @Subscribe
     public void onFSSSignalDiscovered(FSSSignalDiscoveredEvent event) {
         Thread.ofVirtual().start(() -> {
-            LocationDto location = updateLocation(event);
-            locationManager.save(location);
+            LocationDto location = recordSignal(event);
             recordResourceSite(event, location);
             recordConflictZone(event, location);
 
@@ -133,8 +135,22 @@ public class FSSSignalDiscoveredSubscriber {
         );
     }
 
-    private LocationDto updateLocation(FSSSignalDiscoveredEvent event) {
-        LocationDto location = locationManager.findBySystemAddress(event.getSystemAddress());
+    /**
+     * Files the signal on the record of the system's facts, and returns that record for its name and coordinates.
+     * <p>
+     * WHY that record rather than the primary star's: a system entered by carrier has no primary star on record
+     * until the star is scanned, so its signals - and the resource sites and conflict zones they announce - were
+     * written to nothing.
+     */
+    static LocationDto recordSignal(FSSSignalDiscoveredEvent event) {
+        LocationManager locations = LocationManager.getInstance();
+        LocationDto system = locations.findSystemRecord(event.getSystemAddress());
+        String recordName = system.getPlanetName();
+        if (recordName == null || recordName.isBlank()) {
+            log.debug("FSS signal {} not filed: no record of system {} to file it on", event.getSignalName(), event.getSystemAddress());
+            return system;
+        }
+
         FssSignalDto signal = new FssSignalDto();
         signal.setSignalName(event.getSignalName());
         signal.setSignalNameLocalised(event.getSignalNameLocalised());
@@ -146,8 +162,8 @@ public class FSSSignalDiscoveredSubscriber {
         signal.setUssType(event.getUssType());
         signal.setUssTypeLocalised(event.getUssTypeLocalised());
         signal.setSystemAddress(event.getSystemAddress());
-        location.addDetectedSignal(signal);
-        return location;
+        return locations.updateNamedBody(event.getSystemAddress(), system.getBodyId(), recordName,
+                record -> record.addDetectedSignal(signal));
     }
 
     private void publishVoice(String message) {

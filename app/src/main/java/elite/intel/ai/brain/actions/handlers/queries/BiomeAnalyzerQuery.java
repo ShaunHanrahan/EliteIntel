@@ -60,7 +60,7 @@ public class BiomeAnalyzerQuery extends BaseQueryAnalyzer implements IntelQuery 
         JsonElement key = params.get(PARAM_KEY);
         String planetName = key == null ? null : key.getAsString().replace(" ", "");
         Collection<LocationDto> allStellarObjectsInStarSystem = locationManager.findAllBySystemAddress(
-                playerSession.getLocationData().getSystemAddress()
+                playerSession.currentSystemAddress()
         );
 
         boolean runSystemVide;

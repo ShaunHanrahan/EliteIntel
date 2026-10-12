@@ -3,8 +3,8 @@ package elite.intel.junit.gameapi.journal.subscribers;
 import com.google.gson.JsonObject;
 import elite.intel.gameapi.journal.events.ScanOrganicEvent;
 import elite.intel.gameapi.journal.subscribers.ScanOrganicSubscriber;
-import elite.intel.session.LocationData;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -20,14 +20,14 @@ class ScanOrganicSubscriberTest {
     void nullBodyDoesNotUpdateLocationId() throws InterruptedException {
         long uniqueSystem = 65001000L;
         long knownBodyId = 55L;
-        session.setCurrentLocationId(knownBodyId, uniqueSystem);
+        session.moveTo(new Position(uniqueSystem, "Test System", knownBodyId));
 
         subscriber.onScanOrganicEvent(scanOrganicEventNullBody(uniqueSystem));
 
         Thread.sleep(300);
 
-        LocationData<Long, Long> loc = session.getLocationData();
-        assertEquals(knownBodyId, loc.getInGameId(), "null Body must not overwrite current_location_id");
+        Position loc = session.position().orElseThrow();
+        assertEquals(knownBodyId, loc.bodyId(), "null Body must not overwrite current_location_id");
     }
 
     private static ScanOrganicEvent scanOrganicEventNullBody(long systemAddress) {

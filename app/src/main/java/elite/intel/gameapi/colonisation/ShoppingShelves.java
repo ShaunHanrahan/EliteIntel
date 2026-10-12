@@ -72,7 +72,7 @@ public final class ShoppingShelves {
 
     private ShoppingShelves() {
         this(ShoppingShelves::padUnderTheShip, ShoppingShelves::isOneOfOurs, ShoppingShelves::marketOn,
-                () -> PlayerSession.getInstance().getPrimaryStarName());
+                () -> PlayerSession.getInstance().currentStarSystem());
     }
 
     /**

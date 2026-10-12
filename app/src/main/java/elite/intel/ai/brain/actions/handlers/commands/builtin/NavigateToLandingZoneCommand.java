@@ -46,7 +46,7 @@ public final class NavigateToLandingZoneCommand implements IntelCommand {
     @Override
     public String execute(JsonObject params, String responseText) {
 
-        LocationDto currentLocation = locationManager.findByLocationData(playerSession.getLocationData());
+        LocationDto currentLocation = locationManager.currentBody();
         TargetLocation targetLocation = new TargetLocation();
         if (currentLocation.getLandingCoordinates() == null || currentLocation.getLandingCoordinates().length == 0) {
             return StringUtls.localizedResponse("handler.navigate.landingZoneNotAvailable");
