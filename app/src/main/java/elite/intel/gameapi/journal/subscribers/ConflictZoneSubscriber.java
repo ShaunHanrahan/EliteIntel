@@ -32,7 +32,7 @@ public class ConflictZoneSubscriber {
         ConflictZoneIntensity intensity = ConflictZoneIntensity.fromSymbol(event.getTypeSymbol());
         if (intensity == null) return;
 
-        conflictZone.droppedIn(playerSession.getLocationData().getSystemAddress(), intensity);
+        conflictZone.droppedIn(playerSession.currentSystemAddress(), intensity);
     }
 
     /**

@@ -5,11 +5,13 @@ import elite.intel.db.managers.ReminderManager;
 import elite.intel.db.managers.SearchExclusionManager;
 import elite.intel.gameapi.search.PermitLockedSystems;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -26,23 +28,24 @@ class ExcludeStarSystemFromSearchesCommandTest {
     private final ExcludeStarSystemFromSearchesCommand command = new ExcludeStarSystemFromSearchesCommand();
     private final PlayerSession playerSession = PlayerSession.getInstance();
     private final ReminderManager reminders = ReminderManager.getInstance();
-    private String previousPosition;
+    private static final long TEST_ADDRESS = 4802733233387L;
+    private Optional<Position> previousPosition;
 
     @BeforeEach
     void clean() {
-        previousPosition = playerSession.getPrimaryStarName();
+        previousPosition = playerSession.position();
         reminders.clear();
     }
 
     @AfterEach
     void tidy() {
-        playerSession.setCurrentPrimaryStarName(previousPosition);
+        previousPosition.ifPresent(playerSession::moveTo);
         reminders.clear();
     }
 
     @Test
     void thisSystemIsTheOneTheShipIsIn() {
-        playerSession.setCurrentPrimaryStarName("Exclusion Test Here");
+        playerSession.moveTo(new Position(TEST_ADDRESS, "Exclusion Test Here", null));
         reminders.setReminder("Buy Battle Weapons at Oz Prospect", "Exclusion Test Elsewhere", "Oz Prospect", null);
 
         command.execute(which(ExcludeStarSystemFromSearchesCommand.CURRENT), null);
@@ -54,7 +57,7 @@ class ExcludeStarSystemFromSearchesCommandTest {
 
     @Test
     void thatSystemIsWhereTheLastSearchSentUs() {
-        playerSession.setCurrentPrimaryStarName("Exclusion Test Origin");
+        playerSession.moveTo(new Position(TEST_ADDRESS, "Exclusion Test Origin", null));
         reminders.setReminder("Buy Battle Weapons at Oz Prospect", "Exclusion Test Dead Port", "Oz Prospect", null);
 
         command.execute(which(ExcludeStarSystemFromSearchesCommand.DESTINATION), null);
@@ -66,7 +69,7 @@ class ExcludeStarSystemFromSearchesCommandTest {
 
     @Test
     void noArgumentMeansTheSystemTheShipIsIn() {
-        playerSession.setCurrentPrimaryStarName("Exclusion Test Default");
+        playerSession.moveTo(new Position(TEST_ADDRESS, "Exclusion Test Default", null));
         reminders.setReminder("Buy gold", "Exclusion Test Not Meant", null, null);
 
         command.execute(new JsonObject(), null);
@@ -79,7 +82,7 @@ class ExcludeStarSystemFromSearchesCommandTest {
     void theConfirmationNamesTheSystemAndWhichOneItIs() {
         // "that" is worked out at run time, and a misheard this/that (Russian "эту"/"ту") must come back as an
         // audibly different question - not merely a different system name the commander has to catch.
-        playerSession.setCurrentPrimaryStarName("Exclusion Test Prompt Here");
+        playerSession.moveTo(new Position(TEST_ADDRESS, "Exclusion Test Prompt Here", null));
         reminders.setReminder("Buy gold", "Exclusion Test Prompt There", null, null);
 
         String destination = command.confirmationPrompt(which(ExcludeStarSystemFromSearchesCommand.DESTINATION));
@@ -95,7 +98,7 @@ class ExcludeStarSystemFromSearchesCommandTest {
 
     @Test
     void anExcludedSystemIsPutBackFromInsideIt() {
-        playerSession.setCurrentPrimaryStarName("Exclusion Test Rebuilt");
+        playerSession.moveTo(new Position(TEST_ADDRESS, "Exclusion Test Rebuilt", null));
         command.execute(which(ExcludeStarSystemFromSearchesCommand.CURRENT), null);
         assertFalse(PermitLockedSystems.isReachable("Exclusion Test Rebuilt"));
 
@@ -110,7 +113,7 @@ class ExcludeStarSystemFromSearchesCommandTest {
 
     @Test
     void withNoSearchDestinationNothingIsStruckOff() {
-        playerSession.setCurrentPrimaryStarName("Exclusion Test Innocent");
+        playerSession.moveTo(new Position(TEST_ADDRESS, "Exclusion Test Innocent", null));
 
         assertNull(command.confirmationPrompt(which(ExcludeStarSystemFromSearchesCommand.DESTINATION)),
                 "no question to ask - the generic one stands and the command then says why it cannot");
@@ -123,7 +126,7 @@ class ExcludeStarSystemFromSearchesCommandTest {
 
     @Test
     void excludingTwiceIsHarmless() {
-        playerSession.setCurrentPrimaryStarName("Exclusion Test Twice");
+        playerSession.moveTo(new Position(TEST_ADDRESS, "Exclusion Test Twice", null));
         command.execute(which(ExcludeStarSystemFromSearchesCommand.CURRENT), null);
 
         assertFalse(SearchExclusionManager.getInstance().exclude("exclusion test twice"),

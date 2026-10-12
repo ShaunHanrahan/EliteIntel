@@ -29,7 +29,7 @@ public class AnalyzeCarriersQuery extends BaseQueryAnalyzer implements IntelQuer
     private final PlayerSession playerSession = PlayerSession.getInstance();
 
     @Override public JsonObject handle(String action, JsonObject params, String originalUserInput) throws Exception {
-        String primaryStarName = playerSession.getPrimaryStarName();
+        String primaryStarName = playerSession.currentStarSystem();
         StationsDto stationsDto = EdsmApiClient.searchStations(primaryStarName, 0);
         ArrayList<StationData> stationsData = new ArrayList<>();
         StationsData data = stationsDto.getData();

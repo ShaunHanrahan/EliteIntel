@@ -82,7 +82,7 @@ public final class NavigateToMissionTargetCommand implements IntelCommand {
         }
 
         MissionDto mission = MissionSelection
-                .toPlotFor(candidates, PlayerSession.getInstance().getPrimaryStarName())
+                .toPlotFor(candidates, PlayerSession.getInstance().currentStarSystem())
                 .orElse(null);
         if (mission == null) {
             // There are missions, they simply have nowhere to fly to - which is a different answer to

@@ -57,7 +57,7 @@ public final class NavigateToBioSampleCodexEntryCommand implements IntelCommand 
     @Override
     public String execute(JsonObject params, String responseText) {
         Status status = Status.getInstance();
-        LocationDto currentLocation = locationManager.findByLocationData(playerSession.getLocationData());
+        LocationDto currentLocation = locationManager.currentBody();
 
         if (currentLocation == null || status.getStatus() == null) {
             return StringUtls.localizedResponse("handler.navigate.noLocation");

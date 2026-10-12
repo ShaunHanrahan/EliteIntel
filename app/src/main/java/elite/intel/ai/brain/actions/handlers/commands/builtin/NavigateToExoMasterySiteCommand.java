@@ -10,7 +10,6 @@ import elite.intel.db.managers.ExoMasteryManager;
 import elite.intel.db.managers.ReminderManager;
 import elite.intel.gameapi.inputs.RoutePlotter;
 import elite.intel.gameapi.search.PermitLockedSystems;
-import elite.intel.session.LocationData;
 import elite.intel.session.PlayerSession;
 import elite.intel.session.Status;
 import elite.intel.util.StringUtls;
@@ -79,8 +78,7 @@ public final class NavigateToExoMasterySiteCommand implements IntelCommand {
             return StringUtls.localizedResponse("handler.exoMastery.allHarvested");
         }
         Site best = open.getFirst();
-        LocationData<Long, Long> here = playerSession.getLocationData();
-        boolean alreadyThere = here != null && here.getSystemAddress() != null && here.getSystemAddress() == best.systemAddress();
+        boolean alreadyThere = playerSession.currentSystemAddress() == best.systemAddress();
         if (alreadyThere) {
             return StringUtls.localizedResponse("handler.exoMastery.alreadyHere",
                     best.starSystem(), bodyList(exoMastery.remainingBodiesIn(best.systemAddress())));

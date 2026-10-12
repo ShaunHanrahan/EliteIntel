@@ -21,7 +21,7 @@ public class FactionKillBondSubscriber {
     public void onFactionKillBond(FactionKillBondEvent event) {
         if (event == null) return;
         Thread.ofVirtual().start(() -> combatBonds.record(
-                playerSession.getLocationData().getSystemAddress(),
+                playerSession.currentSystemAddress(),
                 preferPlain(event.getAwardingFaction(), event.getAwardingFactionLocalised()),
                 preferPlain(event.getVictimFaction(), event.getVictimFactionLocalised()),
                 event.getReward(),

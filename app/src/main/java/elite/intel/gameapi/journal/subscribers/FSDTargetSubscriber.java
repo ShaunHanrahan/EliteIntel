@@ -22,7 +22,7 @@ public class FSDTargetSubscriber {
     @Subscribe
     public void onFSDTargetEvent(FSDTargetEvent event) {
         Thread.ofVirtual().start(() -> {
-            LocationDto locationDto = locationManager.findBySystemAddress(event.getSystemAddress()); // transient
+            LocationDto locationDto = locationManager.findPrimaryStar(event.getSystemAddress()); // transient
             locationDto.setStarName(event.getName());
             locationDto.setStarClass(event.getStarClass());
             StarSystemDto systemDto = EdsmApiClient.searchStarSystem(event.getName(), 1);

@@ -6,7 +6,6 @@ import elite.intel.db.managers.LocationManager;
 import elite.intel.db.managers.ShipRouteManager;
 import elite.intel.gameapi.gamestate.dtos.NavRouteDto;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
-import elite.intel.session.PlayerSession;
 import elite.intel.util.yaml.ToYamlConvertable;
 import elite.intel.util.yaml.YamlFactory;
 import org.apache.logging.log4j.LogManager;
@@ -31,7 +30,6 @@ public class AnalyzeRouterQuery extends BaseQueryAnalyzer implements IntelQuery 
     @Override public String id() { return ID; }
 
     private static final Logger log = LogManager.getLogger(AnalyzeRouterQuery.class);
-    private final PlayerSession playerSession = PlayerSession.getInstance();
 
     private final ShipRouteManager shipRoute = ShipRouteManager.getInstance();
     private final LocationManager locationManager = LocationManager.getInstance();
@@ -40,7 +38,8 @@ public class AnalyzeRouterQuery extends BaseQueryAnalyzer implements IntelQuery 
     public JsonObject handle(String action, JsonObject params, String originalUserInput) throws Exception {
         //GameEventBus.publish(new AiVoxResponseEvent("Analyzing route telemetry. Stand by."));
         Collection<NavRouteDto> orderedRoute = shipRoute.getOrderedRoute();
-        LocationDto here = locationManager.findByLocationData(playerSession.getLocationData());
+        // The system's record: the body we dropped at may be a ring or drop point with no coordinates on file.
+        LocationDto here = locationManager.currentSystem();
 
         // Create NavRouteDto for current location
         NavRouteDto currentLocation = new NavRouteDto();

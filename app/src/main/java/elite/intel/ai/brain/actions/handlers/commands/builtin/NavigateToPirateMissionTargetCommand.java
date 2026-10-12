@@ -62,7 +62,7 @@ public final class NavigateToPirateMissionTargetCommand implements IntelCommand 
                         .filter(Objects::nonNull)
                         .filter(v -> MissionType.MISSION_PIRATE_MASSACRE.equals(v.getMissionType()))
                         .toList(),
-                PlayerSession.getInstance().getPrimaryStarName()).orElse(null);
+                PlayerSession.getInstance().currentStarSystem()).orElse(null);
 
         if (mission == null) return null;
 

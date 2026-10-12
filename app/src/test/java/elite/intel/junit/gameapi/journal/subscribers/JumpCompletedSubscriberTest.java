@@ -82,11 +82,11 @@ class JumpCompletedSubscriberTest {
         subscriber.onFSDJumpEvent(fsdJumpEvent("Alioth", ALIOTH_ADDRESS, "Alioth A", 0L));
 
         awaitTrue(() -> {
-            LocationDto loc = locationManager.findBySystemAddress(ALIOTH_ADDRESS);
+            LocationDto loc = locationManager.findPrimaryStar(ALIOTH_ADDRESS);
             return "Alioth".equals(loc.getStarName());
         });
 
-        LocationDto saved = locationManager.findBySystemAddress(ALIOTH_ADDRESS);
+        LocationDto saved = locationManager.findPrimaryStar(ALIOTH_ADDRESS);
         assertEquals("Alioth", saved.getStarName());
     }
 
@@ -97,11 +97,11 @@ class JumpCompletedSubscriberTest {
         subscriber.onFSDJumpEvent(fsdJumpEvent("Sol", SOL_ADDRESS, "Sol", 0L));
 
         awaitTrue(() -> {
-            LocationDto loc = locationManager.findBySystemAddress(SOL_ADDRESS);
+            LocationDto loc = locationManager.findPrimaryStar(SOL_ADDRESS);
             return "Sol".equals(loc.getStarName()) && loc.getTrafficDto() != null;
         });
 
-        LocationDto saved = locationManager.findBySystemAddress(SOL_ADDRESS);
+        LocationDto saved = locationManager.findPrimaryStar(SOL_ADDRESS);
         assertNotNull(saved.getTrafficDto());
         assertEquals(800, saved.getTrafficDto().getData().getTraffic().getTotal());
         assertEquals(2, saved.getDeathsDto().getData().getDeaths().getTotal());

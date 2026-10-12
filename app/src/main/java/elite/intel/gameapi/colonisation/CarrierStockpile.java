@@ -109,7 +109,7 @@ public final class CarrierStockpile {
      * @param neededSymbols the goods the build still wants, as bare journal symbols
      */
     public static Optional<Stash> forBuild(Site site, Set<String> neededSymbols) {
-        return forBuild(site, neededSymbols, PlayerSession.getInstance().getPrimaryStarName(),
+        return forBuild(site, neededSymbols, PlayerSession.getInstance().currentStarSystem(),
                 OwnCarrierHold.oursIncludingEmpty());
     }
 

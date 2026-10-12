@@ -7,13 +7,14 @@ import elite.intel.ai.brain.actions.handlers.commands.RegisterCommand;
 import elite.intel.db.managers.ExoMasteryManager;
 import elite.intel.db.managers.LocationManager;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
-import elite.intel.session.LocationData;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import elite.intel.session.Status;
 import elite.intel.util.ExoBio;
 import elite.intel.util.StringUtls;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
  * "The organics here are already sampled" - the one thing about a body the journal cannot tell us.
@@ -121,14 +122,15 @@ public final class SetCurrentBodyExobiologySurveyCompleteCommand implements Inte
      * to prove it - which is exactly who this command is for.
      */
     private LocationDto bodyWithBiology() {
-        LocationData<Long, Long> here = playerSession.getLocationData();
-        if (here == null || here.getSystemAddress() == null || here.getSystemAddress() == 0) return null;
-        if (here.getInGameId() == null) return null;
-        LocationDto body = locationManager.findByLocationData(here);
+        Optional<Position> here = playerSession.position();
+        if (here.isEmpty() || here.get().bodyId() == null) return null;
+        long systemAddress = here.get().systemAddress();
+        long bodyId = here.get().bodyId();
+        LocationDto body = locationManager.findBySystemAddress(systemAddress, bodyId);
         if (body == null || body.getBodyId() < 0) return null;
         boolean hasBiology = ExoBio.bioSignalsDetected(body) > 0
                 || (body.getGenus() != null && !body.getGenus().isEmpty())
-                || (exoMastery.isEnabled() && exoMastery.isListed(here.getSystemAddress(), here.getInGameId()));
+                || (exoMastery.isEnabled() && exoMastery.isListed(systemAddress, bodyId));
         return hasBiology ? body : null;
     }
 

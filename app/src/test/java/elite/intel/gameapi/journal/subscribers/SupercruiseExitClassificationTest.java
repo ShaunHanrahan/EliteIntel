@@ -22,13 +22,13 @@ class SupercruiseExitClassificationTest {
               "Body":"Phylurn IB-O b22-0 2 b", "BodyID":23, "BodyType":"Planet" }
             """;
 
-    private static final String COMPANION_STAR_DROP = """
+    private static final String LETTERED_STAR_DROP = """
             { "timestamp":"2026-07-09T03:51:23Z", "event":"SupercruiseExit", "Taxi":false, "Multicrew":false,
               "StarSystem":"Phylurn YC-H c11-2", "SystemAddress":639984079970,
               "Body":"Phylurn YC-H c11-2 A", "BodyID":2, "BodyType":"Star" }
             """;
 
-    private static final String PRIMARY_STAR_DROP = """
+    private static final String NAMESAKE_STAR_DROP = """
             { "timestamp":"2026-07-11T21:32:52Z", "event":"SupercruiseExit", "Taxi":false, "Multicrew":false,
               "StarSystem":"IC 1287 Sector BG-X c1-9", "SystemAddress":2557082637194,
               "Body":"IC 1287 Sector BG-X c1-9", "BodyID":0, "BodyType":"Star" }
@@ -70,17 +70,22 @@ class SupercruiseExitClassificationTest {
     @Test
     void everyBodyTypeTheJournalReportsIsClassified() {
         assertEquals(PLANET, classify(PLANET_DROP));
-        assertEquals(STAR, classify(COMPANION_STAR_DROP));
+        assertEquals(STAR, classify(LETTERED_STAR_DROP));
         assertEquals(STATION, classify(STATION_DROP));
         assertEquals(PLANETARY_RING, classify(RING_DROP));
         assertEquals(PLANETARY_RING, classify(BELT_DROP));
         assertEquals(BELT_CLUSTER, classify(CLUSTER_DROP));
     }
 
+    /**
+     * A drop never claims a primary star: the name cannot tell. "Phylurn YC-H c11-2 A" is that system's entry point
+     * (the jump arrives there and no second star was ever scanned), while six stars named exactly after their
+     * system were not. Only the FSDJump arrival and a Scan at 0 Ls can prove it.
+     */
     @Test
-    void onlyTheStarASystemIsNamedAfterIsItsPrimary() {
-        assertEquals(PRIMARY_STAR, classify(PRIMARY_STAR_DROP));
-        assertEquals(STAR, classify(COMPANION_STAR_DROP));
+    void aDropAtAStarNeverClaimsThePrimary() {
+        assertEquals(STAR, classify(NAMESAKE_STAR_DROP));
+        assertEquals(STAR, classify(LETTERED_STAR_DROP));
     }
 
     @Test

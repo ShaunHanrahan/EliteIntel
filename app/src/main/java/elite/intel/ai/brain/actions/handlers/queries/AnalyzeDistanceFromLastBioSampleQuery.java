@@ -5,7 +5,6 @@ import elite.intel.ai.brain.actions.handlers.queries.struct.AiDataStruct;
 import elite.intel.db.managers.LocationManager;
 import elite.intel.gameapi.journal.events.dto.BioSampleDto;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
-import elite.intel.session.PlayerSession;
 import elite.intel.session.Status;
 import elite.intel.util.NavigationUtils;
 import elite.intel.util.StringUtls;
@@ -23,16 +22,13 @@ public class AnalyzeDistanceFromLastBioSampleQuery extends BaseQueryAnalyzer imp
 
 
     @Override public String id() { return ID; }
-
-
-    private final PlayerSession playerSession = PlayerSession.getInstance();
     private final LocationManager locationManager = LocationManager.getInstance();
 
     @Override public JsonObject handle(String action, JsonObject params, String originalUserInput) throws Exception {
         //GameEventBus.publish(new AiVoxResponseEvent("Analyzing exobiology collection data. Stand by."));
 
         Status status = Status.getInstance();
-        LocationDto currentLocation = locationManager.findByLocationData(playerSession.getLocationData());
+        LocationDto currentLocation = locationManager.currentBody();
 
         String instructions = """
                 Report the distance to the last partial bio sample.

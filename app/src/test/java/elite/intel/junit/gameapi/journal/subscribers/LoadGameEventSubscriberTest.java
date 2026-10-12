@@ -1,13 +1,12 @@
 package elite.intel.junit.gameapi.journal.subscribers;
 
 import com.google.gson.JsonObject;
-import elite.intel.db.managers.LocationManager;
 import elite.intel.db.managers.ShipRouteManager;
 import elite.intel.gameapi.gamestate.dtos.NavRouteDto;
 import elite.intel.gameapi.journal.events.LoadGameEvent;
-import elite.intel.gameapi.journal.events.dto.LocationDto;
 import elite.intel.gameapi.journal.subscribers.LoadGameEventSubscriber;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -22,7 +21,6 @@ class LoadGameEventSubscriberTest {
     private final LoadGameEventSubscriber subscriber = new LoadGameEventSubscriber();
     private final PlayerSession session = PlayerSession.getInstance();
     private final ShipRouteManager shipRoute = ShipRouteManager.getInstance();
-    private final LocationManager locationManager = LocationManager.getInstance();
 
     @BeforeEach
     void clearRoute() {
@@ -50,16 +48,7 @@ class LoadGameEventSubscriberTest {
 
     @Test
     void cleanUpRouteRemovesCurrentSystemLegFromNavRoute() throws InterruptedException {
-        // Set player's current location to a known systemAddress/bodyId
-        long systemAddress = 999_888_777L;
-        long bodyId = 7L;
-        session.setCurrentLocationId(bodyId, systemAddress);
-
-        // Save a location entry so cleanUpRoute can find the star name
-        LocationDto loc = new LocationDto(bodyId, systemAddress);
-        loc.setStarName("Deciat");
-        loc.setStationName("Deciat Station"); // needed as locationName for upsert
-        locationManager.save(loc);
+        session.moveTo(new Position(999_888_777L, "Deciat", 7L));
 
         // Set up a nav route with Deciat as leg 0
         NavRouteDto leg = new NavRouteDto();

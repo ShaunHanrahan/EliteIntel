@@ -72,7 +72,7 @@ public final class FindBountyHuntingGroundCommand implements IntelCommand {
         if (grounds.isEmpty()) return StringUtls.localizedResponse("handler.pirate.noGroundsKnown", range);
 
         HuntingGround best = grounds.getFirst();
-        if (best.starSystem().equalsIgnoreCase(here.primaryStar())) {
+        if (best.starSystem().equalsIgnoreCase(here.starSystem())) {
             return StringUtls.localizedResponse("handler.pirate.alreadyInGround",
                     HuntingGroundSpeech.sitesOrUnknown(best.starSystem(), best.sites()));
         }

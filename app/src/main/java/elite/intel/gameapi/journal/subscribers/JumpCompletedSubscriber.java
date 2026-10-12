@@ -12,7 +12,6 @@ import elite.intel.gameapi.FuelScoop;
 import elite.intel.gameapi.gamestate.dtos.NavRouteDto;
 import elite.intel.gameapi.hge.HighGradeEmissionsAdvisor;
 import elite.intel.gameapi.journal.events.FSDJumpEvent;
-import elite.intel.gameapi.journal.events.dto.LocationDto;
 import elite.intel.gameapi.search.edsm.EdsmApiClient;
 import elite.intel.gameapi.search.edsm.dto.DeathsDto;
 import elite.intel.gameapi.search.edsm.dto.TrafficDto;
@@ -50,26 +49,7 @@ public class JumpCompletedSubscriber {
             boolean isBuyerSystem = monetizeRouteManager.isBuyer(event.getStarSystem());
             MonetisationTransaction station = monetizeRouteManager.getTransaction();
 
-            LocationDto primaryStar = locationManager.findBySystemAddress(event.getSystemAddress(), event.getBodyId());
-            primaryStar.setBodyId(event.getBodyId());
-            primaryStar.setSystemAddress(event.getSystemAddress());
-            primaryStar.setStationGovernment(event.getSystemGovernmentLocalised());
-            primaryStar.setAllegiance(event.getSystemAllegiance());
-            primaryStar.setSecurity(event.getSystemSecurityLocalised());
-            if (event.getSystemFaction() != null) primaryStar.setSystemFaction(event.getSystemFaction().getName());
-            primaryStar.setStarName(event.getStarSystem());
-            primaryStar.setPlanetName(event.getBody());
-            primaryStar.setLocationType(LocationDto.LocationType.PRIMARY_STAR);
-            primaryStar.setX(event.getStarPos()[0]);
-            primaryStar.setY(event.getStarPos()[1]);
-            primaryStar.setZ(event.getStarPos()[2]);
-            primaryStar.setPopulation(event.getPopulation());
-            primaryStar.setPowerplayState(event.getPowerplayState());
-            primaryStar.setPowerplayStateControlProgress(event.getPowerplayStateControlProgress());
-            primaryStar.setPowerplayStateReinforcement(event.getPowerplayStateReinforcement());
-            primaryStar.setPowerplayStateUndermining(event.getPowerplayStateUndermining());
-            playerSession.setCurrentLocationId(primaryStar.getBodyId(), event.getSystemAddress());
-            playerSession.setCurrentPrimaryStarName(primaryStar.getStarName());
+            FsdJumpArrival.record(event);
 
 
             String finalDestination = playerSession.getFinalDestination();
@@ -93,10 +73,13 @@ public class JumpCompletedSubscriber {
                 } else if (globalSettings.getAnnounceArrival()) {
                     sb.append(localizedEvent("event.route.arrivedFinal", finalDestination));
                 }
+                // WHY: fetched before the write, so the body lock is never held across a network call.
                 TrafficDto trafficDto = EdsmApiClient.searchTraffic(finalDestination);
                 DeathsDto deathsDto = EdsmApiClient.searchDeaths(finalDestination);
-                primaryStar.setTrafficDto(trafficDto);
-                primaryStar.setDeathsDto(deathsDto);
+                locationManager.updateNamedBody(event.getSystemAddress(), event.getBodyId(), event.getBody(), star -> {
+                    star.setTrafficDto(trafficDto);
+                    star.setDeathsDto(deathsDto);
+                });
 
             } else if (roueSet) {
                 // Matched on the reminder's system column above; the text itself no longer names the system.
@@ -107,8 +90,6 @@ public class JumpCompletedSubscriber {
                 sb.append(waypointArrival(event.getStarSystem(), shipRoute.getOrderedRoute(),
                         globalSettings.getAnnounceArrival(), globalSettings.getAnnounceRemainingJumps(), FuelScoop::announceFuelStars));
             }
-
-            locationManager.save(primaryStar);
 
             if (!event.isReplay()) {
                 if (playerSession.isRouteAnnouncementOn() && !sb.isEmpty()) {

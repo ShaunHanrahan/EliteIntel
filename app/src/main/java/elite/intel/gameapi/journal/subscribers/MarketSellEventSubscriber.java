@@ -210,7 +210,7 @@ public class MarketSellEventSubscriber {
         String tradeMessage;
         String reminder;
         String reminderSystem;
-        if (playerSession.getPrimaryStarName().equalsIgnoreCase(sourceSystem)) {
+        if (sourceSystem != null && sourceSystem.equalsIgnoreCase(playerSession.currentStarSystem())) {
             tradeMessage = localizedEvent("event.market.trade.buy", commodities, destinationSystem, destinationStation);
             reminder = localizedEvent("event.market.trade.sellReminder", destinationStation);
             reminderSystem = destinationSystem;

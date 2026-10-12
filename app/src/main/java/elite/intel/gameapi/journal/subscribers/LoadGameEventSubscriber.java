@@ -1,15 +1,10 @@
 package elite.intel.gameapi.journal.subscribers;
 
 import com.google.common.eventbus.Subscribe;
-import elite.intel.db.managers.LocationManager;
 import elite.intel.db.managers.ShipMakeManager;
 import elite.intel.db.managers.ShipRouteManager;
-import elite.intel.gameapi.gamestate.dtos.NavRouteDto;
 import elite.intel.gameapi.journal.events.LoadGameEvent;
-import elite.intel.gameapi.journal.events.dto.LocationDto;
 import elite.intel.session.PlayerSession;
-
-import java.util.List;
 
 import static org.apache.commons.lang3.StringUtils.trimToNull;
 
@@ -17,7 +12,6 @@ public class LoadGameEventSubscriber {
 
     private final ShipRouteManager shipRoute = ShipRouteManager.getInstance();
     private final PlayerSession playerSession = PlayerSession.getInstance();
-    private final LocationManager locationManager = LocationManager.getInstance();
     private final ShipMakeManager shipMakeManager = ShipMakeManager.getInstance();
     @Subscribe
     public void onEvent(LoadGameEvent event) {
@@ -39,15 +33,9 @@ public class LoadGameEventSubscriber {
     }
 
     private void cleanUpRoute(PlayerSession playerSession) {
-        List<NavRouteDto> orderedRoute = shipRoute.getOrderedRoute();
-        boolean roueSet = !orderedRoute.isEmpty();
-        LocationDto currentLocation = locationManager.findByLocationData(playerSession.getLocationData());
-        if (!roueSet) {
-            return;
-        }
-        if (currentLocation == null) {
-            return;
-        }
-        shipRoute.removeLeg(currentLocation.getStarName());
+        if (shipRoute.getOrderedRoute().isEmpty()) return;
+        String currentSystem = playerSession.currentStarSystem();
+        if (currentSystem == null) return;
+        shipRoute.removeLeg(currentSystem);
     }
 }

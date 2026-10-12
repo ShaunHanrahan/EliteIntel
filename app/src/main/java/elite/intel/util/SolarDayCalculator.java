@@ -32,7 +32,7 @@ public final class SolarDayCalculator {
         if (location.isTidalLocked()
                 && LocationDto.LocationType.MOON.equals(location.getLocationType())
                 && location.getParentBodyId() > 0) {
-            LocationDto parentPlanet = LocationManager.getInstance().getLocation(location.getStarName(), location.getParentBodyId());
+            LocationDto parentPlanet = LocationManager.getInstance().findBySystemAddress(location.getSystemAddress(), location.getParentBodyId());
             double parentOrbitalPeriod = parentPlanet == null ? 0 : parentPlanet.getOrbitalPeriod();
             if (parentOrbitalPeriod > 0) {
                 return Math.abs(parentOrbitalPeriod);

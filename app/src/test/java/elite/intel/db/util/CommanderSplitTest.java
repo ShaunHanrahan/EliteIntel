@@ -39,6 +39,23 @@ class CommanderSplitTest {
         }
     }
 
+    /**
+     * The commander tree renamed player.current_primary_star to current_system after the split. A database that is
+     * split only now still has the old name in the shared file, and the copy matches columns by name.
+     */
+    @Test
+    void aColumnRenamedSinceTheSplitKeepsItsValue() throws Exception {
+        try (MigrationLayoutTest.Built built = MigrationLayoutTest.Built.fresh()) {
+            Handle h = built.handle;
+            h.execute("UPDATE main.player SET current_primary_star = 'Synuefe UC-I b43-8' WHERE id = 1");
+
+            CommanderSplit.runIfNeeded(h);
+
+            assertEquals("Synuefe UC-I b43-8", h.createQuery("SELECT current_system FROM cmdr.player WHERE id = 1")
+                    .mapTo(String.class).one());
+        }
+    }
+
     @Test
     void theUsersPreferencesStayShared() throws Exception {
         try (MigrationLayoutTest.Built built = MigrationLayoutTest.Built.fresh()) {

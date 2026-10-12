@@ -22,6 +22,7 @@ public class ScanBodyClassifier {
      */
     private static final Pattern DESIGNATION = Pattern.compile("^(?:[A-Z]+ )?(\\d+)((?: [a-z])*)$");
     private static final Pattern STAR_DESIGNATION = Pattern.compile("^[A-Z]+$");
+    private static final Pattern RING_SUFFIX = Pattern.compile(" [A-Z] Ring$");
 
     private ScanBodyClassifier() {
     }
@@ -111,8 +112,18 @@ public class ScanBodyClassifier {
      * bodies. A ring's parent is a planet, so without this it would fall through to MOON.
      */
     private static LocationDto.LocationType ringOrBelt(String name) {
-        if (name.matches(".* [A-Z] Ring")) return PLANETARY_RING;
+        if (ringParent(name) != null) return PLANETARY_RING;
         if (name.contains("Belt Cluster")) return BELT_CLUSTER;
         return null;
+    }
+
+    /**
+     * The body a ring circles, named the way the game names rings ("<parent> <letter> Ring"), or null when the
+     * name is not a ring's.
+     */
+    public static String ringParent(String name) {
+        if (name == null) return null;
+        Matcher ring = RING_SUFFIX.matcher(name);
+        return ring.find() ? name.substring(0, ring.start()) : null;
     }
 }

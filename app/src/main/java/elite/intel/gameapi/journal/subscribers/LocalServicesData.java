@@ -42,7 +42,8 @@ public class LocalServicesData {
         if (hasShipyard) services.add(localizedEvent("event.docked.shipyard"));
         if (!services.isEmpty()) sb.append(" ").append(spokenList(services));
 
-        if (hasMarket || hasOutfitting || hasShipyard) {
+        boolean named = recordKey != null && !recordKey.isBlank();
+        if (named && (hasMarket || hasOutfitting || hasShipyard)) {
             LocationManager.getInstance().updateNamedBody(systemAddress, marketId, recordKey, station -> {
                 station.setStarName(starSystem);
                 if (hasMarket) station.setMarket(marketDto);

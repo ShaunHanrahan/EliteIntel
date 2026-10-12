@@ -74,7 +74,7 @@ public final class NavigateToPirateMissionProviderCommand implements IntelComman
         MassacrePair pair = resolve(here);
         if (pair == null) return StringUtls.localizedResponse("handler.pirate.noPairsKnown", DEFAULT_RANGE_LY);
 
-        if (pair.providerSystem().equalsIgnoreCase(here.primaryStar())) {
+        if (pair.providerSystem().equalsIgnoreCase(here.starSystem())) {
             return StringUtls.localizedResponse("handler.pirate.alreadyAtProvider",
                     pair.targetSystem(), HuntingGroundSpeech.join(pair.stations()));
         }
@@ -99,7 +99,7 @@ public final class NavigateToPirateMissionProviderCommand implements IntelComman
         MassacrePair forOpenContracts = firstFor(openContractTargets(), here);
         if (forOpenContracts != null) return forOpenContracts;
 
-        MassacrePair forThisSystem = firstOf(huntingGrounds.providersFor(here.primaryStar(), here));
+        MassacrePair forThisSystem = firstOf(huntingGrounds.providersFor(here.starSystem(), here));
         if (forThisSystem != null) return forThisSystem;
 
         return firstOf(huntingGrounds.bestPairs(here, DEFAULT_RANGE_LY));

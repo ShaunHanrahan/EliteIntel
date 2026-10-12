@@ -61,8 +61,8 @@ public class BiomeAnalyzer extends BaseQueryAnalyzer {
                 """;
 
         List<LocationData> list = List.of(locations);
-        Map<Long, LocationDto> byPrimaryStar = locationManager.findByPrimaryStar(playerSession.getPrimaryStarName());
-        return process(new AiDataStruct(instructions, new DataDto2(BioForms.getGenusToBiome(), list, starSystemCharacteristics(byPrimaryStar.values()))), originalUserInput);
+        Collection<LocationDto> system = locationManager.findAllBySystemAddress(playerSession.currentSystemAddress());
+        return process(new AiDataStruct(instructions, new DataDto2(BioForms.getGenusToBiome(), list, starSystemCharacteristics(system))), originalUserInput);
     }
 
     private String starSystemCharacteristics(Collection<LocationDto> starSystem) {

@@ -6,7 +6,6 @@ import elite.intel.ai.brain.vega.memory.facts.MemoryFactSource;
 import elite.intel.ai.brain.vega.memory.facts.RegisterMemoryFactSource;
 import elite.intel.db.managers.LocationManager;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
-import elite.intel.session.PlayerSession;
 import elite.intel.session.PlayerSituation;
 import elite.intel.session.Status;
 import elite.intel.util.GravityCalculator;
@@ -60,7 +59,7 @@ public final class CurrentBodyFactSource implements MemoryFactSource {
         if (!AT_BODY.contains(Status.getInstance().getSituation(null))) {
             return List.of();
         }
-        LocationDto body = LocationManager.getInstance().findByLocationData(PlayerSession.getInstance().getLocationData());
+        LocationDto body = LocationManager.getInstance().currentBody();
         String name = FactLine.value(body.getPlanetShortName());
         if (name == null) {
             name = FactLine.value(body.getPlanetName());

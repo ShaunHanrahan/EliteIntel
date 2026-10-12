@@ -91,7 +91,7 @@ public final class BookmarkSpot {
             carrier = station.getLocationType() == LocationDto.LocationType.FLEET_CARRIER
                     || (!blank(squadronCallSign) && squadronCallSign.equalsIgnoreCase(stationName));
         }
-        return new Here(status.getSituation(null), PlayerSession.getInstance().getPrimaryStarName(),
+        return new Here(status.getSituation(null), PlayerSession.getInstance().currentStarSystem(),
                 stationName, carrier, portBody, snapshot.getBodyName(), status.hasLatLong(),
                 snapshot.getLatitude(), snapshot.getLongitude());
     }

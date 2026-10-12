@@ -1,11 +1,13 @@
 package elite.intel.junit.db.managers;
 
 import elite.intel.db.dao.LocationDao;
+import elite.intel.db.managers.LocationFixtures;
 import elite.intel.db.managers.LocationManager;
 import elite.intel.db.util.Database;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
 import elite.intel.session.DockedMarket;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import elite.intel.util.json.GsonFactory;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -47,7 +49,7 @@ class LocationNamedBodyWriteTest {
         body.setPlanetName(planet);
         body.setLocationType(MOON);
         body.setGravity(0.08);
-        locations.save(body);
+        LocationFixtures.store(body);
 
         // What docking at a carrier parked here leaves behind: the body's record, re-labelled and saved
         // under the carrier's name, still claiming the body's BodyID.
@@ -55,7 +57,7 @@ class LocationNamedBodyWriteTest {
         dockedAtCarrier.setStarName(star);
         dockedAtCarrier.setStationName(carrier);
         dockedAtCarrier.setLocationType(FLEET_CARRIER);
-        locations.save(dockedAtCarrier);
+        LocationFixtures.store(dockedAtCarrier);
     }
 
     @Test
@@ -80,7 +82,7 @@ class LocationNamedBodyWriteTest {
         elsewhere.setStarName(star + " Far");
         elsewhere.setStationName(station);
         elsewhere.setGravity(3.0);
-        locations.save(elsewhere);
+        LocationFixtures.store(elsewhere);
 
         locations.updateNamedBody(systemAddress, 46L, station, here -> {
             here.setStarName(star);
@@ -104,10 +106,10 @@ class LocationNamedBodyWriteTest {
         parkedHere.setStationName(carrierName);
         parkedHere.setMarketID(marketId);
         parkedHere.setLocationType(FLEET_CARRIER);
-        locations.save(parkedHere);
+        LocationFixtures.store(parkedHere);
 
         // The ship is on the carrier's pad, but the current location is still the moon it is parked at.
-        PlayerSession.getInstance().setCurrentLocationId(bodyId, systemAddress);
+        PlayerSession.getInstance().moveTo(new Position(systemAddress, "Test System", bodyId));
         DockedMarket.getInstance().arrived(marketId, carrierName);
         try {
             LocationDto here = locations.findCurrentStation();

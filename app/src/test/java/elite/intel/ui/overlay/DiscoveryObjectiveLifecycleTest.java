@@ -1,20 +1,18 @@
 package elite.intel.ui.overlay;
 
-import elite.intel.db.managers.BioSamplesManager;
-import elite.intel.db.managers.CartographicDataManager;
-import elite.intel.db.managers.FssSurveyManager;
-import elite.intel.db.managers.LocationManager;
+import elite.intel.db.managers.*;
 import elite.intel.gameapi.journal.events.dto.BioSampleDto;
 import elite.intel.gameapi.journal.events.dto.GenusDto;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
-import elite.intel.session.LocationData;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -46,7 +44,7 @@ class DiscoveryObjectiveLifecycleTest {
 
     private long system;
     private String star;
-    private LocationData<Long, Long> previousLocation;
+    private Optional<Position> previousPosition;
     private Boolean previousDiscoveryToggle;
 
     @BeforeEach
@@ -55,21 +53,17 @@ class DiscoveryObjectiveLifecycleTest {
         star = String.format("Discovery Test %03d", run);
         system = 481167690000L + run * 2L;
 
-        previousLocation = session.getLocationData();
+        previousPosition = session.position();
         previousDiscoveryToggle = session.isDiscoveryAnnouncementOn();
         session.setDiscoveryAnnouncementOn(true);
         savePrimaryStar(true);
-        session.setCurrentLocationId(STAR_BODY, system);
+        session.moveTo(new Position(system, star, STAR_BODY));
     }
 
     @AfterEach
     void restoreSession() {
         session.setDiscoveryAnnouncementOn(previousDiscoveryToggle);
-        if (previousLocation != null && previousLocation.getSystemAddress() != null) {
-            session.setCurrentLocationId(
-                    previousLocation.getInGameId() == null ? 0 : previousLocation.getInGameId(),
-                    previousLocation.getSystemAddress());
-        }
+        previousPosition.ifPresent(session::moveTo);
     }
 
     @Test
@@ -94,7 +88,7 @@ class DiscoveryObjectiveLifecycleTest {
         surveys.recordBodyCount(system, 15);
         LocationDto planet = saveBody(21, "2", "Icy body", 0);
         planet.setOurDiscovery(true);
-        locations.save(planet);
+        LocationFixtures.store(planet);
 
         HudObjective card = source.currentObjective().orElseThrow();
 
@@ -137,7 +131,7 @@ class DiscoveryObjectiveLifecycleTest {
         saveBody(25, "2 b", "Icy body", 0);
         LocationDto geo = saveBody(11, "1 a", "High metal content body", 0);
         geo.setGeoSignals(2);
-        locations.save(geo);
+        LocationFixtures.store(geo);
         saveBody(LIFE_BODY, "1 b", "Rocky body", 4);
 
         HudObjective card = source.currentObjective().orElseThrow();
@@ -159,7 +153,7 @@ class DiscoveryObjectiveLifecycleTest {
         companion.setStarName(star);
         companion.setPlanetName(star + " B");
         companion.setLocationType(LocationDto.LocationType.STAR);
-        locations.save(companion);
+        LocationFixtures.store(companion);
 
         HudRow stars = source.currentObjective().orElseThrow().rows().get(1);
         assertEquals("STARS", stars.label());
@@ -231,7 +225,7 @@ class DiscoveryObjectiveLifecycleTest {
     void atABodyWithSamplingToDoTheExobiologyCardTakesOver() {
         surveys.recordBodyCount(system, 2);
         saveSurveyedLifeBody("Bacterium", "Tussock");
-        session.setCurrentLocationId(LIFE_BODY, system);
+        session.moveTo(new Position(system, star, LIFE_BODY));
 
         inOrbit.set(true);
         assertTrue(source.currentObjective().isEmpty(), "in orbit of the life body");
@@ -245,7 +239,7 @@ class DiscoveryObjectiveLifecycleTest {
         surveys.recordBodyCount(system, 2);
         saveSurveyedLifeBody("Bacterium");
         saveBody(24, "2 a", "Icy body", 0);
-        session.setCurrentLocationId(24L, system);
+        session.moveTo(new Position(system, star, 24L));
         inOrbit.set(true);
 
         assertTrue(source.currentObjective().isPresent());
@@ -259,7 +253,7 @@ class DiscoveryObjectiveLifecycleTest {
         surveys.recordBodyCount(system, 15);
         assertTrue(source.currentObjective().isPresent());
 
-        session.setCurrentLocationId(0L, system + 1);
+        session.moveTo(new Position(system + 1, star + " Elsewhere", 0L));
 
         assertTrue(source.currentObjective().isEmpty());
     }
@@ -283,7 +277,7 @@ class DiscoveryObjectiveLifecycleTest {
         primary.setPlanetName(star);
         primary.setLocationType(LocationDto.LocationType.PRIMARY_STAR);
         primary.setOurDiscovery(ourDiscovery);
-        locations.save(primary);
+        LocationFixtures.store(primary);
     }
 
     private LocationDto saveBody(long bodyId, String shortName, String planetClass, int bioSignals) {
@@ -294,7 +288,7 @@ class DiscoveryObjectiveLifecycleTest {
         body.setLocationType(shortName.contains(" ") ? LocationDto.LocationType.MOON : LocationDto.LocationType.PLANET);
         body.setPlanetClass(planetClass);
         body.setBioSignals(bioSignals);
-        locations.save(body);
+        LocationFixtures.store(body);
         return body;
     }
 
@@ -307,7 +301,7 @@ class DiscoveryObjectiveLifecycleTest {
             genus.setPlanetName(body.getPlanetName());
             return genus;
         }).toList());
-        locations.save(body);
+        LocationFixtures.store(body);
     }
 
     private BioSampleDto completedSample(String genusName) {

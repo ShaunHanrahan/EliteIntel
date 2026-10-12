@@ -13,7 +13,6 @@ import elite.intel.eventbus.UiBus;
 import elite.intel.gameapi.gamestate.dtos.GameEvents;
 import elite.intel.gameapi.i18n.EventsTextProvider;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
-import elite.intel.session.PlayerSession;
 import elite.intel.session.PlayerSituation;
 import elite.intel.session.Status;
 import elite.intel.ui.dialog.CommandDetailsDialog;
@@ -69,8 +68,6 @@ import static org.apache.commons.lang3.StringUtils.trimToNull;
  * kept - and it took the other's search with it.
  */
 public class BuiltInCommandsTabPanel extends JPanel {
-
-    private final PlayerSession playerSession = PlayerSession.getInstance();
     private final Status status = Status.getInstance();
     private final LocationManager locationManager = LocationManager.getInstance();
     private final CommandCatalog commandCatalog = new CommandCatalog();
@@ -439,7 +436,7 @@ public class BuiltInCommandsTabPanel extends JPanel {
     }
 
     private LocationDto currentLocation() {
-        return locationManager.findByLocationData(playerSession.getLocationData());
+        return locationManager.currentBody();
     }
 
     /**

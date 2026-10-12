@@ -31,7 +31,7 @@ class LocationDtoNotFoundTest {
     @Test
     void aSystemWithNoRecordAnswersTheNotFoundMarker() {
         long unknownSystem = 9_999_999_999_991L;
-        assertEquals(-1L, LocationManager.getInstance().findBySystemAddress(unknownSystem).getBodyId());
+        assertEquals(-1L, LocationManager.getInstance().findPrimaryStar(unknownSystem).getBodyId());
         assertEquals(-1L, LocationManager.getInstance().findBySystemAddress(unknownSystem, "Nowhere").getBodyId());
     }
 }

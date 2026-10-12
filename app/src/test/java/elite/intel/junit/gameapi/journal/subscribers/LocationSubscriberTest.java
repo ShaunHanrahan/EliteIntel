@@ -3,6 +3,7 @@ package elite.intel.junit.gameapi.journal.subscribers;
 import com.github.tomakehurst.wiremock.junit5.WireMockExtension;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import elite.intel.db.managers.LocationFixtures;
 import elite.intel.db.managers.LocationManager;
 import elite.intel.gameapi.journal.events.LocationEvent;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
@@ -109,7 +110,7 @@ class LocationSubscriberTest {
         body.setStarName(star);
         body.setPlanetName(moon);
         body.setLocationType(LocationDto.LocationType.MOON);
-        locationManager.save(body);
+        LocationFixtures.store(body);
 
         subscriber.onLocationEvent(dockedAtCarrier(star, sysAddr, moon, "GHY-L8X", marketId));
 
@@ -163,7 +164,7 @@ class LocationSubscriberTest {
         planet.setStarName(star);
         planet.setPlanetName(star + " 7");
         planet.setLocationType(LocationDto.LocationType.PLANET);
-        locationManager.save(planet);
+        LocationFixtures.store(planet);
 
         subscriber.onLocationEvent(locationEvent(star, sysAddr, star, "StarSystem", "Independent"));
 
@@ -185,7 +186,7 @@ class LocationSubscriberTest {
         primary.setStarName(star);
         primary.setPlanetName(star);
         primary.setLocationType(LocationDto.LocationType.PRIMARY_STAR);
-        locationManager.save(primary);
+        LocationFixtures.store(primary);
 
         subscriber.onLocationEvent(starLocationEvent(star, sysAddr, star, 0L, 0.0));
 
@@ -193,7 +194,7 @@ class LocationSubscriberTest {
 
         assertEquals(LocationDto.LocationType.PRIMARY_STAR,
                 locationManager.findBySystemAddress(sysAddr, star).getLocationType());
-        assertEquals(star, locationManager.findBySystemAddress(sysAddr).getStarName(),
+        assertEquals(star, locationManager.findPrimaryStar(sysAddr).getStarName(),
                 "the system's primary-star lookup must still find it");
     }
 

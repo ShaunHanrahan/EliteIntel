@@ -36,7 +36,7 @@ public interface PlayerDao {
 
     @SqlUpdate("""
                     INSERT OR REPLACE INTO player
-                      (id, current_primary_star, carrier_departure_time, crew_wags_payout,
+                      (id, current_system, carrier_departure_time, crew_wags_payout,
                        current_ship, current_ship_name, current_location_id, current_wealth,
                        final_destination, game_version,
                        goods_sold_this_session, highest_single_transaction, in_game_name,
@@ -49,7 +49,7 @@ public interface PlayerDao {
                        game_build, bounty_collected_lifetime, homeSystemId,
                        systemAddress, currentGenus
                     )
-                    VALUES (1, :currentPrimaryStar,
+                    VALUES (1, :currentSystem,
                        :carrierDepartureTime, :crewWagsPayout,
                        :currentShip, :currentShipName, :currentLocationId, :currentWealth,
                        :finalDestination, :gameVersion,
@@ -117,7 +117,7 @@ public interface PlayerDao {
         private long totalSystemsVisited = 0;
         private long exobiologyProfits = 0;
         private Long homeSystemId;
-        private String currentPrimaryStar = "";
+        private String currentSystem = "";
         private String gameBuild = "r321306";
         private String alternativeName;
         private String journalDirectory;
@@ -154,12 +154,12 @@ public interface PlayerDao {
             this.bindingsDirectory = bindingsDirectory;
         }
 
-        public String getCurrentPrimaryStar() {
-            return currentPrimaryStar;
+        public String getCurrentSystem() {
+            return currentSystem;
         }
 
-        public void setCurrentPrimaryStar(String currentPrimaryStar) {
-            this.currentPrimaryStar = currentPrimaryStar;
+        public void setCurrentSystem(String currentSystem) {
+            this.currentSystem = currentSystem;
         }
 
         public String getCarrierDepartureTime() {
@@ -522,7 +522,7 @@ public interface PlayerDao {
             p.setTotalProfitsFromExploration(rs.getLong("total_profits_from_exploration"));
             p.setTotalSystemsVisited(rs.getInt("total_systems_visited"));
             p.setExobiologyProfits(rs.getLong("exobiology_profits"));
-            p.setCurrentPrimaryStar(rs.getString("current_primary_star"));
+            p.setCurrentSystem(rs.getString("current_system"));
             p.setAlternativeName(rs.getString("alternative_name"));
             p.setJournalDirectory(rs.getString("journal_dir"));
             p.setBindingsDirectory(rs.getString("bindings_dir"));

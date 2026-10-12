@@ -78,7 +78,7 @@ public class AnalyzeBioScansStarSystemQuery extends BaseQueryAnalyzer implements
         List<PlanetsToScan> requireScans = new ArrayList<>();
         List<UnmappedPlanet> unmapped = new ArrayList<>();
         List<String> surveyed = new ArrayList<>();
-        Collection<LocationDto> locations = locationManager.findAllBySystemAddress(playerSession.getLocationData().getSystemAddress());
+        Collection<LocationDto> locations = locationManager.findAllBySystemAddress(playerSession.currentSystemAddress());
 
         for (LocationDto location : locations) {
             // A body recorded as sampled out is finished for good, and the sample count below cannot

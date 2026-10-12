@@ -5,9 +5,9 @@ import elite.intel.gameapi.journal.events.CarrierJumpEvent;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
 
 /**
- * Builds the arrival-body row for a carrier jump. Shared by the live subscriber and the startup
- * pre-scan so both persist the same shape: previously the two drifted, and a system recorded while
- * the app was running carried different fields than the same system recovered from the journal.
+ * Records the arrival body of a carrier jump the commander was aboard for. Shared by the live subscriber and the
+ * startup pre-scan so both persist the same shape: previously the two drifted, and a system recorded while the app
+ * was running carried different fields than the same system recovered from the journal.
  */
 final class CarrierJumpLocationMapper {
 
@@ -15,15 +15,19 @@ final class CarrierJumpLocationMapper {
     }
 
     /**
-     * Fetches the existing row for the carrier's arrival body and populates it from the event.
-     * The caller is responsible for saving it.
+     * Files the arrival body under its journal name in one locked write.
+     * <p>
+     * WHY by name, not by BodyID: a BodyID miss built a sparse row that the upsert then wrote over the real one,
+     * destroying its scan data.
+     *
+     * @return the record as saved, whose body id may differ from the event's (see {@link LocationDto#setBodyId})
      */
-    static LocationDto toArrivalLocation(CarrierJumpEvent event, LocationManager locationManager) {
-        // WHY: fetch by the unique locationName that LocationDao.upsert conflicts on (fed from
-        // planetName), not by bodyId. A bodyId miss builds a sparse row that the upsert then writes
-        // over the top of the real one, destroying its scan data. LocationSubscriber keys the same way.
-        LocationDto location = locationManager.findBySystemAddress(event.getSystemAddress(), event.getBody());
+    static LocationDto recordArrival(CarrierJumpEvent event, LocationManager locationManager) {
+        return locationManager.updateNamedBody(event.getSystemAddress(), event.getBodyId(), event.getBody(),
+                location -> describe(location, event));
+    }
 
+    private static void describe(LocationDto location, CarrierJumpEvent event) {
         location.setStarName(event.getStarSystem());
         // WHY: without systemAddress the row is unreachable. The current-location pointer stores the
         // real address and every lookup joins on it, so a row saved with the default 0 is orphaned.
@@ -44,13 +48,9 @@ final class CarrierJumpLocationMapper {
         location.setPowerplayStateReinforcement(event.getPowerplayStateReinforcement());
         location.setPowerplayStateUndermining(event.getPowerplayStateUndermining());
 
-        if (event.getBodyType() != null) {
-            location.setBodyType(event.getBodyType());
-            // WHY: a carrier always arrives at the system's primary star, hence isPrimaryStar=true.
-            // A body type determineType does not recognise yields null; keep the existing type then.
-            LocationDto.LocationType type = LocationDto.determineType(event.getBodyType(), true);
-            if (type != null) location.setLocationType(type);
-        }
-        return location;
+        // WHY: the type is left to the events that can prove it. A carrier parks at whichever orbit was free - a
+        // planet in about a third of jumps, once beside Proxima Centauri in Alpha Centauri - so the body it parks
+        // at says nothing about which star is primary. Claiming it was is how Proxima was filed as the primary.
+        if (event.getBodyType() != null) location.setBodyType(event.getBodyType());
     }
 }

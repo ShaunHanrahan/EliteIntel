@@ -5,8 +5,8 @@ import elite.intel.ai.brain.vega.memory.facts.MemoryFactContext;
 import elite.intel.ai.brain.vega.memory.facts.MemoryFactSource;
 import elite.intel.ai.brain.vega.memory.facts.RegisterMemoryFactSource;
 import elite.intel.db.managers.LocationManager;
+import elite.intel.db.managers.Whereabouts;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
-import elite.intel.session.PlayerSession;
 import elite.intel.session.PlayerSituation;
 import elite.intel.session.Status;
 
@@ -53,13 +53,13 @@ public final class CurrentSystemFactSource implements MemoryFactSource {
 
     @Override
     public List<String> factsFor(MemoryFactContext context) {
-        String system = PlayerSession.getInstance().getPrimaryStarName();
-        if (isUnknown(system)) {
+        Optional<Whereabouts> here = LocationManager.getInstance().here();
+        if (here.isEmpty()) {
             return List.of();
         }
         boolean brief = !SYSTEM_TRAVEL.contains(Status.getInstance().getSituation(null));
-        LocationDto loc = LocationManager.getInstance().findPrimaryStar(system);
-        String fact = format(brief, system, loc.getAllegiance(), loc.getSecurity(), loc.getEconomy(),
+        LocationDto loc = here.get().system();
+        String fact = format(brief, here.get().starSystem(), loc.getAllegiance(), loc.getSecurity(), loc.getEconomy(),
                 loc.getPopulation(), loc.getControllingPower());
         return fact.isBlank() ? List.of() : List.of(fact);
     }

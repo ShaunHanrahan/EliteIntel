@@ -5,6 +5,7 @@ import elite.intel.gameapi.search.spansh.commodity.CommoditySearchResult;
 import elite.intel.i18n.Language;
 import elite.intel.session.DockedMarket;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import elite.intel.session.SystemSession;
 import elite.intel.util.Cypher;
 import org.junit.jupiter.api.AfterEach;
@@ -29,6 +30,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class AlreadyAtTheBestMarketTest {
 
     private static final String HERE = "Col 285 Sector IB-X d1-32";
+    private static final long HERE_ADDRESS = 2870514738635L;
 
     @BeforeAll
     static void boot() throws Exception {
@@ -39,7 +41,7 @@ class AlreadyAtTheBestMarketTest {
 
     @BeforeEach
     void dockAtLoveHub() {
-        PlayerSession.getInstance().setCurrentPrimaryStarName(HERE);
+        PlayerSession.getInstance().moveTo(new Position(HERE_ADDRESS, HERE, null));
         DockedMarket.getInstance().arrived(4335542787L, "Love Hub");
     }
 

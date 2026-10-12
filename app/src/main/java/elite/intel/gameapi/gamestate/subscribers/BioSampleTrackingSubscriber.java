@@ -6,8 +6,8 @@ import elite.intel.db.managers.LocationManager;
 import elite.intel.gameapi.gamestate.status_events.PlayerMovedEvent;
 import elite.intel.gameapi.journal.BioSampleDistanceCalculator;
 import elite.intel.gameapi.journal.events.dto.BioSampleDto;
-import elite.intel.session.LocationData;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import elite.intel.session.Status;
 
 import java.util.List;
@@ -44,18 +44,18 @@ public class BioSampleTrackingSubscriber {
 
     @Subscribe
     public void onPlayerMovedEvent(PlayerMovedEvent event) {
-        LocationData<Long, Long> where = playerSession.getLocationData();
-        if (where.getSystemAddress() == null || where.getInGameId() == null) return;
+        Position where = playerSession.position().orElse(null);
+        if (where == null || where.bodyId() == null) return;
 
         // Nearly every tick changes nothing: no partial on the body, or the stored flags already give
         // today's answer. Those are settled from a plain read, so the row is not rewritten once a second.
-        Separation probe = refresh(locationManager.findByLocationData(where).getPartialBioSamples(), event);
+        Separation probe = refresh(locationManager.findBySystemAddress(where.systemAddress(), where.bodyId()).getPartialBioSamples(), event);
         if (probe == null || !probe.flipped()) return;
 
         // Something did flip, so measure it again against the row as it is under the lock - a scan
         // handler may have changed the partials since the read above - and persist that answer.
         AtomicReference<Separation> settled = new AtomicReference<>();
-        locationManager.updateBody(where.getSystemAddress(), where.getInGameId(),
+        locationManager.updateBody(where.systemAddress(), where.bodyId(),
                 location -> settled.set(refresh(location.getPartialBioSamples(), event)));
 
         Separation separation = settled.get();

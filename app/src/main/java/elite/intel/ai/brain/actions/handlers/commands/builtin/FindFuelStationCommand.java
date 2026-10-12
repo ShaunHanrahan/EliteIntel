@@ -90,7 +90,7 @@ public final class FindFuelStationCommand implements IntelCommand {
     @Override
     public String execute(JsonObject params, String responseText) {
         LocationDao.Coordinates coordinates = locationManager.getGalacticCoordinates();
-        if (!isKnownPosition(coordinates)) {
+        if (coordinates == null) {
             return StringUtls.localizedResponse("handler.refuel.noCoords");
         }
 
@@ -144,24 +144,12 @@ public final class FindFuelStationCommand implements IntelCommand {
     }
 
     /**
-     * Sol really does sit at 0,0,0 - and so does a position we have recorded nothing for, because the unset
-     * value and the real one are the same three zeroes. Only the star's name separates them, and the
-     * difference matters more here than anywhere: a commander short of fuel out in the black would otherwise
-     * be sent to the nearest station to SOL, thousands of light years away, and told it was nearby.
-     */
-    private boolean isKnownPosition(LocationDao.Coordinates coordinates) {
-        if (coordinates == null) return false;
-        boolean atOrigin = coordinates.x() == 0 && coordinates.y() == 0 && coordinates.z() == 0;
-        return !atOrigin || "Sol".equalsIgnoreCase(playerSession.getPrimaryStarName());
-    }
-
-    /**
      * Whether the station is in the system the commander is already in. Both tests, because either input can
      * be the stale one: a reported distance of zero means the same system without trusting session state at
      * all, and the name comparison still catches it when the coordinates were what lagged.
      */
     private boolean isHere(RefuelStation station) {
-        String current = playerSession.getPrimaryStarName();
+        String current = playerSession.currentStarSystem();
         return station.distanceLy() <= 0
                 || (current != null && current.strip().equalsIgnoreCase(station.starSystem().strip()));
     }

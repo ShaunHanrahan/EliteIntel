@@ -187,7 +187,7 @@ public class HuntingGroundManager {
 
         return Database.withDao(MassacreMissionDao.class, dao -> dao.record(
                 mission.getMissionId(),
-                providerLocation.primaryStar(),
+                providerLocation.starSystem(),
                 providerLocation.x(),
                 providerLocation.y(),
                 providerLocation.z(),

@@ -145,7 +145,7 @@ class ExoMasteryLedgerTest {
         known.setStarName("Exo Known F");
         known.setPlanetName("Exo Known F 4");
         known.markBioScansCompleted();
-        LocationManager.getInstance().save(known);
+        LocationFixtures.store(known);
 
         load(system("Exo Known F", address, body("Exo Known F 4", 4, 20_000_000, "Stratum_07"), body("Exo Known F 5", 5, 20_000_000, "Stratum_07")));
 
@@ -160,7 +160,7 @@ class ExoMasteryLedgerTest {
         long address = BAND + 70;
         load(system("Exo Latch G", address, body("Exo Latch G 2", 2, 20_000_000, "Stratum_07")));
         LocationManager locations = LocationManager.getInstance();
-        locations.updateBody(address, 2, location -> {
+        locations.updateNamedBody(address, 2, "Exo Latch G 2", location -> {
             location.setStarName("Exo Latch G");
             location.setPlanetName("Exo Latch G 2");
         });

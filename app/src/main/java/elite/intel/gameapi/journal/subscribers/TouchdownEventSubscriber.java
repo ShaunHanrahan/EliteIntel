@@ -5,7 +5,6 @@ import elite.intel.ai.brain.vega.VegaRuntime;
 import elite.intel.ai.mouth.EventNarrator;
 import elite.intel.db.managers.LocationManager;
 import elite.intel.gameapi.journal.events.TouchdownEvent;
-import elite.intel.gameapi.journal.events.dto.LocationDto;
 import elite.intel.session.PlayerSession;
 
 import static elite.intel.util.StringUtls.localizedEvent;
@@ -48,10 +47,15 @@ public class TouchdownEventSubscriber {
             sb.append(pointOfInterest);
 
 
-            LocationDto currentLocation = locationManager.findByLocationData(playerSession.getLocationData());
-            currentLocation.setStarName(starSystem);
-            currentLocation.setLandingCoordinates(new double[]{event.getLatitude(), event.getLongitude()});
-            locationManager.save(currentLocation);
+            // WHY the event's own body, not the one the position points at: a stale position wrote the landing
+            // site onto another body. Only a body on record is written - the landing names nothing else about it.
+            if (body != null && latitude != null && longitude != null
+                    && locationManager.findBySystemAddress(event.getSystemAddress(), body).getStarName() != null) {
+                locationManager.updateNamedBody(event.getSystemAddress(), event.getBodyId(), body, landedOn -> {
+                    landedOn.setStarName(starSystem);
+                    landedOn.setLandingCoordinates(new double[]{latitude, longitude});
+                });
+            }
 
             boolean atPointOfInterest = pointOfInterest != null && !pointOfInterest.isEmpty();
             // Hopping between bio samples lands beside the same beacon over and over: name it once per stay.

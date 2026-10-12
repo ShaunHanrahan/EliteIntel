@@ -3,8 +3,8 @@ package elite.intel.junit.gameapi.journal.subscribers;
 import com.google.gson.JsonObject;
 import elite.intel.gameapi.journal.events.CodexEntryEvent;
 import elite.intel.gameapi.journal.subscribers.CodexEntryEventSubscriber;
-import elite.intel.session.LocationData;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -20,14 +20,14 @@ class CodexEntryEventSubscriberTest {
     void nullBodyIdDoesNotUpdateLocationId() throws InterruptedException {
         long uniqueSystem = 60001000L;
         long knownBodyId = 33L;
-        session.setCurrentLocationId(knownBodyId, uniqueSystem);
+        session.moveTo(new Position(uniqueSystem, "Test System", knownBodyId));
 
         subscriber.onCodexEntryEvent(codexEntryEventNullBodyId(uniqueSystem));
 
         Thread.sleep(300);
 
-        LocationData<Long, Long> loc = session.getLocationData();
-        assertEquals(knownBodyId, loc.getInGameId(), "null BodyID must not overwrite current_location_id");
+        Position loc = session.position().orElseThrow();
+        assertEquals(knownBodyId, loc.bodyId(), "null BodyID must not overwrite current_location_id");
     }
 
     /**

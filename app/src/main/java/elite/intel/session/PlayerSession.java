@@ -17,6 +17,8 @@ import elite.intel.ui.event.RadioTransmissionStateChangedEvent;
 import elite.intel.util.OsDetector;
 import elite.intel.util.Ranks;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -34,6 +36,7 @@ import static org.apache.commons.lang3.StringUtils.trimToNull;
  */
 public class PlayerSession {
 
+    private static final Logger log = LogManager.getLogger(PlayerSession.class);
     private static final String UUD = java.util.UUID.randomUUID().toString();
     private static volatile PlayerSession instance;
     /// Data managers.
@@ -138,10 +141,6 @@ public class PlayerSession {
         return bounties.getAll();
     }
 
-    public String getPrimaryStarName() {
-        return Database.withDao(PlayerDao.class, dao -> dao.get().getCurrentPrimaryStar());
-    }
-
     public void clearBounties() {
         Database.withDao(PlayerDao.class, dao -> {
             PlayerDao.Player player = dao.get();
@@ -168,32 +167,69 @@ public class PlayerSession {
         });
     }
 
-    public void setCurrentLocationId(long bodyId, long systemAddress) {
-        // systemAddress is the reliable, unique id of the star system and is the only field
-        // that may gate this write. BodyID is NOT reliable: the journal frequently reports
-        // BodyID 0 on arrival even when that body is not the primary star. Letting an
-        // unreliable bodyId==0 veto the write froze the current-system pointer at the last
-        // jump whose arrival body happened to be non-zero, so "where am I" reported a stale
-        // system while current_primary_star had already advanced.
-        if (systemAddress == 0) {
-            return;
-        }
+    /**
+     * Places the commander in a system. Only the events that can take the commander to another system call
+     * this - Location, FSDJump and CarrierJump - live and in the startup replay alike; the address, the name
+     * and the body are written in one save so they cannot disagree.
+     */
+    public void moveTo(Position position) {
         Database.withDao(PlayerDao.class, dao -> {
             PlayerDao.Player player = dao.get();
-            player.setCurrentLocationId(bodyId);
-            player.setSystemAddress(systemAddress);
+            player.setSystemAddress(position.systemAddress());
+            player.setCurrentSystem(position.starSystem());
+            player.setCurrentLocationId(position.bodyId());
             dao.save(player);
             return Void.class;
         });
     }
 
-    public LocationData<Long, Long> getLocationData() {
+    /**
+     * Moves the commander to another body of the system they are in, for the events that happen inside a system
+     * (a supercruise drop, an approach, a scan on the surface).
+     * <p>
+     * WHY refused for another system: those events never take the commander anywhere, so one naming another
+     * system means the position is out of date, and moving only the body would pair this system's body with
+     * another system's name. Only a Location, FSDJump or CarrierJump may change the system.
+     */
+    public void moveWithinSystem(long systemAddress, long bodyId) {
+        Optional<Position> here = position();
+        if (here.isEmpty() || !here.get().isIn(systemAddress)) {
+            log.warn("Body {} reported in system {}, but the commander is placed at {}; position left as it was",
+                    bodyId, systemAddress, here.map(Position::starSystem).orElse("nowhere yet"));
+            return;
+        }
+        moveTo(new Position(systemAddress, here.get().starSystem(), bodyId));
+    }
+
+    /**
+     * Where the commander is, or empty before any journal event has placed them.
+     */
+    public Optional<Position> position() {
         return Database.withDao(PlayerDao.class, dao -> {
             PlayerDao.Player player = dao.get();
-            Long currentLocationId = player.getCurrentLocationId();
             Long systemAddress = player.getSystemAddress();
-            return new LocationData<>(systemAddress, currentLocationId);
+            String starSystem = player.getCurrentSystem();
+            if (systemAddress == null || systemAddress <= 0 || starSystem == null || starSystem.isBlank()) {
+                return Optional.empty();
+            }
+            return Optional.of(new Position(systemAddress, starSystem, player.getCurrentLocationId()));
         });
+    }
+
+    /**
+     * The name of the commander's system, or null before any journal event has placed them - shorthand for the
+     * name in {@link #position()}.
+     */
+    public String currentStarSystem() {
+        return position().map(Position::starSystem).orElse(null);
+    }
+
+    /**
+     * The address of the commander's system, or 0 - no system has that address - before any journal event has placed
+     * them. Shorthand for the address in {@link #position()}.
+     */
+    public long currentSystemAddress() {
+        return position().map(Position::systemAddress).orElse(0L);
     }
 
 
@@ -291,11 +327,15 @@ public class PlayerSession {
         });
     }
 
+    /**
+     * The body last scanned in the commander's system, or the not-found marker (body id -1) before any journal event
+     * has placed them.
+     */
     public LocationDto getLastScan() {
-        return Database.withDao(PlayerDao.class, dao -> {
-            PlayerDao.Player player = dao.get();
-            return LocationManager.getInstance().getLocation(player.getCurrentPrimaryStar(), player.getLastScanId());
-        });
+        Long lastScanId = Database.withDao(PlayerDao.class, dao -> dao.get().getLastScanId());
+        return position()
+                .map(here -> LocationManager.getInstance().findBySystemAddress(here.systemAddress(), lastScanId))
+                .orElseGet(() -> new LocationDto(-1L));
     }
 
     public TargetLocation getTracking() {
@@ -395,8 +435,10 @@ public class PlayerSession {
     }
 
     public LocationDto getHomeSystem() {
-        Long homeSystemId = Database.withDao(PlayerDao.class, dao -> dao.get().getHomeSystemId());
-        return LocationManager.getInstance().findBySystemAddress(homeSystemId);
+        // WHY 0: the column defaults to 0 and the mapper reads it with getLong, so "no home system" is stored as 0.
+        long homeSystemId = Database.withDao(PlayerDao.class, dao -> dao.get().getHomeSystemId());
+        if (homeSystemId == 0) return new LocationDto(-1L);
+        return LocationManager.getInstance().findSystemRecord(homeSystemId);
     }
 
     public void setCrewWagsPayout(long crewWagsPayout) {
@@ -733,15 +775,6 @@ public class PlayerSession {
 
     public String getInGameName() {
         return Database.withDao(PlayerDao.class, dao -> dao.get().getInGameName());
-    }
-
-    public void setCurrentPrimaryStarName(String starName) {
-        Database.withDao(PlayerDao.class, dao -> {
-            PlayerDao.Player player = dao.get();
-            player.setCurrentPrimaryStar(starName);
-            dao.save(player);
-            return Void.class;
-        });
     }
 
     /**

@@ -50,7 +50,7 @@ public class MissionAcceptedSubscriber {
     private void recordHuntingGroundPair(MissionAcceptedEvent event) {
         if (!PirateMassacreContract.isOne(event.getName(), event.getTargetType())) return;
 
-        LocationDto here = locationManager.findByLocationData(playerSession.getLocationData());
+        LocationDto here = locationManager.currentSystem();
         if (here.getStarName() == null || here.getStarName().isBlank()) return;
 
         LocationDto station = locationManager.findCurrentStation();

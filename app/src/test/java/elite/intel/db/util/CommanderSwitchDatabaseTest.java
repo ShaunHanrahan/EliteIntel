@@ -3,6 +3,7 @@ package elite.intel.db.util;
 import elite.intel.db.dao.HuntingGroundDao;
 import elite.intel.db.dao.MaterialNameDao;
 import elite.intel.db.dao.PlayerDao;
+import elite.intel.db.managers.LocationFixtures;
 import elite.intel.db.managers.LocationManager;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
 import org.jdbi.v3.core.Handle;
@@ -79,7 +80,7 @@ class CommanderSwitchDatabaseTest {
         place.setStarName("Split Test Star");
         place.setPlanetName("Split Test Star 1");
         place.setOurDiscovery(true);
-        LocationManager.getInstance().save(place);
+        LocationFixtures.store(place);
 
         Database.switchCommander(BRAVO);
         assertEquals(0, iron(), "Bravo holds none of Alpha's iron");

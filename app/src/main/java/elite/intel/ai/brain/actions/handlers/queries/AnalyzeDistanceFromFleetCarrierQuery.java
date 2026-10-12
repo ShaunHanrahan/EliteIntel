@@ -1,9 +1,9 @@
 package elite.intel.ai.brain.actions.handlers.queries;
 
 import com.google.gson.JsonObject;
+import elite.intel.db.dao.LocationDao;
 import elite.intel.db.managers.LocationManager;
 import elite.intel.gameapi.journal.events.dto.CarrierDataDto;
-import elite.intel.gameapi.journal.events.dto.LocationDto;
 import elite.intel.gameapi.journal.events.dto.shiploadout.ShipLoadOutDto;
 import elite.intel.session.PlayerSession;
 import elite.intel.util.NavigationUtils;
@@ -38,15 +38,15 @@ public class AnalyzeDistanceFromFleetCarrierQuery extends BaseQueryAnalyzer impl
             return process(StringUtls.localizedResponse("query.carrier.noCoords"));
         }
 
-        double x = 0, y = 0, z = 0;
-        LocationDto playerLocation = locationManager.findPrimaryStar(playerSession.getPrimaryStarName());
-        x = playerLocation.getX();
-        y = playerLocation.getY();
-        z = playerLocation.getZ();
-        boolean arePlayerLocationCoordinatesAvailable = x == 0 && y == 0 && z == 0;
-        if (arePlayerLocationCoordinatesAvailable) {
+        // WHY the system's coordinates rather than a primary star's: a system entered by carrier has no primary star
+        // on record until it is scanned, and zeroes are Sol's, not "unknown".
+        LocationDao.Coordinates here = locationManager.getGalacticCoordinates();
+        if (here == null) {
             return process(StringUtls.localizedResponse("query.noPlayerCoords"));
         }
+        double x = here.x();
+        double y = here.y();
+        double z = here.z();
 
         ShipLoadOutDto shipLoadout = playerSession.getShipLoadout();
         double jumpRange = shipLoadout == null ? -1 : shipLoadout.getMaxJumpRange();

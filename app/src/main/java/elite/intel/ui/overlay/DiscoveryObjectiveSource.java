@@ -7,8 +7,8 @@ import elite.intel.gameapi.journal.ScanBodyClassifier;
 import elite.intel.gameapi.journal.events.dto.BioSampleDto;
 import elite.intel.gameapi.journal.events.dto.GenusDto;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
-import elite.intel.session.LocationData;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import elite.intel.session.Status;
 
 import java.util.*;
@@ -91,9 +91,9 @@ public class DiscoveryObjectiveSource implements HudObjectiveSource {
     public Optional<HudObjective> currentObjective() {
         if (!Boolean.TRUE.equals(playerSession.isDiscoveryAnnouncementOn())) return Optional.empty();
 
-        LocationData<Long, Long> here = playerSession.getLocationData();
-        Long systemAddress = here == null ? null : here.getSystemAddress();
-        if (systemAddress == null || systemAddress == 0) return Optional.empty();
+        Optional<Position> here = playerSession.position();
+        if (here.isEmpty()) return Optional.empty();
+        long systemAddress = here.get().systemAddress();
 
         // A scan that says nobody had charted the body is what earns the card - the arrival star's, or any
         // star or planet the FSS resolves later in a system someone else found first. ScanEventSubscriber
@@ -101,7 +101,7 @@ public class DiscoveryObjectiveSource implements HudObjectiveSource {
         List<LocationDto> bodies = locationManager.findBodies(systemAddress);
         if (bodies.stream().noneMatch(LocationDto::isOurDiscovery)) return Optional.empty();
 
-        if (atBodyWithSamplingToDo(systemAddress, here.getInGameId())) return Optional.empty();
+        if (atBodyWithSamplingToDo(systemAddress, here.get().bodyId())) return Optional.empty();
 
         Map<Long, List<BioSampleDto>> samplesByBody = new HashMap<>();
         for (LocationDto body : bodies) {
@@ -110,9 +110,9 @@ public class DiscoveryObjectiveSource implements HudObjectiveSource {
             }
         }
 
-        LocationDto primaryStar = locationManager.findBySystemAddress(systemAddress);
+        LocationDto primaryStar = locationManager.findPrimaryStar(systemAddress);
         String systemName = primaryStar == null || primaryStar.getStarName() == null || primaryStar.getStarName().isBlank()
-                ? playerSession.getPrimaryStarName()
+                ? playerSession.currentStarSystem()
                 : primaryStar.getStarName();
         return Optional.of(card("discovery:" + systemAddress, systemName,
                 fssSurveys.find(systemAddress).orElse(null), bodies, samplesByBody,

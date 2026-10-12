@@ -32,7 +32,7 @@ public class AnalyzeDistanceToStellarObjectQuery extends BaseQueryAnalyzer imple
         //GameEventBus.publish(new AiVoxResponseEvent("Analyzing local star system data. Stand by."));
 
         Collection<LocationDto> locations = locationManager.findAllBySystemAddress(
-                playerSession.getLocationData().getSystemAddress()
+                playerSession.currentSystemAddress()
         );
         List<StellarObject> objects = new ArrayList<>();
         for (LocationDto loc : locations) {

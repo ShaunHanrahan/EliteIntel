@@ -52,7 +52,7 @@ public class AnalyzeGeologyInStarSystemQuery extends BaseQueryAnalyzer implement
 
     private Map<String, Integer> planetsWithGeoSignals() {
         Map<String, Integer> result = new HashMap<>();
-        Collection<LocationDto> locations = locationManager.findAllBySystemAddress(playerSession.getLocationData().getSystemAddress());
+        Collection<LocationDto> locations = locationManager.findAllBySystemAddress(playerSession.currentSystemAddress());
         for (LocationDto location : locations) {
             if (location.getGeoSignals() > 0) {
                 result.put(location.getPlanetShortName(), location.getGeoSignals());

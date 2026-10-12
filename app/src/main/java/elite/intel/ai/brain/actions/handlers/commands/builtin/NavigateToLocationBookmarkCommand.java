@@ -64,7 +64,7 @@ public final class NavigateToLocationBookmarkCommand implements IntelCommand {
         pending.clear();
 
         String system = bookmark.starSystem();
-        boolean inSystem = system.equalsIgnoreCase(PlayerSession.getInstance().getPrimaryStarName());
+        boolean inSystem = system.equalsIgnoreCase(PlayerSession.getInstance().currentStarSystem());
 
         if (bookmark.hasCoordinates()) {
             if (inSystem && onBody(bookmark.planetName())) {

@@ -7,6 +7,7 @@ import elite.intel.gameapi.journal.events.SupercruiseDestinationDropEvent;
 import elite.intel.gameapi.signals.ConflictZoneIntensity;
 import elite.intel.session.ConflictZone;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import elite.intel.util.Cypher;
 import elite.intel.util.json.GsonFactory;
 import org.junit.jupiter.api.BeforeAll;
@@ -38,7 +39,7 @@ class ConflictZoneSubscriberTest {
 
     @BeforeEach
     void inCeos() {
-        PlayerSession.getInstance().setCurrentLocationId(1, CEOS);
+        PlayerSession.getInstance().moveTo(new Position(CEOS, "Ceos", 1L));
         conflictZone.cashedIn();
     }
 

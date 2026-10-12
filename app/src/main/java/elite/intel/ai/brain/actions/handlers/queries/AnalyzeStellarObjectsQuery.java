@@ -177,7 +177,7 @@ public class AnalyzeStellarObjectsQuery extends BaseQueryAnalyzer implements Int
     @Override public JsonObject handle(String action, JsonObject params, String originalUserInput) throws Exception {
         //GameEventBus.publish(new AiVoxResponseEvent("Analyzing stelar objects data. Stand by."));
 
-        StellarObjectsData<List<LocationData>, String> data = toLocationList(locationManager.findAllBySystemAddress(playerSession.getLocationData().getSystemAddress()));
+        StellarObjectsData<List<LocationData>, String> data = toLocationList(locationManager.findAllBySystemAddress(playerSession.currentSystemAddress()));
 
         // If the commander named one specific body, resolve it here and hand the model ONLY that body
         // with no whole-system aggregate. Drops the prompt from ~5700 tokens to a few hundred and removes

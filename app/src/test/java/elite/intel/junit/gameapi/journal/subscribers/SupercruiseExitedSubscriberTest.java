@@ -3,8 +3,8 @@ package elite.intel.junit.gameapi.journal.subscribers;
 import com.google.gson.JsonObject;
 import elite.intel.gameapi.journal.events.SupercruiseExitEvent;
 import elite.intel.gameapi.journal.subscribers.SupercruiseExitedSubscriber;
-import elite.intel.session.LocationData;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -22,45 +22,45 @@ class SupercruiseExitedSubscriberTest {
     void supercruiseExitUpdatesCurrentLocationIdInSession() throws InterruptedException {
         long sysAddr = 555_444_333L;
         long bodyId = 12L;
-        session.setCurrentPrimaryStarName("Wolf 359");
+        session.moveTo(new Position(sysAddr, "Wolf 359", null));
 
         subscriber.onSupercruiseExited(supercruiseExitEvent(sysAddr, bodyId, "Wolf 359 A 1", "Planet"));
 
         awaitTrue(() -> {
-            LocationData<Long, Long> loc = session.getLocationData();
-            return Long.valueOf(bodyId).equals(loc.getInGameId()) && sysAddr == loc.getSystemAddress();
+            Position loc = session.position().orElseThrow();
+            return Long.valueOf(bodyId).equals(loc.bodyId()) && sysAddr == loc.systemAddress();
         });
 
-        LocationData<Long, Long> loc = session.getLocationData();
-        assertEquals(sysAddr, loc.getSystemAddress());
-        assertEquals(bodyId, loc.getInGameId());
+        Position loc = session.position().orElseThrow();
+        assertEquals(sysAddr, loc.systemAddress());
+        assertEquals(bodyId, loc.bodyId());
     }
 
     @Test
     void supercruiseExitToStationUpdatesLocationId() throws InterruptedException {
         long sysAddr = 555_111_222L;
         long bodyId = 5L;
-        session.setCurrentPrimaryStarName("Sol");
+        session.moveTo(new Position(sysAddr, "Sol", null));
 
         subscriber.onSupercruiseExited(supercruiseExitEvent(sysAddr, bodyId, "Galileo", "Station"));
 
-        awaitTrue(() -> Long.valueOf(bodyId).equals(session.getLocationData().getInGameId()));
+        awaitTrue(() -> Long.valueOf(bodyId).equals(session.position().orElseThrow().bodyId()));
 
-        assertEquals(sysAddr, session.getLocationData().getSystemAddress());
+        assertEquals(sysAddr, session.currentSystemAddress());
     }
 
     @Test
     void nullBodyIdDoesNotUpdateLocationId() throws InterruptedException {
         long uniqueSystem = 55544321L;
         long knownBodyId = 88L;
-        session.setCurrentLocationId(knownBodyId, uniqueSystem);
+        session.moveTo(new Position(uniqueSystem, "Test System", knownBodyId));
 
         subscriber.onSupercruiseExited(supercruiseExitEventNullBodyId(uniqueSystem, "Wolf 359 A 1", "Planet"));
 
         Thread.sleep(300);
 
-        LocationData<Long, Long> loc = session.getLocationData();
-        assertEquals(knownBodyId, loc.getInGameId(), "null BodyID must not overwrite current_location_id");
+        Position loc = session.position().orElseThrow();
+        assertEquals(knownBodyId, loc.bodyId(), "null BodyID must not overwrite current_location_id");
     }
 
     private static SupercruiseExitEvent supercruiseExitEvent(long systemAddress, long bodyId,

@@ -65,7 +65,7 @@ public final class ObjectiveFactSource implements MemoryFactSource {
             return List.of();
         }
         if (!isAhead(FactLine.value(reminder.getStarSystem()),
-                PlayerSession.getInstance().getPrimaryStarName(),
+                PlayerSession.getInstance().currentStarSystem(),
                 ShipRouteManager.getInstance().getDestination())) {
             return List.of();
         }

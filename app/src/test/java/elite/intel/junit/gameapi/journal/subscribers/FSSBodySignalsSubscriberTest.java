@@ -5,11 +5,13 @@ import com.google.gson.JsonObject;
 import elite.intel.ai.brain.vega.VegaNarrator;
 import elite.intel.ai.brain.vega.VegaRuntimeGraph;
 import elite.intel.ai.brain.vega.VegaRuntimeTestSupport;
+import elite.intel.db.managers.LocationFixtures;
 import elite.intel.db.managers.LocationManager;
 import elite.intel.gameapi.journal.events.FSSBodySignalsEvent;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
 import elite.intel.gameapi.journal.subscribers.FSSBodySignalsSubscriber;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,7 +47,7 @@ class FSSBodySignalsSubscriberTest {
         carrier.setStarName(SYSTEM);
         carrier.setStationName("GHY-L8X");
         carrier.setLocationType(LocationDto.LocationType.FLEET_CARRIER);
-        locationManager.save(carrier);
+        LocationFixtures.store(carrier);
     }
 
     @AfterEach
@@ -71,8 +73,7 @@ class FSSBodySignalsSubscriberTest {
     void theFirstBodyInAnUnrecordedSystemIsNamedFromTheSession() throws InterruptedException {
         long emptySystem = 3932277478201L;
         PlayerSession session = PlayerSession.getInstance();
-        session.setCurrentLocationId(0L, emptySystem);
-        session.setCurrentPrimaryStarName("Synuefe XR-H d11-102");
+        session.moveTo(new Position(emptySystem, "Synuefe XR-H d11-102", 0L));
         JsonObject j = bioSignalsJson("Synuefe XR-H d11-102 4 b", 12L, 3);
         j.addProperty("SystemAddress", emptySystem);
 
@@ -91,7 +92,7 @@ class FSSBodySignalsSubscriberTest {
         scanned.setStarName(SYSTEM);
         scanned.setPlanetName("76 Leonis 6 d");
         scanned.setLocationType(LocationDto.LocationType.PLANET);
-        locationManager.save(scanned);
+        LocationFixtures.store(scanned);
 
         subscriber.onFssBodySignal(bioSignals("76 Leonis 6 d", 28L, 7));
 
