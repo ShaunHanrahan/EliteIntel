@@ -20,7 +20,7 @@ import elite.intel.ai.mouth.sherpa.SherpaOnnxTTS;
 import elite.intel.ai.mouth.subscribers.events.AiVoxResponseEvent;
 import elite.intel.ai.mouth.subscribers.events.MissionCriticalAnnouncementEvent;
 import elite.intel.ai.mouth.supertonic.SupertonicTTS;
-import elite.intel.bindforge.devicefiles.DeviceFilesWatch;
+import elite.intel.bindforge.devicefiles.DeviceFilesMonitor;
 import elite.intel.bindforge.devices.ButtonMapStartup;
 import elite.intel.bindforge.rules.KeyBindCheck;
 import elite.intel.devices.DeviceService;
@@ -534,8 +534,8 @@ public class AppController {
                 diagnostics ? NoOpService::new : ButtonMapStartup::new));
         // Polls every installation's device files and asks the Alias Designer screen to re-read when one changes.
         // Diagnostics stubs it with the other game-file services: the harness owns game state.
-        services.put(ServiceType.DEVICE_FILES_WATCH, new ServiceHolder(
-                diagnostics ? NoOpService::new : DeviceFilesWatch::new));
+        services.put(ServiceType.DEVICE_FILES_MONITOR, new ServiceHolder(
+                diagnostics ? NoOpService::new : DeviceFilesMonitor::new));
         // VEGA subsystem is the LLM service (the legacy command pipeline was removed). In diagnostics
         // mode it is wired with a recording execution gateway (file-fed phrases exercise the real routing path
         // without pressing keys into the game or calling third-party REST APIs) and a speech gateway that
@@ -615,7 +615,7 @@ public class AppController {
     }
 
     enum ServiceType {
-        MOUTH, RADIO_MOUTH, EARS, HANDS, DEVICE, PUSH_TO_TALK, BUTTON_MAP_STARTUP, DEVICE_FILES_WATCH, VEGA,
+        MOUTH, RADIO_MOUTH, EARS, HANDS, DEVICE, PUSH_TO_TALK, BUTTON_MAP_STARTUP, DEVICE_FILES_MONITOR, VEGA,
         NOTIFICATION_MONITOR, MISSING_MISSION_MONITOR, WEB_SOCKET, JOURNAL_PARSER, AUXILIARY_FILES_MONITOR
     }
 }

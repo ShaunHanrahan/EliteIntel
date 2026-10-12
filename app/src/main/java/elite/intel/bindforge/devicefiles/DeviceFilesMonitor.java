@@ -37,12 +37,12 @@ import java.util.stream.Stream;
  * <p>
  * Polls through {@link FilePoller} rather than extending {@code BindingsMonitor}'s {@code WatchService}: the game
  * writes these files, and a notification for another process's write can be lost for good (Krondor, 2026-10-03;
- * recorded in the overview's "External change detection"). Started as {@code ServiceType.DEVICE_FILES_WATCH} in
+ * recorded in the overview's "External change detection"). Started as {@code ServiceType.DEVICE_FILES_MONITOR} in
  * {@code AppController}; diagnostics mode stubs it with the other game-file services.
  */
-public final class DeviceFilesWatch implements ManagedService {
+public final class DeviceFilesMonitor implements ManagedService {
 
-    private static final Logger log = LogManager.getLogger(DeviceFilesWatch.class);
+    private static final Logger log = LogManager.getLogger(DeviceFilesMonitor.class);
 
     /**
      * These files change when the user saves in the game's Controls screen or a patch lands - rarely - and one poll
@@ -50,7 +50,10 @@ public final class DeviceFilesWatch implements ManagedService {
      */
     private static final Duration INTERVAL = Duration.ofSeconds(2);
 
-    /** Plenty for one poll to notice the interrupt. */
+    /**
+     * Long enough for a poll on a drive that answers. Listing a folder and reading a file's times are not
+     * interruptible, so a poll stuck on a drive that stopped answering is left behind on its daemon thread, and logged.
+     */
     private static final long STOP_WAIT_SECONDS = 1;
 
     private final Supplier<List<Target>> targets;
@@ -59,7 +62,7 @@ public final class DeviceFilesWatch implements ManagedService {
     private final FilePoller poller;
     private ScheduledExecutorService worker;
 
-    public DeviceFilesWatch() {
+    public DeviceFilesMonitor() {
         this(DeviceFilesPush::storedInstallations, () -> UiBus.publish(new DeviceFilesChangedEvent()), INTERVAL);
     }
 
@@ -67,7 +70,7 @@ public final class DeviceFilesWatch implements ManagedService {
      * @param targets  the stored installations, asked on every poll so one added or removed is followed
      * @param onChange told once per poll that found anything changed
      */
-    DeviceFilesWatch(Supplier<List<Target>> targets, Runnable onChange, Duration interval) {
+    DeviceFilesMonitor(Supplier<List<Target>> targets, Runnable onChange, Duration interval) {
         this.targets = targets;
         this.onChange = onChange;
         this.interval = interval;
@@ -79,7 +82,7 @@ public final class DeviceFilesWatch implements ManagedService {
     public synchronized void start() {
         if (worker != null) return;
         worker = Executors.newSingleThreadScheduledExecutor(runnable -> {
-            Thread thread = new Thread(runnable, "bindforge-device-files-watch");
+            Thread thread = new Thread(runnable, "bindforge-device-files-monitor");
             thread.setDaemon(true);
             return thread;
         });
@@ -94,7 +97,7 @@ public final class DeviceFilesWatch implements ManagedService {
         worker.shutdownNow();
         try {
             if (!worker.awaitTermination(STOP_WAIT_SECONDS, TimeUnit.SECONDS)) {
-                log.warn("The device-file watch did not stop within {} s", STOP_WAIT_SECONDS);
+                log.warn("The device-file monitor did not stop within {} s", STOP_WAIT_SECONDS);
             }
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -111,7 +114,7 @@ public final class DeviceFilesWatch implements ManagedService {
             onChange.run();
         } catch (RuntimeException e) {
             // WHY: broad on purpose. An exception escaping a scheduled task cancels every later run, silently - the
-            // watch would stop and nothing would say so.
+            // monitor would stop and nothing would say so.
             log.warn("Could not poll the device files", e);
         }
     }

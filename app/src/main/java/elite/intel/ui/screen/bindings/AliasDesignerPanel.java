@@ -164,19 +164,13 @@ public class AliasDesignerPanel extends JPanel {
     private Map<String, String> installPaths = Map.of();
     /** The My Devices rows, in table order - the gear opens the one it sits on. */
     private List<MyDevice> currentMyDevices = List.of();
-    private final AtomicBoolean refreshInProgress = new AtomicBoolean();
+    private final RefreshCoalescer refreshes = new RefreshCoalescer();
     /**
      * Set when the screen is shown while this run's missing-controller warning is still to come, and taken by the next
      * refresh to start. A refresh already running when the screen appeared may have read the hardware before the
      * Device Service had listed it, so it is never the one that judges.
      */
     private final AtomicBoolean missingWarningWanted = new AtomicBoolean();
-    /**
-     * Set when a device file changes on disk, and taken by the next refresh to start. A refresh already running may
-     * have read the files before the change, and would otherwise leave the screen showing the old state until
-     * something else asked for a refresh (C5, 2026-10-11).
-     */
-    private final AtomicBoolean filesChanged = new AtomicBoolean();
     /** Whether the Device Service was running at the last refresh. Written and read on the EDT only. */
     private boolean deviceServiceRunning;
     private final InstallationDeviceScanner deviceScanner = new InstallationDeviceScanner();
@@ -212,10 +206,12 @@ public class AliasDesignerPanel extends JPanel {
         UiBus.unregister(this);
     }
 
-    /** An installation's device files changed on disk - read again, so the check runs on what is there now. */
+    /**
+     * An installation's device files changed on disk - read again, so the check runs on what is there now. A refresh
+     * already running may have read them before the change, so it is followed by another rather than trusted.
+     */
     @Subscribe
     public void onDeviceFilesChanged(DeviceFilesChangedEvent event) {
-        filesChanged.set(true);
         initData();
     }
 
@@ -334,14 +330,14 @@ public class AliasDesignerPanel extends JPanel {
      * {@code DeviceMappings.xml} would otherwise freeze the window, and an installation on a spun-down or
      * disconnected drive freezes it for as long as the filesystem takes to answer.
      * <p>
-     * A refresh already in flight is left to finish rather than a second one being started beside it: this is
-     * called again on every ship-profile change, and nothing here depends on the ship.
+     * A refresh already in flight is left to finish rather than a second one being started beside it, and one more
+     * follows it, however many requests came in meanwhile - see {@link RefreshCoalescer} for why none is dropped. A
+     * ship-profile change mid-refresh therefore costs one extra refresh; nothing here depends on the ship.
      */
     public void initData() {
-        if (!refreshInProgress.compareAndSet(false, true)) return;
+        if (!refreshes.tryStart()) return;
         new Thread(() -> {
             boolean judgeMissing = missingWarningWanted.getAndSet(false);
-            filesChanged.set(false);
             Map<String, String> labels = Map.of();
             Map<String, String> paths = Map.of();
             Divergence divergence = new Divergence(null, List.of());
@@ -400,10 +396,9 @@ public class AliasDesignerPanel extends JPanel {
                 showBuiltIn(loadedBuiltIn);
                 currentReport = loadedDivergence.report();
                 showFindings(loadedDivergence.findings());
-                refreshInProgress.set(false);
-                // WHY: the screen was shown, or a device file changed, while this refresh was already running, which
-                // did not take the request.
-                if (missingWarningWanted.get() || filesChanged.get()) initData();
+                // WHY: something asked for a refresh while this one ran - the screen shown, a device file changed, an
+                // action finished - and this one may have read what it changed too early.
+                if (refreshes.finish()) initData();
             });
         }, "BindForge-Divergence").start();
     }

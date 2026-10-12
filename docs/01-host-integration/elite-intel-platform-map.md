@@ -177,7 +177,8 @@ StarVizion implementation begins — it is the most direct evidence of what the 
 ## File Access
 
 Elite-Intel has **no central file broker**. There is no Controlled Replace pattern, no shared backup-then-write
-service, no archive/restore service, and no Watch Path facility available generically.
+service, no archive/restore service, and no Watch Path facility available generically — the nearest is
+`elite.intel.io.FilePoller` (2026-10-11), which says which files changed but leaves the polling to its caller.
 
 What exists instead is BindForge-shaped already, and since 2026-10-03 it lives under `elite.intel.bindforge`
 (it moved out of `elite.intel.ai.hands`, which now only presses keys):
@@ -190,7 +191,8 @@ What exists instead is BindForge-shaped already, and since 2026-10-03 it lives u
 | `elite.intel.io.TimestampedBackups` | timestamped backups — **moved out of BindForge 2026-10-03**, replacing `io.BindingsBackupService`, because it knows nothing about `.binds` and StarVizion will want it too. See [the shared write path](#the-shared-write-path-is-eliteintelio--built-2026-10-03) |
 | `elite.intel.io.AtomicFiles` | safe replace: temp file, flush, rename over the target |
 | `io.BindingsApplyService`, `io.BindingsApplyException`, `io.BindingSaveResult` | apply-to-game with typed failure |
-| `io.BindingsMonitor` | external-change detection |
+| `io.BindingsMonitor` | external-change detection for the bindings folder (`WatchService`) |
+| `elite.intel.io.FilePoller` | polled change detection for files another process writes — first used by `devicefiles.DeviceFilesMonitor` for each installation's device files (C5, 2026-10-11) |
 | `rules.BindingConflictScanner`, `rules.BindingConflictRules` | conflict detection |
 | `model.BindingSection`, `model.BindingDisplayNames` | in-game section, group and row label for a `.binds` tag |
 | `db.dao.BindingConflictDao`, `db.managers.BindingConflictManager` | conflict persistence |
@@ -202,8 +204,9 @@ single most important next task is a detailed read of `elite.intel.bindforge.io`
 what must be rewritten.
 
 **Gaps against the ported specs:** the Archive Backup (ZIP) and Restore Archive operations that BindForge's
-File Manager is built on have no equivalent and must be written. `DeviceMappings.xml` and `.buttonMap` handling
-appears absent entirely — BindForge's Device Identity and Button Map domains are greenfield.
+File Manager is built on have no equivalent and must be written. ~~`DeviceMappings.xml` and `.buttonMap` handling
+appears absent entirely — BindForge's Device Identity and Button Map domains are greenfield.~~ Built since, in
+`elite.intel.bindforge.devicefiles` (Core C1–C3 and C5, 2026-10-04 to 2026-10-11).
 
 ---
 
@@ -652,7 +655,7 @@ ships, so the conflict the rule above guards against cannot arise — the watche
 **Watching: `io.FilePoller` — built 2026-10-11 (C5).** It says which of a set of files changed since the last look,
 by last-modified plus size, and holds no thread. It polls rather than using `WatchService`, as
 `AuxiliaryFilesMonitor` does, because notifications for files another process writes arrive late, get merged, or
-never arrive, and a missed one is never recovered. Its first caller is BindForge's `DeviceFilesWatch`, for the
+never arrive, and a missed one is never recovered. Its first caller is BindForge's `DeviceFilesMonitor`, for the
 game-written `DeviceMappings.xml` and `.buttonMap` files.
 
 ---

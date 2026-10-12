@@ -32,7 +32,7 @@ Krondor's work is not reviewed as ours.
 - **Shared code changes on `V1.1-Release`, via Krondor, and merges up.** That covers `bindforge.io`,
   `bindforge.rules`, `elite.intel.io` and `AppPaths` — anything both release lines call. A slice that needs one
   of them is **blocked** until it is settled with him, not worked around. **A new class only V1.2 calls is
-  not a change to shared code** and is built on `V1.2-BindForge` (Alan, 2026-10-11 — [CLAUDE.md](../../CLAUDE.md#branching-model)).
+  not a change to shared code** and is built on `V1.2-BindForge` (Alan, 2026-10-11 — [the platform map](../01-host-integration/elite-intel-platform-map.md#the-shared-write-path-is-eliteintelio--built-2026-10-03)).
 - **`elite.intel.ai.hands` is keystroke execution only.** BindForge code never goes there.
 - **Migrations:** the next free number in BindForge's band, `12000–12499`. Never edit an applied one.
 - **Strings:** all nine `gui*.properties` bundles. `getText` runs `MessageFormat` only when arguments are passed,

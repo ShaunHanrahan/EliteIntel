@@ -674,22 +674,24 @@ by different hands:
 - **The bindings folder** (`.binds`, `StartPreset`) stays with `bindforge.io.BindingsMonitor` and its
   `WatchService`, unchanged.
 - **Each installation's `DeviceMappings.xml` and `.buttonMap` files are polled**, by
-  `bindforge.devicefiles.DeviceFilesWatch` through `elite.intel.io.FilePoller`, every two seconds. The game writes
+  `bindforge.devicefiles.DeviceFilesMonitor` through `elite.intel.io.FilePoller`, every two seconds. The game writes
   these, and a `WatchService` notification for another process's write can arrive late, merged, or never — and a
   missed one is never recovered (Krondor, 2026-10-03, in the
   [platform map](../../01-host-integration/elite-intel-platform-map.md#the-shared-write-path-is-eliteintelio--built-2026-10-03)).
   `AuxiliaryFilesMonitor` polls for the same reason.
 
-**What a change does.** The watch publishes `DeviceFilesChangedEvent`, and the Alias Designer screen refreshes —
+**What a change does.** The monitor publishes `DeviceFilesChangedEvent`, and the Alias Designer screen refreshes —
 which runs [the startup check](#for-the-device-files--settled-2026-10-05-alan) against the master again, by
-content. The watch itself judges nothing and writes nothing: a changed stamp is not a changed file.
+content. The monitor itself judges nothing and writes nothing: a changed stamp is not a changed file.
 
 - **Installations are re-read on every poll**, so one added or removed is followed; one the registry knows is
   missing is not polled.
 - **BindForge's own writes are reported too** — Apply, revert, adopt, first setup, generated `.buttonMap`s. That
-  costs one refresh that finds the files matching the master, which was judged cheaper than telling the watch
+  costs one refresh that finds the files matching the master, which was judged cheaper than telling the monitor
   which writes were ours.
-- **A change landing during a refresh is not lost**: the screen refreshes once more when the running one ends.
+- **No refresh asked for is lost** (C5 review, 2026-10-11, Alan): a request made while the screen is refreshing —
+  a file change, the end of an APPLY, a ship-profile change — is followed by one more refresh when the running one
+  ends. Before, it was dropped, and a poll landing mid-APPLY left the screen showing what APPLY had already changed.
 - **Not here:** the Error-level condition for a [wipe](#destructive-change-detection), which still has no caller.
 
 *Replaced — one watcher for everything:*

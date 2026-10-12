@@ -78,7 +78,7 @@ class AppControllerServicesTest {
     @Test
     void deviceFilesWatchIsRegistered() {
         assertTrue(AppController.buildServices(TtsProvider.GOOGLE, TtsProvider.KOKORO)
-                .containsKey(ServiceType.DEVICE_FILES_WATCH));
+                .containsKey(ServiceType.DEVICE_FILES_MONITOR));
     }
 
     @Test

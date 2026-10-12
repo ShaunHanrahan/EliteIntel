@@ -21,10 +21,10 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * What the watch looks at - each installation's {@code DeviceMappings.xml} and its {@code .buttonMap}s, and nothing
+ * What the monitor looks at - each installation's {@code DeviceMappings.xml} and its {@code .buttonMap}s, and nothing
  * else - and that it says so once per poll that found a change.
  */
-class DeviceFilesWatchTest {
+class DeviceFilesMonitorTest {
 
     private static final Instant BEFORE = Instant.parse("2026-10-01T12:00:00Z");
     private static final Instant AFTER = Instant.parse("2026-10-01T12:00:05Z");
@@ -35,22 +35,22 @@ class DeviceFilesWatchTest {
     Path dir;
 
     private final AtomicInteger told = new AtomicInteger();
-    private DeviceFilesWatch watch;
+    private DeviceFilesMonitor monitor;
 
     @AfterEach
     void stopIt() {
-        if (watch != null) watch.stop();
+        if (monitor != null) monitor.stop();
     }
 
     @Test
     void aGameSaveOfDeviceMappingsIsReported() throws IOException {
         Path steam = install("steam");
         Path mappings = write(steam.resolve("DeviceMappings.xml"), "<Root/>", BEFORE);
-        watch = watching(target(1, steam, false));
-        watch.poll();
+        monitor = monitoring(target(1, steam, false));
+        monitor.poll();
 
         write(mappings, "<Root/>", AFTER);
-        watch.poll();
+        monitor.poll();
 
         assertEquals(1, told.get());
     }
@@ -59,15 +59,15 @@ class DeviceFilesWatchTest {
     void aButtonMapWrittenCreatedOrDeletedIsReported() throws IOException {
         Path steam = install("steam");
         Path lvwap = write(steam.resolve("DeviceButtonMaps/LVWAP.buttonMap"), "<Root/>", BEFORE);
-        watch = watching(target(1, steam, false));
-        watch.poll();
+        monitor = monitoring(target(1, steam, false));
+        monitor.poll();
 
         write(lvwap, "<Root/>", AFTER);
-        watch.poll();
+        monitor.poll();
         write(steam.resolve("DeviceButtonMaps/RVWAP.buttonMap"), "<Root/>", BEFORE);
-        watch.poll();
+        monitor.poll();
         Files.delete(lvwap);
-        watch.poll();
+        monitor.poll();
 
         assertEquals(3, told.get());
     }
@@ -78,12 +78,12 @@ class DeviceFilesWatchTest {
         Path steam = install("steam");
         Path mappings = write(steam.resolve("DeviceMappings.xml"), "<Root/>", BEFORE);
         Path lvwap = write(steam.resolve("DeviceButtonMaps/LVWAP.buttonMap"), "<Root/>", BEFORE);
-        watch = watching(target(1, steam, false));
-        watch.poll();
+        monitor = monitoring(target(1, steam, false));
+        monitor.poll();
 
         write(mappings, "<Root/>", AFTER);
         write(lvwap, "<Root/>", AFTER);
-        watch.poll();
+        monitor.poll();
 
         assertEquals(1, told.get());
     }
@@ -92,11 +92,11 @@ class DeviceFilesWatchTest {
     void nothingChangedIsNotReported() throws IOException {
         Path steam = install("steam");
         write(steam.resolve("DeviceMappings.xml"), "<Root/>", BEFORE);
-        watch = watching(target(1, steam, false));
-        watch.poll();
+        monitor = monitoring(target(1, steam, false));
+        monitor.poll();
 
-        watch.poll();
-        watch.poll();
+        monitor.poll();
+        monitor.poll();
 
         assertEquals(0, told.get());
     }
@@ -108,12 +108,12 @@ class DeviceFilesWatchTest {
         write(steam.resolve("DeviceMappings.xml"), "<Root/>", BEFORE);
         Path preset = write(steam.resolve("KeyboardMouseOnly.binds"), "<Root/>", BEFORE);
         Path note = write(steam.resolve("DeviceButtonMaps/readme.txt"), "x", BEFORE);
-        watch = watching(target(1, steam, false));
-        watch.poll();
+        monitor = monitoring(target(1, steam, false));
+        monitor.poll();
 
         write(preset, "<Root/>", AFTER);
         write(note, "x", AFTER);
-        watch.poll();
+        monitor.poll();
 
         assertEquals(0, told.get());
     }
@@ -125,15 +125,16 @@ class DeviceFilesWatchTest {
         Path epic = install("epic");
         Path epicMappings = write(epic.resolve("DeviceMappings.xml"), "<Root/>", BEFORE);
         List<Target> targets = new ArrayList<>(List.of(target(1, steam, false)));
-        watch = new DeviceFilesWatch(() -> List.copyOf(targets), told::incrementAndGet, NEVER);
-        watch.poll();
+        monitor = new DeviceFilesMonitor(() -> List.copyOf(targets), told::incrementAndGet, NEVER);
+        monitor.poll();
 
         targets.add(target(2, epic, false));
-        watch.poll();
+        monitor.poll();
+        assertEquals(1, told.get(), "its files entering the watched set are a change");
         told.set(0);
 
         write(epicMappings, "<Root/>", AFTER);
-        watch.poll();
+        monitor.poll();
 
         assertEquals(1, told.get());
     }
@@ -143,41 +144,40 @@ class DeviceFilesWatchTest {
     void anInstallationKnownToBeMissingIsNotWatched() throws IOException {
         Path steam = install("steam");
         Path mappings = write(steam.resolve("DeviceMappings.xml"), "<Root/>", BEFORE);
-        watch = watching(target(1, steam, true));
-        watch.poll();
+        monitor = monitoring(target(1, steam, true));
+        monitor.poll();
 
         write(mappings, "<Root/>", AFTER);
-        watch.poll();
+        monitor.poll();
 
         assertEquals(0, told.get());
     }
 
     /** A failure reading the installations is contained: the schedule would otherwise stop for good, silently. */
     @Test
-    void aFailedPollDoesNotStopTheWatch() throws IOException, InterruptedException {
+    void aFailedPollDoesNotStopTheMonitor() throws IOException, InterruptedException {
         Path steam = install("steam");
         Path mappings = write(steam.resolve("DeviceMappings.xml"), "<Root/>", BEFORE);
         AtomicInteger asked = new AtomicInteger();
+        CountDownLatch pastTheFailure = new CountDownLatch(1);
         CountDownLatch reported = new CountDownLatch(1);
-        watch = new DeviceFilesWatch(() -> {
-            if (asked.incrementAndGet() == 2) throw new IllegalStateException("database locked");
+        monitor = new DeviceFilesMonitor(() -> {
+            int ask = asked.incrementAndGet();
+            if (ask == 2) throw new IllegalStateException("database locked");
+            if (ask == 3) pastTheFailure.countDown();
             return List.of(target(1, steam, false));
         }, reported::countDown, Duration.ofMillis(20));
-        watch.start();
+        monitor.start();
 
-        // WHY: after the failing poll, so the first poll's record is from before the write.
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
-        while (asked.get() < 3) {
-            assertTrue(System.nanoTime() < deadline, "the watch stopped polling after a failure");
-            Thread.onSpinWait();
-        }
+        // WHY: written after the failing poll, so the first poll's record is from before the write.
+        assertTrue(pastTheFailure.await(5, TimeUnit.SECONDS), "the monitor stopped polling after a failed poll");
         write(mappings, "<Root/>", AFTER);
 
-        assertTrue(reported.await(5, TimeUnit.SECONDS), "the watch kept polling after a failure");
+        assertTrue(reported.await(5, TimeUnit.SECONDS), "the monitor stopped reporting after a failed poll");
     }
 
-    private DeviceFilesWatch watching(Target target) {
-        return new DeviceFilesWatch(() -> List.of(target), told::incrementAndGet, NEVER);
+    private DeviceFilesMonitor monitoring(Target target) {
+        return new DeviceFilesMonitor(() -> List.of(target), told::incrementAndGet, NEVER);
     }
 
     private static Target target(long id, Path controlSchemes, boolean missing) {

@@ -3,6 +3,7 @@ package elite.intel.io;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -69,12 +70,18 @@ public final class FilePoller {
      * WHY the full {@link java.time.Instant} and the size, as {@code AuxiliaryFilesMonitor} keeps them: truncating to
      * milliseconds makes two same-size writes inside one millisecond look identical, and on a filesystem with coarse
      * times (FAT keeps two seconds) the size is the only thing left to tell two writes apart.
+     * <p>
+     * One read of the attributes, not separate calls for existence, time and size, which a write landing between
+     * them could split into a stamp no file ever had.
      */
     private static String stampOf(Path file) {
         try {
-            if (!Files.exists(file)) return null;
-            return Files.getLastModifiedTime(file).toInstant() + ":" + Files.size(file);
+            BasicFileAttributes attributes = Files.readAttributes(file, BasicFileAttributes.class);
+            return attributes.lastModifiedTime().toInstant() + ":" + attributes.size();
         } catch (IOException e) {
+            // WHY: a missing file (NoSuchFileException) and an unreadable one both give no stamp, and neither is
+            // logged - a drive that stopped answering would otherwise log on every poll. Going from a stamp to none
+            // reads as a change, and the check the caller runs then names the file as missing or unreadable.
             return null;
         }
     }
