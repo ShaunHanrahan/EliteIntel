@@ -646,11 +646,14 @@ fixes the same file on `V1.1-Release` produces a conflict in the most sensitive 
 real risk is not a bad merge but silently dropping a rule already shipped to users. The whole conversion was
 therefore done as one change on `V1.1-Release` and merged up.
 
-**Still to come: watching.** A folder watcher is deliberately *not* in this package yet. `AuxiliaryFilesMonitor`
-polls rather than using `WatchService`, because notifications for files another process writes arrive late, get
-merged, or never arrive, and a missed one is never recovered. `DeviceMappings.xml` is written by the game, so
-that applies directly — when BindForge needs to watch device files, it goes here with polling or a watch plus a
-periodic re-check, not a bare `WatchService`.
+**A new class here that only V1.2 calls is built on `V1.2-BindForge`** (Alan, 2026-10-11). It edits no file V1.1
+ships, so the conflict the rule above guards against cannot arise — the watcher below is the first.
+
+**Watching: `io.FilePoller` — built 2026-10-11 (C5).** It says which of a set of files changed since the last look,
+by last-modified plus size, and holds no thread. It polls rather than using `WatchService`, as
+`AuxiliaryFilesMonitor` does, because notifications for files another process writes arrive late, get merged, or
+never arrive, and a missed one is never recovered. Its first caller is BindForge's `DeviceFilesWatch`, for the
+game-written `DeviceMappings.xml` and `.buttonMap` files.
 
 ---
 

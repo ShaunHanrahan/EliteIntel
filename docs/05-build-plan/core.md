@@ -28,6 +28,7 @@ once here so no tab builds its own.
 | Device-file write (C1) | `bindforge.devicefiles.DeviceFilesPush` — Apply for `DeviceMappings.xml` and `.buttonMap`, per installation, with Edit History in `elite-intel/bindings/history/<installId>/`; `DeviceMappingsMerge`, `ButtonMapWriter`, `DeviceFileXml` (the layout). **No caller yet** |
 | Device draft and Apply (C2) | migrations `12003`, `12004`; `db.managers.BindForgeDeviceDraftManager` — `start()` copies the whole master in (a started draft may hold no edits, so `isStarted()` is not "changed"); `promote()` makes it the master and stores what it removed as pending removals (`BindForgeDeviceMasterManager.pendingRemovals()`, `clearPendingRemoval`); `revert(masterId)`, `discard()`. Master ids change on every promote. `bindforge.devicefiles.DeviceApply` — promote, then `DeviceFilesPush.push(Set)` with the pending removals `.binds` does not name; called by APPLY on the Alias Designer screen (A10). `DraftChanges` tells a draft with edits from one only started |
 | Startup check, adopt, revert (C3) | `bindforge.devicefiles.DeviceFilesCheck` — each installation against the saved master: `UNCHANGED`, `WIPED`, `EDITED` (with element and label changes), `MISSING`, `UNREADABLE`; an empty master reports *not set up*. `DeviceFilesAdopt` — the installation into the master (and the draft, three-way) through `BindForgeDeviceDraftManager.adopt()`, one transaction. Revert is `DeviceFilesPush.push(installId)`. Helpers: `ButtonMapReader`, `DeviceMappingsParser.primaries()`. **No caller yet** |
+| Device-file watch (C5) | `elite.intel.io.FilePoller` (which files changed since the last look - stamp only, no thread); `bindforge.devicefiles.DeviceFilesWatch` (polls every installation's `DeviceMappings.xml` and `.buttonMap`s every 2 s, started as `DEVICE_FILES_WATCH` in `AppController`) publishes `ui.event.DeviceFilesChangedEvent`; `AliasDesignerPanel` refreshes on it, and once more if it lands mid-refresh |
 | `.binds` draft and apply | `bindforge.io.BindingsWorkingCopyRepository` (drafts in `elite-intel/bindings/`), `BindingsApplyService`, `BindingsMonitor` |
 
 **The `.binds` master is only a hash today.** `BindingsWorkingCopyRepository` records a baseline fingerprint
@@ -52,10 +53,9 @@ Growing it touches `bindforge.io` — see C4.
 1. ~~**Freshness Checks and Destructive Change Detection still describe the old model.**~~ **Settled 2026-10-05**
    (Alan): both rewritten for the master model, the old text struck through, in
    [overview.md](../02-features/bindforge/overview.md#freshness-checks).
-2. **[External change detection stays in one place](../02-features/bindforge/overview.md#external-change-detection-stays-in-one-place)
-   says to extend `BindingsMonitor`'s `WatchService` to the install folders.** Krondor, 2026-10-03: files another
-   process writes need polling, or a watch plus a periodic re-check, in `elite.intel.io` — see "Still to come:
-   watching" in the platform map. `DeviceMappings.xml` is written by the game. **Before C5.**
+2. ~~**External change detection said to extend `BindingsMonitor`'s `WatchService` to the install folders.**~~
+   **Settled 2026-10-11** (Alan, C5): two watchers — `BindingsMonitor` keeps the bindings folder, device files are
+   polled, per Krondor's 2026-10-03 ruling. [overview.md](../02-features/bindforge/overview.md#external-change-detection--two-watchers-settled-2026-10-11).
 
 ## Known issues
 
@@ -88,8 +88,8 @@ Growing it touches `bindforge.io` — see C4.
 | C2 | **Device draft** — where unapplied device edits live; SAVE writes the draft, APPLY promotes it | **done 2026-10-04** |
 | C3 | **Startup check for device files** — each installation against the master: unchanged, wiped (matches the stock reference), or edited; adopt or revert | **done 2026-10-05** |
 | C4 | **`.binds` and `StartPreset`** — whole-file master, Edit History on apply, the version-bump merge | blocked — `bindforge.io` |
-| C5 | **Change detection for the install folders** | blocked — `elite.intel.io`; doc conflict 2 |
-| C6 | **Unsaved work on exit** — Save or Discard, never Apply | **ready** — A10 done 2026-10-11; "has edits" is `DraftChanges.stored()`; see the 2026-10-06 note |
+| C5 | **Change detection for the install folders** | **done 2026-10-11** |
+| C6 | **Unsaved work on exit** — Save or Discard, never Apply | **next** — A10 done 2026-10-11; "has edits" is `DraftChanges.stored()`; see the 2026-10-06 note |
 | C7 | **First-time startup** | after Preset Editor can read all four `StartPreset` lines |
 
 ### C1 in detail — designed 2026-10-03, built 2026-10-04
@@ -138,6 +138,16 @@ Growing it touches `bindforge.io` — see C4.
 
 *Newest first. Two or three lines each: what was decided and where it is recorded, what was found, what the
 next slice needs.*
+
+- **2026-10-11 — C5 built.** **Branch ruling (Alan):** a new class in `elite.intel.io` that only V1.2 calls is built
+  on `V1.2-BindForge` — it edits nothing V1.1 ships; recorded in the README, the platform map and `CLAUDE.md`
+  (local only, it is git-ignored). Doc conflict 2 settled as two watchers, in
+  [overview.md](../02-features/bindforge/overview.md#external-change-detection--two-watchers-settled-2026-10-11):
+  the watch only reports, the screen's refresh re-runs `DeviceFilesCheck` by content, BindForge's own writes cost
+  one harmless refresh. **Found:** `AliasDesignerPanel.initData()` dropped a request arriving mid-refresh — fixed
+  for file changes with a `filesChanged` flag, as A13 did. **Left out (Alan):** the Error-level wipe alert and
+  the startup report line still have no caller. **C6 needs:** read the 2026-10-06 note; "has edits" is
+  `DraftChanges.stored()`.
 
 - **2026-10-06 — C6 deferred, no code (Alan).** C6 guards edits held on screen and not yet saved, and nothing in
   BindForge holds any: the `.binds` grid writes every edit straight into its draft, and the screen designed with

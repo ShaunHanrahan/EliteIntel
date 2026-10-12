@@ -74,6 +74,13 @@ class AppControllerServicesTest {
         assertTrue(order.indexOf(ServiceType.DEVICE) < order.indexOf(ServiceType.BUTTON_MAP_STARTUP));
     }
 
+    /** The device-file watch is a service of its own, so a change is noticed whether or not the screen is open. */
+    @Test
+    void deviceFilesWatchIsRegistered() {
+        assertTrue(AppController.buildServices(TtsProvider.GOOGLE, TtsProvider.KOKORO)
+                .containsKey(ServiceType.DEVICE_FILES_WATCH));
+    }
+
     @Test
     void audioComesUpBeforeVegaAndJournal() {
         List<ServiceType> order =

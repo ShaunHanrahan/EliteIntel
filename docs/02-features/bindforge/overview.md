@@ -321,7 +321,7 @@ other way round, and nothing is refreshed from it without the user's say.
 
 *Replaced — the working-copy model, kept because older notes use its wording:*
 
-~~Whenever BindForge is opened, or whenever a live file changes while BindForge is running (detected by `bindforge.io.BindingsMonitor`, which already watches the bindings directory and is [extended to cover the game installation folders too](#external-change-detection-stays-in-one-place) rather than BindForge adding a second watcher; see [File Access](../../01-host-integration/elite-intel-platform-map.md#file-access)), BindForge compares its local working copy against the live file's current state.~~
+~~Whenever BindForge is opened, or whenever a live file changes while BindForge is running (detected by `bindforge.io.BindingsMonitor`, which already watches the bindings directory and is [extended to cover the game installation folders too](#external-change-detection--two-watchers-settled-2026-10-11) rather than BindForge adding a second watcher; see [File Access](../../01-host-integration/elite-intel-platform-map.md#file-access)), BindForge compares its local working copy against the live file's current state.~~
 
 - ~~If the local copy is simply behind — the live file changed in a way that doesn't lose anything the user has customized — BindForge treats the live file as newer truth and offers to refresh the local working copy to match it.~~
 - ~~If the local working copy already has unsaved edits at the moment a live-file change is detected, BindForge does not silently pick a winner. It surfaces the conflict to the user, using the same pattern as [Unsaved Work on Exit](#unsaved-work-on-exit): keep editing the current local draft (ignoring the incoming live change for now), or refresh from the live file (discarding the unsaved local edits).~~
@@ -666,17 +666,37 @@ Two consequences worth building for:
    though the user sees it as bound. That is a real state with a real remedy, and it belongs in
    [Anomalies](bind-editor.md#four-kinds-one-question) rather than only in a log line.
 
-### External change detection stays in one place
+### External change detection — two watchers, settled 2026-10-11
 
-`BindingsMonitor` already watches the bindings directory with a `java.nio.file.WatchService`, re-parsing and
-swapping a `volatile` map when the file changes. **It is extended to also register the detected game
-installation folders**, rather than BindForge adding a watcher of its own — one component owns
-external-change detection across all four [managed file domains](#managed-file-domains).
+**Rewritten 2026-10-11 (Alan, Core C5).** Two watchers, one per kind of file, because the two kinds are written
+by different hands:
 
-The install folders differ from the bindings directory in one way worth building for: there may be several,
-and they appear and disappear as the player adds or removes installations, so registration is dynamic where
-the bindings directory is fixed. Nothing in Elite-Intel reads `DeviceMappings.xml` or `.buttonMap` at
-runtime, so this watch serves BindForge's own freshness checks rather than any live consumer.
+- **The bindings folder** (`.binds`, `StartPreset`) stays with `bindforge.io.BindingsMonitor` and its
+  `WatchService`, unchanged.
+- **Each installation's `DeviceMappings.xml` and `.buttonMap` files are polled**, by
+  `bindforge.devicefiles.DeviceFilesWatch` through `elite.intel.io.FilePoller`, every two seconds. The game writes
+  these, and a `WatchService` notification for another process's write can arrive late, merged, or never — and a
+  missed one is never recovered (Krondor, 2026-10-03, in the
+  [platform map](../../01-host-integration/elite-intel-platform-map.md#the-shared-write-path-is-eliteintelio--built-2026-10-03)).
+  `AuxiliaryFilesMonitor` polls for the same reason.
+
+**What a change does.** The watch publishes `DeviceFilesChangedEvent`, and the Alias Designer screen refreshes —
+which runs [the startup check](#for-the-device-files--settled-2026-10-05-alan) against the master again, by
+content. The watch itself judges nothing and writes nothing: a changed stamp is not a changed file.
+
+- **Installations are re-read on every poll**, so one added or removed is followed; one the registry knows is
+  missing is not polled.
+- **BindForge's own writes are reported too** — Apply, revert, adopt, first setup, generated `.buttonMap`s. That
+  costs one refresh that finds the files matching the master, which was judged cheaper than telling the watch
+  which writes were ours.
+- **A change landing during a refresh is not lost**: the screen refreshes once more when the running one ends.
+- **Not here:** the Error-level condition for a [wipe](#destructive-change-detection), which still has no caller.
+
+*Replaced — one watcher for everything:*
+
+~~`BindingsMonitor` already watches the bindings directory with a `java.nio.file.WatchService`, re-parsing and swapping a `volatile` map when the file changes. **It is extended to also register the detected game installation folders**, rather than BindForge adding a watcher of its own — one component owns external-change detection across all four [managed file domains](#managed-file-domains).~~
+
+~~The install folders differ from the bindings directory in one way worth building for: there may be several, and they appear and disappear as the player adds or removes installations, so registration is dynamic where the bindings directory is fixed. Nothing in Elite-Intel reads `DeviceMappings.xml` or `.buttonMap` at runtime, so this watch serves BindForge's own freshness checks rather than any live consumer.~~
 
 ### BindForge must not publish `BindingsUpdatedEvent`
 

@@ -45,6 +45,7 @@ public class BindingsTabPanel extends JPanel {
 
     public void dispose() {
         bindingProfilePanel.dispose();
+        aliasDesignerPanel.dispose();
     }
 
     /**

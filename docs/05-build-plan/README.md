@@ -31,7 +31,8 @@ Krondor's work is not reviewed as ours.
 - **`CLAUDE.md`**, and [WORKING-RULES.md](../../WORKING-RULES.md) — spec first, sources table, terminology.
 - **Shared code changes on `V1.1-Release`, via Krondor, and merges up.** That covers `bindforge.io`,
   `bindforge.rules`, `elite.intel.io` and `AppPaths` — anything both release lines call. A slice that needs one
-  of them is **blocked** until it is settled with him, not worked around.
+  of them is **blocked** until it is settled with him, not worked around. **A new class only V1.2 calls is
+  not a change to shared code** and is built on `V1.2-BindForge` (Alan, 2026-10-11 — [CLAUDE.md](../../CLAUDE.md#branching-model)).
 - **`elite.intel.ai.hands` is keystroke execution only.** BindForge code never goes there.
 - **Migrations:** the next free number in BindForge's band, `12000–12499`. Never edit an applied one.
 - **Strings:** all nine `gui*.properties` bundles. `getText` runs `MessageFormat` only when arguments are passed,
@@ -48,7 +49,7 @@ it is the machinery every tab writes through, so it comes first and is built onl
 
 | # | Section | Brief | Spec | State |
 |---|---|---|---|---|
-| 1 | **Core** — master and draft, Apply, Edit History filling, startup check | [core.md](core.md) | [overview.md](../02-features/bindforge/overview.md) | C1–C3 done; C4, C5 blocked; C6 ready |
+| 1 | **Core** — master and draft, Apply, Edit History filling, startup check | [core.md](core.md) | [overview.md](../02-features/bindforge/overview.md) | C1–C3 and C5 done; C4 blocked; C6 next |
 | 2 | **Alias Designer** | [alias-designer.md](alias-designer.md) | [alias-designer.md](../02-features/bindforge/alias-designer.md) | device list, naming rule, startup `.buttonMap`, first setup, the label merge, divergence against the master and its ways out, the Installations markers, the Built-in Devices tab, which axes and hats a controller has, the Device Editor, the actions (CLEAR, RESET LABELS, APPLY, DISCARD), the missing-controller warning built; nothing unblocked — A6b and A11 wait on the `.binds` rewrite |
 | 3 | **Preset Editor** | *not yet written* | [preset-editor.md](../02-features/bindforge/preset-editor.md) | nothing built |
 | 4 | **File Manager** — Edit History browsing, auto-backup and retention, restore scope | *not yet written* | [file-manager.md](../02-features/bindforge/file-manager.md) | Install Locations built; Player Backups manual only |

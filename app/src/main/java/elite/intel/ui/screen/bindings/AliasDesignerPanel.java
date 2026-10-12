@@ -1,5 +1,6 @@
 package elite.intel.ui.screen.bindings;
 
+import com.google.common.eventbus.Subscribe;
 import elite.intel.bindforge.devicefiles.BindsDeviceReferences;
 import elite.intel.bindforge.devicefiles.DeviceApply;
 import elite.intel.bindforge.devicefiles.DeviceDivergence;
@@ -38,8 +39,10 @@ import elite.intel.devices.DeviceService;
 import elite.intel.devices.model.Device;
 import elite.intel.devices.model.DeviceDescription;
 import elite.intel.devices.model.DeviceIdentity;
+import elite.intel.eventbus.UiBus;
 import elite.intel.session.PlayerSession;
 import elite.intel.ui.dialog.HudConfirmDialog;
+import elite.intel.ui.event.DeviceFilesChangedEvent;
 import elite.intel.ui.theme.AppTheme;
 import elite.intel.ui.theme.HudGlyphs;
 import elite.intel.ui.theme.HudPalette;
@@ -168,6 +171,12 @@ public class AliasDesignerPanel extends JPanel {
      * Device Service had listed it, so it is never the one that judges.
      */
     private final AtomicBoolean missingWarningWanted = new AtomicBoolean();
+    /**
+     * Set when a device file changes on disk, and taken by the next refresh to start. A refresh already running may
+     * have read the files before the change, and would otherwise leave the screen showing the old state until
+     * something else asked for a refresh (C5, 2026-10-11).
+     */
+    private final AtomicBoolean filesChanged = new AtomicBoolean();
     /** Whether the Device Service was running at the last refresh. Written and read on the EDT only. */
     private boolean deviceServiceRunning;
     private final InstallationDeviceScanner deviceScanner = new InstallationDeviceScanner();
@@ -196,6 +205,18 @@ public class AliasDesignerPanel extends JPanel {
             missingWarningWanted.set(true);
             initData();
         });
+        UiBus.register(this);
+    }
+
+    public void dispose() {
+        UiBus.unregister(this);
+    }
+
+    /** An installation's device files changed on disk - read again, so the check runs on what is there now. */
+    @Subscribe
+    public void onDeviceFilesChanged(DeviceFilesChangedEvent event) {
+        filesChanged.set(true);
+        initData();
     }
 
     private void buildUi() {
@@ -320,6 +341,7 @@ public class AliasDesignerPanel extends JPanel {
         if (!refreshInProgress.compareAndSet(false, true)) return;
         new Thread(() -> {
             boolean judgeMissing = missingWarningWanted.getAndSet(false);
+            filesChanged.set(false);
             Map<String, String> labels = Map.of();
             Map<String, String> paths = Map.of();
             Divergence divergence = new Divergence(null, List.of());
@@ -379,8 +401,9 @@ public class AliasDesignerPanel extends JPanel {
                 currentReport = loadedDivergence.report();
                 showFindings(loadedDivergence.findings());
                 refreshInProgress.set(false);
-                // WHY: the screen was shown while this refresh was already running, which did not take the request.
-                if (missingWarningWanted.get()) initData();
+                // WHY: the screen was shown, or a device file changed, while this refresh was already running, which
+                // did not take the request.
+                if (missingWarningWanted.get() || filesChanged.get()) initData();
             });
         }, "BindForge-Divergence").start();
     }
