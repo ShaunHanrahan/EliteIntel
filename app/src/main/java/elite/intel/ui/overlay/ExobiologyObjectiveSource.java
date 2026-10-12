@@ -148,6 +148,11 @@ public class ExobiologyObjectiveSource implements HudObjectiveSource {
         if (remaining.isEmpty()) return Optional.empty();
 
         Map<String, Integer> partials = partialsByGenus(body.getPartialBioSamples());
+        // The genus being sampled leads the list, so it cannot be one of those folded into the
+        // overflow row on a body with more genuses than the card has rows. The sort is stable,
+        // so the rest keep their order.
+        remaining = new ArrayList<>(remaining);
+        remaining.sort(Comparator.comparing((GenusDto genus) -> !isInProgress(sampledStage(partials, genus))));
 
         List<HudRow> rows = new ArrayList<>();
         rows.add(HudRow.progress(HudText.get("overlay.card.row.genus"),
@@ -157,7 +162,7 @@ public class ExobiologyObjectiveSource implements HudObjectiveSource {
         for (GenusDto genus : remaining.subList(0, shown)) {
             String label = displayName(genus);
             Integer sampled = sampledStage(partials, genus);
-            if (sampled != null && sampled > 0 && sampled < SAMPLES_PER_GENUS) {
+            if (isInProgress(sampled)) {
                 // The one being worked on right now: the bar says how many more
                 // colonies to walk to, which is the only number that matters then.
                 rows.add(HudRow.progress(label, sampled, SAMPLES_PER_GENUS, HudRow.State.WARN));
@@ -216,6 +221,13 @@ public class ExobiologyObjectiveSource implements HudObjectiveSource {
             }
         }
         return result;
+    }
+
+    /**
+     * Started but not finished: at least one sample taken, the last one still to go.
+     */
+    private static boolean isInProgress(Integer sampled) {
+        return sampled != null && sampled > 0 && sampled < SAMPLES_PER_GENUS;
     }
 
     /**

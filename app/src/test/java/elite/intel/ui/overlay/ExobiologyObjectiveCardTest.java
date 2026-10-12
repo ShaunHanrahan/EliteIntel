@@ -204,6 +204,29 @@ class ExobiologyObjectiveCardTest {
     }
 
     /**
+     * A genus that the overflow row hid is the one being walked to as soon as it is sampled, so it
+     * moves to the top rather than staying folded into the count.
+     */
+    @Test
+    void aGenusBeingSampledLeadsTheCardEvenWhenItWasInTheOverflow() {
+        GenusDto[] many = new GenusDto[ExobiologyObjectiveSource.MAX_GENUS_ROWS + 2];
+        for (int i = 0; i < many.length; i++) {
+            many[i] = genus("Genus" + i, "$Codex_Ent_Genus" + i + "_Name;");
+        }
+        LocationDto body = bodyWith(many);
+        int last = many.length - 1;
+        body.addBioScan(partial("Genus" + last, "$Codex_Ent_Genus" + last + "_Name;", 1));
+
+        HudObjective card = ExobiologyObjectiveSource.card(body, List.of(), ID).orElseThrow();
+
+        HudRow first = card.rows().get(1);
+        assertEquals("GENUS" + last, first.label());
+        assertTrue(first.hasProgress(), "the genus being sampled carries its bar");
+        assertEquals("GENUS0", card.rows().get(2).label(), "the rest keep their order");
+        assertEquals("+2", card.rows().getLast().value(), "the overflow count is unchanged");
+    }
+
+    /**
      * Pre-symbol samples only carry the localised name; they must still match.
      */
     @Test
