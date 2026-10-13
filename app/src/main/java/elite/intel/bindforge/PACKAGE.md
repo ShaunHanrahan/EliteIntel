@@ -135,7 +135,7 @@ modifiers on any device and the slot's Hold flag; an axis takes a controller's w
 with Inverted and Deadzone, the deadzone written as the game writes a float. It does not check `KEY_OCCUPIED` - the
 editor warns and the user decides - and refuses a token that does not suit the slot (`UNKNOWN_KEY`) or a slot with
 structure it does not know (`UNSUPPORTED_XML`). A keyboard token is any `Key_` name, not only the keys
-`EliteKeyboardKeys` lists, because a non-English layout writes the character itself (`Key_ß`; format section 5.5).
+`EliteKeyboardKeys` lists, because a non-English layout writes the character itself (`Key_ß`).
 The game's own literals (`Keyboard`, `Mouse`, `{NoDevice}`) are taken in the game's spelling only, and never as a
 controller's name in another case. Hold is written as the `<Hold Value="1" />` child the game writes, unless the
 slot already carries it as an attribute. `ToggleOn` is never touched, and `KeyBindingsParser` is not widened:
@@ -147,9 +147,9 @@ all or nothing: every file read first (a file named twice, under any spelling, c
 rewritten whole stops it as `UNSUPPORTED_XML`), each changed file backed up, re-read before its write, and put back
 if a later one fails or was saved meanwhile - unless the game saved it again after the rewrite, which is left as the
 game wrote it (`DeviceRewriteResult.notRestored`). `DeviceReferenceRewrite` builds the three cases:
-`hardwareIdToName` (hex in either order), `rename`, and `nameToHardwareId` (VID then PID, upper case). Matching
+`hardwareIdToName` (VID then PID, the order the game writes; a caller that found the reverse uses the constructor), `rename`, and `nameToHardwareId` (VID then PID, upper case). Matching
 ignores case. The text-only form, `rewriteDeviceReferences(String, DeviceReferenceRewrite)`, is pure and returns a
-`RewrittenXml`. Rewriting a working copy with its game file moves both off the baseline, so the caller then calls
+`RewrittenXml`. Files are written in the order given, and the game's file goes last: writing it makes the monitor's reload refresh a working copy that holds no draft, which a later working copy would read as changed. Rewriting a working copy with its game file moves both off the baseline, so the caller then calls
 `BindingsWorkingCopyRepository.recordGameFileBaseline` for that preset; without it the next apply refuses the draft.
 
 **3. `BindingsApplyService`**

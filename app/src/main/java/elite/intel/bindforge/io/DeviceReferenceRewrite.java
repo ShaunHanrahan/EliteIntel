@@ -2,8 +2,6 @@ package elite.intel.bindforge.io;
 
 import elite.intel.bindforge.model.BindingInput;
 
-import java.util.LinkedHashSet;
-import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
@@ -17,8 +15,7 @@ import java.util.regex.Pattern;
  * {@code .binds} names a device by its {@code DeviceMappings.xml} element when one matches, and by its VID and PID
  * in hex when none does, so naming, renaming and clearing a device each move its references:
  * {@link #hardwareIdToName}, {@link #rename} and {@link #nameToHardwareId}. Matching ignores case - the comparison
- * that decides whether a device is referenced at all - and a hardware id is matched in either order, VID+PID or
- * PID+VID, since a reader cannot rule the second out. {@code Keyboard}, {@code Mouse} and {@code {NoDevice}} are
+ * that decides whether a device is referenced at all. {@code Keyboard}, {@code Mouse} and {@code {NoDevice}} are
  * the game's own literals and are never rewritten, from or to.
  */
 public record DeviceReferenceRewrite(Set<String> from, String to) {
@@ -47,18 +44,15 @@ public record DeviceReferenceRewrite(Set<String> from, String to) {
     }
 
     /**
-     * Naming a device the bindings reference by hardware id: {@code vid}+{@code pid}, or the reverse, becomes
-     * {@code name}.
+     * Naming a device the bindings reference by hardware id: {@code vid}+{@code pid}, the order the game writes,
+     * becomes {@code name}.
      * <p>
-     * Matching the reverse order is the reader's defensive rule (format section 4.2) put to use as a write: a second
-     * device whose VID and PID are exactly this one's PID and VID would be renamed too. When the caller knows which
-     * order the file holds - {@code BindsDeviceReferences} reports the value it found - it should build the rewrite
-     * from that value alone, with the constructor.
+     * The reverse order is not matched: a rewrite writes, and a second device whose VID and PID are exactly this
+     * one's PID and VID would be renamed with it. A caller that found the id in the other order builds the rewrite
+     * from the value it found, with the constructor.
      */
     public static DeviceReferenceRewrite hardwareIdToName(String vid, String pid, String name) {
-        String v = hexHalf(vid, "vid");
-        String p = hexHalf(pid, "pid");
-        return new DeviceReferenceRewrite(new LinkedHashSet<>(List.of(v + p, p + v)), name);
+        return new DeviceReferenceRewrite(Set.of(hexHalf(vid, "vid") + hexHalf(pid, "pid")), name);
     }
 
     /**

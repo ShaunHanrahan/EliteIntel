@@ -15,16 +15,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -59,9 +50,9 @@ public class BindingsWriter {
     private static final Pattern DEVICE_ATTRIBUTE = Pattern.compile("(?<![A-Za-z0-9_.:-])Device\\s*=\\s*([\"'])(.*?)\\1");
     private static final Pattern VALUE_ATTRIBUTE = Pattern.compile("(?<![A-Za-z0-9_.:-])Value\\s*=\\s*([\"'])(.*?)\\1");
 
-    // The tokens the user-edit path writes, by device - the vocabulary the game itself writes (format section 5).
+    // The tokens the user-edit path writes, by device - the vocabulary the game itself writes.
     // Characters that would need escaping in an attribute are never part of one.
-    // WHY no list of keys: a non-English layout writes the character itself (Key_ß, Key_é - format section 5.5), so
+    // WHY no list of keys: a non-English layout writes the character itself (Key_ß, Key_é), so
     // EliteKeyboardKeys cannot hold every key the game writes; any Key_ name with something after it is a key.
     private static final Pattern KEYBOARD_TOKEN = Pattern.compile("Key_[^\\s\"'<>&]+");
     private static final Pattern MOUSE_BUTTON_TOKEN = Pattern.compile("Mouse_[1-9][0-9]*|(?:Pos|Neg)_Mouse_ZAxis");
@@ -152,7 +143,7 @@ public class BindingsWriter {
      * know ({@code UNSUPPORTED_XML}), which it never rewrites. {@code <ToggleOn>} is never touched.
      * <p>
      * A keyboard token is any {@code Key_} name, not only the keys {@code EliteKeyboardKeys} lists: a non-English
-     * layout writes the character itself (format section 5.5). Hold is written as the child the game writes, unless
+     * layout writes the character itself ({@code Key_ß}). Hold is written as the child the game writes, unless
      * the slot already carries it as an attribute, which is kept.
      */
     public BindingSaveResult assignSlot(SlotAssignment edit) {
@@ -284,6 +275,10 @@ public class BindingsWriter {
      * Rewriting the game's file and its working copy together moves both away from the working copy's baseline,
      * which would make the next apply refuse the draft as a conflict. A caller that rewrites a working copy calls
      * {@link BindingsWorkingCopyRepository#recordGameFileBaseline(String, Path)} for its preset once this succeeds.
+     * <p>
+     * Files are written in the order given, so list the game's file last. Writing it makes {@link BindingsMonitor}
+     * reload the bindings, and that reload copies the game's file over a working copy that holds no draft; a working
+     * copy still to come would then read as changed, and the whole rewrite would be put back as {@code STALE_FILE}.
      */
     public DeviceRewriteResult rewriteDeviceReferences(List<Path> bindsFiles, DeviceReferenceRewrite rewrite,
                                                        Path backupDirectory) {

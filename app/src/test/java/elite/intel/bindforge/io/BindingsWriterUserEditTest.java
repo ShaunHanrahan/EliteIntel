@@ -161,7 +161,7 @@ class BindingsWriterUserEditTest {
                 new BindingInput("334443F4", "Neg_Joy_RYAxis"),
                 new BindingInput("T-Rudder", "Pos_Joy_UAxis"),
                 new BindingInput("Keyboard", "Key_Numpad_Enter"),
-                // A non-English layout writes the character itself (format section 5.5).
+                // A non-English layout writes the character itself.
                 new BindingInput("Keyboard", "Key_ß"));
 
         for (BindingInput input : accepted) {

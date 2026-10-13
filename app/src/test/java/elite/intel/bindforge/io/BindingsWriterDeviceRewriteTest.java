@@ -61,15 +61,22 @@ class BindingsWriterDeviceRewriteTest {
     }
 
     @Test
-    void hardwareIdIsMatchedInEitherOrderAndIgnoringCase() {
-        String reversed = BINDS.replace("334443F4", "43f43344");
-
-        assertEquals(1, writer.rewriteDeviceReferences(BINDS,
-                DeviceReferenceRewrite.hardwareIdToName("3344", "43F4", "Stick")).references());
-        RewrittenXml result = writer.rewriteDeviceReferences(reversed,
+    void hardwareIdIsMatchedVidThenPidIgnoringCase() {
+        RewrittenXml result = writer.rewriteDeviceReferences(BINDS,
                 DeviceReferenceRewrite.hardwareIdToName("3344", "43f4", "Stick"));
+
         assertEquals(1, result.references());
         assertTrue(result.xml().contains("<Binding Device=\"Stick\" Key=\"Joy_XAxis\" />"));
+    }
+
+    @Test
+    void theReverseOrderIsMovedOnlyFromTheValueFound() {
+        String reversed = BINDS.replace("334443F4", "43F43344");
+
+        assertEquals(0, writer.rewriteDeviceReferences(reversed,
+                DeviceReferenceRewrite.hardwareIdToName("3344", "43F4", "Stick")).references());
+        assertEquals(1, writer.rewriteDeviceReferences(reversed,
+                new DeviceReferenceRewrite(Set.of("43F43344"), "Stick")).references());
     }
 
     @Test
