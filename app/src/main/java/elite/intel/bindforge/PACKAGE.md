@@ -39,6 +39,14 @@ Reads `StartPreset.*.start` in the game's bindings directory to find the active 
 `<presetName>.<version>.binds`. Falls back to the most recently modified
 `.binds` file if the preset file is absent or the name cannot be resolved.
 
+That one name is the first non-empty line, which is the right answer for the assistant. `readStartPresetSections`
+reads all four lines (General, Ship, SRV and On Foot) into a `StartPresetSections`, for a caller that needs
+each section's preset, such as a split preset with General on a different file. It reads the file the live game
+uses (`findLiveStartPresetFile`: the highest `StartPreset.N.start`, else `StartPreset.start`), and the
+pre-Odyssey single-line form counts as one preset for all four sections. In a folder holding both generations,
+`findStartPresetFile` (and so the assistant's single name) can still pick the other file, because it takes
+whichever the listing yields first; it is left that way for its V1.1 callers.
+
 ### `BindingsMonitor` (singleton)
 
 Monitors the bindings directory via `WatchService` on a dedicated background thread.
@@ -120,6 +128,30 @@ Write sequence for a single slot assignment:
 `BindingSaveResult` values: `SAVED`, `NO_CHANGE`, `STALE_FILE`, `UNKNOWN_KEY`,
 `BINDING_NOT_FOUND`, `UNSUPPORTED_XML`, `KEY_OCCUPIED`, `WRITE_FAILED`.
 
+**The user-edit path** - `assignSlot(SlotAssignment)` and `assignAxis(AxisAssignment)` - is for an edit the user
+made on purpose in the bindings editor, and nothing automatic calls it. It may write any device: a button slot
+takes a key, mouse button or wheel direction, or a controller's button, hat or axis direction, with up to three
+modifiers on any device and the slot's Hold flag; an axis takes a controller's whole axis (`Joy_XAxis`-`Joy_VAxis`)
+with Inverted and Deadzone, the deadzone written as the game writes a float. It does not check `KEY_OCCUPIED` - the
+editor warns and the user decides - and refuses a token that does not suit the slot (`UNKNOWN_KEY`) or a slot with
+structure it does not know (`UNSUPPORTED_XML`). A keyboard token is any `Key_` name, not only the keys
+`EliteKeyboardKeys` lists, because a non-English layout writes the character itself (`Key_ß`).
+The game's own literals (`Keyboard`, `Mouse`, `{NoDevice}`) are taken in the game's spelling only, and never as a
+controller's name in another case. Hold is written as the `<Hold Value="1" />` child the game writes, unless the
+slot already carries it as an attribute. `ToggleOn` is never touched, and `KeyBindingsParser` is not widened:
+writing a controller binding never makes one executable.
+
+**The device rewrite** - `rewriteDeviceReferences(List<Path>, DeviceReferenceRewrite, Path)` - moves every
+`Device="..."` naming one device to a new name across several `.binds` files (the game's, drafts, saved copies),
+all or nothing: every file read first (a file named twice, under any spelling, counts once; one whose text cannot be
+rewritten whole stops it as `UNSUPPORTED_XML`), each changed file backed up, re-read before its write, and put back
+if a later one fails or was saved meanwhile - unless the game saved it again after the rewrite, which is left as the
+game wrote it (`DeviceRewriteResult.notRestored`). `DeviceReferenceRewrite` builds the three cases:
+`hardwareIdToName` (VID then PID, the order the game writes; a caller that found the reverse uses the constructor), `rename`, and `nameToHardwareId` (VID then PID, upper case). Matching
+ignores case. The text-only form, `rewriteDeviceReferences(String, DeviceReferenceRewrite)`, is pure and returns a
+`RewrittenXml`. Files are written in the order given, and the game's file goes last: writing it makes the monitor's reload refresh a working copy that holds no draft, which a later working copy would read as changed. Rewriting a working copy with its game file moves both off the baseline, so the caller then calls
+`BindingsWorkingCopyRepository.recordGameFileBaseline` for that preset; without it the next apply refuses the draft.
+
 **3. `BindingsApplyService`**
 
 Pushes the approved working copy to the game directory:
@@ -130,6 +162,11 @@ Pushes the approved working copy to the game directory:
 4. Backup current game file to `elite-intel/bindings/backups/` via `elite.intel.io.TimestampedBackups`.
 5. Atomic write to game directory (`AtomicFiles`).
 6. `workingCopyRepo.markApplied()` updates the baseline hash to the newly written content.
+
+`applyFrom(source, gameFile)` pushes a file that is not the working copy - BindForge's saved copy, on a revert -
+through steps 1, 2, 4 and 5, leaving the working copy and its baseline alone. A game file already identical to the
+source is not rewritten. A draft kept across it needs its baseline moved the same way, with
+`recordGameFileBaseline`.
 
 ### Conflict & Missing Binding Detection
 

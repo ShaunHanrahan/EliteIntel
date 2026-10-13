@@ -79,6 +79,109 @@ class BindingsApplyServiceTest {
         assertTrue(backups().isEmpty());
     }
 
+    @Test
+    void applyFromPushesTheSourceAndLeavesTheDraftAlone() throws Exception {
+        Path gameFile = gameFile();
+        String editedInGame = binds("Key_G");
+        String saved = binds("Key_A");
+        String eiDraft = binds("Key_E");
+        write(gameFile, binds("Key_A"));
+
+        BindingsWorkingCopyRepository repo = repo();
+        Path workingCopy = repo.loadOrImportFromGame(PRESET, gameFile);
+        write(workingCopy, eiDraft);
+        write(gameFile, editedInGame);
+        Path source = tempDir.resolve("master").resolve(PRESET);
+        write(source, saved);
+
+        Path backup = service(repo).applyFrom(source, gameFile);
+
+        assertNotNull(backup);
+        assertEquals(editedInGame, Files.readString(backup, StandardCharsets.UTF_8));
+        assertEquals(saved, Files.readString(gameFile, StandardCharsets.UTF_8));
+        assertEquals(eiDraft, Files.readString(workingCopy, StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void applyFromOverAMatchingGameFileWritesAndBacksUpNothing() throws Exception {
+        Path gameFile = gameFile();
+        write(gameFile, binds("Key_A"));
+        Path source = tempDir.resolve("master").resolve(PRESET);
+        write(source, binds("Key_A"));
+        Files.setLastModifiedTime(gameFile, java.nio.file.attribute.FileTime.fromMillis(0));
+
+        assertNull(service(repo()).applyFrom(source, gameFile));
+        assertTrue(backups().isEmpty());
+        assertEquals(0, Files.getLastModifiedTime(gameFile).toMillis());
+    }
+
+    @Test
+    void applyFromCreatesAMissingGameFileWithoutABackup() throws Exception {
+        Path gameFile = gameFile();
+        Path source = tempDir.resolve("master").resolve(PRESET);
+        write(source, binds("Key_A"));
+
+        assertNull(service(repo()).applyFrom(source, gameFile));
+        assertEquals(binds("Key_A"), Files.readString(gameFile, StandardCharsets.UTF_8));
+        assertTrue(backups().isEmpty());
+    }
+
+    @Test
+    void applyFromRefusesInvalidXmlAndLeavesTheGameFile() throws Exception {
+        Path gameFile = gameFile();
+        write(gameFile, binds("Key_A"));
+        Path source = tempDir.resolve("master").resolve(PRESET);
+        write(source, "<Root><Unclosed></Root>");
+
+        assertThrows(BindingsApplyException.class, () -> service(repo()).applyFrom(source, gameFile));
+        assertEquals(binds("Key_A"), Files.readString(gameFile, StandardCharsets.UTF_8));
+        assertTrue(backups().isEmpty());
+    }
+
+    @Test
+    void applyFromAMissingSourceIsAnError() throws Exception {
+        Path gameFile = gameFile();
+        write(gameFile, binds("Key_A"));
+
+        assertThrows(BindingsApplyException.class,
+                () -> service(repo()).applyFrom(tempDir.resolve("nowhere.binds"), gameFile));
+        assertEquals(binds("Key_A"), Files.readString(gameFile, StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void aDraftRewrittenWithTheGameFileStillAppliesOnceItsBaselineMoves() throws Exception {
+        Path gameFile = gameFile();
+        write(gameFile, controllerBinds("Throttle", "Key_A"));
+        BindingsWorkingCopyRepository repo = repo();
+        Path workingCopy = repo.loadOrImportFromGame(PRESET, gameFile);
+        write(workingCopy, controllerBinds("Throttle", "Key_E"));
+
+        DeviceRewriteResult rewrite = new BindingsWriter().rewriteDeviceReferences(List.of(gameFile, workingCopy),
+                DeviceReferenceRewrite.rename("Throttle", "LeftStick"), tempDir.resolve("rewrite-backups"));
+        repo.recordGameFileBaseline(PRESET, gameFile);
+
+        assertEquals(DeviceRewriteResult.Status.REWRITTEN, rewrite.status());
+        assertTrue(repo.hasUnappliedDraft(PRESET, gameFile));
+        assertNotNull(service(repo).apply(PRESET, gameFile));
+        assertEquals(controllerBinds("LeftStick", "Key_E"), Files.readString(gameFile, StandardCharsets.UTF_8));
+    }
+
+    @Test
+    void aCleanWorkingCopyRewrittenWithTheGameFileIsNotADraft() throws Exception {
+        Path gameFile = gameFile();
+        write(gameFile, controllerBinds("Throttle", "Key_A"));
+        BindingsWorkingCopyRepository repo = repo();
+        Path workingCopy = repo.loadOrImportFromGame(PRESET, gameFile);
+
+        new BindingsWriter().rewriteDeviceReferences(List.of(gameFile, workingCopy),
+                DeviceReferenceRewrite.rename("Throttle", "LeftStick"), tempDir.resolve("rewrite-backups"));
+        repo.recordGameFileBaseline(PRESET, gameFile);
+
+        assertFalse(repo.hasUnappliedDraft(PRESET, gameFile));
+        assertNull(service(repo).apply(PRESET, gameFile));
+        assertEquals(controllerBinds("LeftStick", "Key_A"), Files.readString(gameFile, StandardCharsets.UTF_8));
+    }
+
     private BindingsWorkingCopyRepository repo() {
         return new BindingsWorkingCopyRepository(tempDir.resolve("working"));
     }
@@ -106,6 +209,17 @@ class BindingsApplyServiceTest {
     private void write(Path file, String content) throws Exception {
         Files.createDirectories(file.getParent());
         Files.writeString(file, content, StandardCharsets.UTF_8);
+    }
+
+    private String controllerBinds(String device, String key) {
+        return """
+                <Root>
+                    <FocusLeftPanel>
+                        <Primary Device="Keyboard" Key="%s" />
+                        <Secondary Device="%s" Key="Joy_5" />
+                    </FocusLeftPanel>
+                </Root>
+                """.formatted(key, device);
     }
 
     private String binds(String key) {
