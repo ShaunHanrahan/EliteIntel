@@ -596,7 +596,13 @@ everything automatic, unchanged.
   The keyboard path keeps refusing with `KEY_OCCUPIED`.
 - **The edit carries Hold**, since it is the slot's inline toggle, written as a `<Hold Value="1" />` child
   ([format §3.2](domain-knowledge/EliteDangerous-BindsFileFormat.md#32-hold)). The keyboard path keeps preserving
-  whatever Hold the slot had.
+  whatever Hold the slot had. *Added in review:* a slot that already carries Hold as a `Hold="1"` attribute — a
+  form the game does not write, but the keyboard reader accepts — keeps that form, so an untouched Hold never
+  counts as a change.
+- **A keyboard token is any `Key_` name**, not only the keys `EliteKeyboardKeys` lists: a non-English layout writes
+  the character itself (`Key_ß`, [format §5.5](domain-knowledge/EliteDangerous-BindsFileFormat.md#55-keyboard-codes)). The game's
+  literals — `Keyboard`, `Mouse`, `{NoDevice}` — are taken in the game's spelling only, never as a controller's
+  name in another case.
 - **A button slot** takes any device, its input, and up to three modifiers on any device, never one equal to the
   input itself; never a whole axis. **An axis slot** takes a controller's whole axis only — `Joy_XAxis` to
   `Joy_VAxis` — with Inverted and Deadzone, and no modifiers. Clearing writes `{NoDevice}`, as the game does.
