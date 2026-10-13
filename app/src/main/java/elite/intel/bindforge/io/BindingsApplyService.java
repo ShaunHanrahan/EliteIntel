@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 
 /**
  * Applies a working copy bindings file to the Elite Dangerous game directory.
@@ -81,6 +82,50 @@ public class BindingsApplyService {
             log.warn("Applied bindings but could not update baseline metadata: {}", e.getMessage());
         }
         return result;
+    }
+
+    /**
+     * Pushes {@code sourceFile} over the game's {@code .binds} through the same steps as {@link #apply} - XML
+     * validation, a timestamped backup of the file being replaced, an atomic write - for a source that is not the
+     * working copy: BindForge's saved copy of the file, pushed back over the game's on a revert. The working copy
+     * and its baseline are not read or changed, so a draft survives the push; keeping it consistent is the
+     * caller's. A draft kept across the push is now a draft from the pushed file, so the caller moves its baseline
+     * with {@link BindingsWorkingCopyRepository#recordGameFileBaseline(String, Path)} - otherwise the next
+     * {@link #apply} refuses it as a conflict.
+     * <p>
+     * A game file already byte-identical to the source is not rewritten, and nothing is backed up.
+     *
+     * @return the path of the created backup, or {@code null} when the game file did not exist or already matched
+     * @throws BindingsApplyException if the source cannot be read, fails validation, or the write cannot complete
+     */
+    public Path applyFrom(Path sourceFile, Path gameBindsFile) throws BindingsApplyException {
+        byte[] content;
+        try {
+            content = Files.readAllBytes(sourceFile);
+        } catch (IOException e) {
+            throw new BindingsApplyException("Cannot read bindings source " + sourceFile + ": " + e.getMessage(), e);
+        }
+
+        validateXml(content);
+
+        if (matchesGameFile(gameBindsFile, content)) {
+            log.info("Game bindings {} already match {}; nothing to write", gameBindsFile, sourceFile);
+            return null;
+        }
+
+        Path backupPath = backupGameFile(gameBindsFile);
+        return writeToGameDir(gameBindsFile, content, backupPath);
+    }
+
+    private boolean matchesGameFile(Path gameBindsFile, byte[] content) throws BindingsApplyException {
+        if (!Files.exists(gameBindsFile)) {
+            return false;
+        }
+        try {
+            return Arrays.equals(Files.readAllBytes(gameBindsFile), content);
+        } catch (IOException e) {
+            throw new BindingsApplyException("Cannot read game bindings " + gameBindsFile + ": " + e.getMessage(), e);
+        }
     }
 
     private boolean verifyGameFileDidNotChange(String presetFileName, Path gameBindsFile) throws BindingsApplyException {
