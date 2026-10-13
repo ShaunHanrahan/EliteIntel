@@ -2,6 +2,7 @@ package elite.intel.ui.overlay;
 
 import elite.intel.db.managers.BioSamplesManager;
 import elite.intel.db.managers.LocationManager;
+import elite.intel.gameapi.data.BioForms;
 import elite.intel.gameapi.journal.events.dto.BioSampleDto;
 import elite.intel.gameapi.journal.events.dto.GenusDto;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
@@ -147,6 +148,11 @@ public class ExobiologyObjectiveSource implements HudObjectiveSource {
         if (remaining.isEmpty()) return Optional.empty();
 
         Map<String, Integer> partials = partialsByGenus(body.getPartialBioSamples());
+        // The genus being sampled leads the list, so it cannot be one of those folded into the
+        // overflow row on a body with more genuses than the card has rows. The sort is stable,
+        // so the rest keep their order.
+        remaining = new ArrayList<>(remaining);
+        remaining.sort(Comparator.comparing((GenusDto genus) -> !isInProgress(sampledStage(partials, genus))));
 
         List<HudRow> rows = new ArrayList<>();
         rows.add(HudRow.progress(HudText.get("overlay.card.row.genus"),
@@ -156,7 +162,7 @@ public class ExobiologyObjectiveSource implements HudObjectiveSource {
         for (GenusDto genus : remaining.subList(0, shown)) {
             String label = displayName(genus);
             Integer sampled = sampledStage(partials, genus);
-            if (sampled != null && sampled > 0 && sampled < SAMPLES_PER_GENUS) {
+            if (isInProgress(sampled)) {
                 // The one being worked on right now: the bar says how many more
                 // colonies to walk to, which is the only number that matters then.
                 rows.add(HudRow.progress(label, sampled, SAMPLES_PER_GENUS, HudRow.State.WARN));
@@ -218,6 +224,13 @@ public class ExobiologyObjectiveSource implements HudObjectiveSource {
     }
 
     /**
+     * Started but not finished: at least one sample taken, the last one still to go.
+     */
+    private static boolean isInProgress(Integer sampled) {
+        return sampled != null && sampled > 0 && sampled < SAMPLES_PER_GENUS;
+    }
+
+    /**
      * The furthest sample stage reached on a genus, under either of its keys.
      */
     private static Integer sampledStage(Map<String, Integer> partials, GenusDto genus) {
@@ -241,10 +254,19 @@ public class ExobiologyObjectiveSource implements HudObjectiveSource {
         return keys;
     }
 
+    /**
+     * The genus name followed by the distance its colonies must be apart, e.g. {@code CONCHA (150m)}: the
+     * one number the commander needs while walking between samples. The range is looked up by the FDev
+     * symbol, so it holds on any game client language; a genus the table does not know shows the name alone.
+     */
     private static String displayName(GenusDto genus) {
         String name = genus.getGenusLocalised();
         if (name == null || name.isBlank()) name = genus.getGenusSymbol();
-        return name == null ? HudText.get("overlay.card.row.unknownGenus") : name.toUpperCase(Locale.ROOT);
+        if (name == null) return HudText.get("overlay.card.row.unknownGenus");
+        Integer range = BioForms.colonyRangeOrNull(
+                genus.getGenusSymbol() == null || genus.getGenusSymbol().isBlank() ? name : genus.getGenusSymbol());
+        String label = name.toUpperCase(Locale.ROOT);
+        return range == null ? label : label + " (" + range + "m)";
     }
 
     /**

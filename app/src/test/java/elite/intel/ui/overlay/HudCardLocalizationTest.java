@@ -159,7 +159,7 @@ class HudCardLocalizationTest {
 
         assertEquals("ESOBIOLOGIA", card.title());
         assertEquals("GENERE", card.rows().getFirst().label());
-        assertEquals("BACTERIUM", card.rows().get(1).label(),
+        assertEquals("BACTERIUM (500m)", card.rows().get(1).label(),
                 "the genus name came from the game and is not ours to translate");
     }
 

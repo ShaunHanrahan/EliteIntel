@@ -5,7 +5,7 @@ EliteIntel is distributed under the repository's `LICENSE`. The following compon
 ## jlayer-decoder 2024.04.19
 
 - Maven coordinates: `dev.mccue:jlayer-decoder:2024.04.19`
-- Purpose: pure-Java decoding of Microsoft Edge Read Aloud's MPEG audio into PCM.
+- Purpose: pure-Java decoding of the commander's own MP3 files into PCM for the Jukebox. Decoding only.
 - Provenance: a repackaged and modernized subset of JavaLayer from the
   [java-audio-stack project](https://github.com/bowbahdoe/java-audio-stack/tree/v2024.04.19/jlayer-decoder).
 - Published module POM license metadata: GNU Lesser General Public License, version 2.1. The source tag's
@@ -68,10 +68,3 @@ The model is unmodified and distributed as downloaded from the
 ## Jukebox audio test fixtures
 
 `app/src/test/resources/jukebox/` holds short synthetic MP3, FLAC, M4A/M4B and Ogg Vorbis files - a few seconds at most of a plain sine tone, generated with FFmpeg for this repository. They carry no third-party audio and exist so the decoders, the resampler and the tag reader are tested against real files of each format rather than against mocks. Two of them hold a codec this build deliberately cannot decode, so that refusing such a file is tested too: `lossless-alac.m4a` is Apple Lossless rather than AAC, and `opus-in-ogg.ogg` is Opus rather than Vorbis.
-
-## MP3 decoder test fixture
-
-`EdgeMp3DecoderTest` contains a short excerpt of Espressif's 24 kHz mono MP3 test sample, “Furious Freak”
-by Kevin MacLeod. It is used only by the offline test suite and is attributed under
-[CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) with its
-[original source](https://dl.espressif.com/dl/audio/ff-16b-1c-24000hz.mp3).
