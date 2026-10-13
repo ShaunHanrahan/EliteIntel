@@ -85,6 +85,58 @@ public class BindingsLoader {
         }
     }
 
+    /**
+     * Locates the {@code StartPreset} file the live game reads, when a folder holds more than one generation of it:
+     * the highest-numbered {@code StartPreset.N.start}, else the pre-Odyssey {@code StartPreset.start}. Unlike
+     * {@link #findStartPresetFile(Path)}, which returns whichever the listing yields first, the choice does not
+     * depend on listing order. A {@code StartPreset.*.start} whose middle is not a version number is not a
+     * generation the game writes, and is passed over with a warning.
+     */
+    public Optional<Path> findLiveStartPresetFile(Path bindingsDir) throws IOException {
+        try (var stream = Files.list(bindingsDir)) {
+            return stream
+                    .filter(p -> startPresetGeneration(p.getFileName().toString()) >= 0)
+                    .max(Comparator.<Path>comparingInt(p -> startPresetGeneration(p.getFileName().toString()))
+                            .thenComparing(p -> p.getFileName().toString()));
+        }
+    }
+
+    /**
+     * Reads all four sections of the live {@code StartPreset} file - General, Ship, SRV and On Foot - for callers
+     * that need each section's preset rather than {@link #getActivePresetName()}'s single answer. Empty when the
+     * folder has no {@code StartPreset}; how the lines are read is {@link StartPresetSections#parse(String)}.
+     *
+     * @throws IOException when the folder cannot be listed or the file cannot be read
+     */
+    public Optional<StartPresetSections> readStartPresetSections(Path bindingsDir) throws IOException {
+        Optional<Path> startPresetFile = findLiveStartPresetFile(bindingsDir);
+        if (startPresetFile.isEmpty()) {
+            log.debug("No StartPreset file in {}", bindingsDir);
+            return Optional.empty();
+        }
+        StartPresetSections sections = StartPresetSections.parse(Files.readString(startPresetFile.get()));
+        log.debug("StartPreset sections from {}: {}", startPresetFile.get().getFileName(), sections);
+        return Optional.of(sections);
+    }
+
+    // StartPreset.start is generation 0 (pre-Odyssey) and StartPreset.N.start is N + 1, so any numbered file
+    // outranks the unnumbered one. -1 when the name is not a StartPreset file the game writes. Nine digits at most
+    // keeps N + 1 inside an int.
+    private static int startPresetGeneration(String fileName) {
+        if (fileName.equals("StartPreset.start")) {
+            return 0;
+        }
+        if (!fileName.startsWith("StartPreset.") || !fileName.endsWith(".start")) {
+            return -1;
+        }
+        String version = fileName.substring("StartPreset.".length(), fileName.length() - ".start".length());
+        if (version.isEmpty() || version.length() > 9 || !version.chars().allMatch(c -> c >= '0' && c <= '9')) {
+            log.warn("Ignoring {}: not a StartPreset generation the game writes", fileName);
+            return -1;
+        }
+        return Integer.parseInt(version) + 1;
+    }
+
     public String getActivePresetName() {
         return findActivePresetName(PlayerSession.getInstance().getBindingsDir());
     }

@@ -1,0 +1,16 @@
+Added a Type Text custom command step and a Duplicate button for custom commands
+
+Type Text step:
+- Added a TYPE_TEXT step type that types its stored text into whichever game text field has focus, through the same layout-aware typing path the route plotter uses. It reaches characters no single key can, such as @, so a command like Enter then "@VEGA " can address VEGA in the comms panel.
+- The text is typed exactly as entered, untrimmed, so a trailing space leaves the cursor ready for the commander's own words. A blank text is rejected by both the step check and the editor validator.
+- The step editor reuses the existing text field, and the step table and command summary show the text in quotes.
+
+Duplicate button:
+- Added a Duplicate button to a custom command's details dialog, beside Edit and Delete.
+- It opens the editor as a new command pre-filled with the original's phrases and steps, its name with a localized "(copy)" suffix, and no id or action key. Existing validation keeps it from being saved until its phrases and action key no longer collide with the original's.
+
+Labels for both added to all nine language bundles.
+
+Tests: a Type Text step reaches the executor after the key that opened the field, with its text untouched; blank Type Text is rejected at load and in the editor; a duplicate keeps phrases and steps but not identity.
+
+Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>

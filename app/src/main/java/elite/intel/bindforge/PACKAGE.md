@@ -39,6 +39,12 @@ Reads `StartPreset.*.start` in the game's bindings directory to find the active 
 `<presetName>.<version>.binds`. Falls back to the most recently modified
 `.binds` file if the preset file is absent or the name cannot be resolved.
 
+That one name is the first non-empty line, which is the right answer for the assistant. `readStartPresetSections`
+reads all four lines (General, Ship, SRV and On Foot) into a `StartPresetSections`, for a caller that needs
+each section's preset, such as a split preset with General on a different file. It reads the file the live game
+uses (`findLiveStartPresetFile`: the highest `StartPreset.N.start`, else `StartPreset.start`), and the
+pre-Odyssey single-line form counts as one preset for all four sections.
+
 ### `BindingsMonitor` (singleton)
 
 Monitors the bindings directory via `WatchService` on a dedicated background thread.
