@@ -27,18 +27,27 @@ file*. Recorded in the [platform map](../01-host-integration/elite-intel-platfor
 
 ## How a foundation session runs
 
-`V1.1-Release` holds none of BindForge's docs — no `docs/05-build-plan/`, no specs. So the work is split across two
-checkouts:
+`V1.1-Release` holds none of BindForge's docs — no `docs/05-build-plan/`, no specs, no V1.2 code. So a session
+**switches branches in the one checkout**, `E:\EliteIntelProject\EliteIntel` — never a git worktree (Alan,
+2026-10-12: F1 began in one and was moved off it, because a worktree is a second IntelliJ project and its branch
+cannot be checked out from the first):
 
-- **Code and tests** on `V1.1-Release-bf-foundation`, in its own git worktree at
-  **`E:\EliteIntelProject\EliteIntel-bf-foundation`**, so the main checkout stays on `V1.2-BindForge`. Branch and
-  worktree created by Alan 2026-10-12, from `V1.1-Release` at `7a3c51d26`, and pushed. Run step 1 of
-  `/next-slice` (fetch, behind or not) in the worktree too: `git -C ../EliteIntel-bf-foundation status -sb`.
-- **This brief and every spec decision** in the main checkout, on `V1.2-BindForge`, as for every other section.
-- **Tests:** `.\gradlew app:test` run **in the worktree**, against V1.1's own suite.
-- **A slice is done when Krondor has merged it**, not when its tests pass. Until then it is *with Krondor*, and
-  the slices it unblocks still wait. The merge-up reaching `V1.2-BindForge` is what releases them.
-- **Never commit, push or merge** — Alan does, and Krondor merges into `V1.1-Release`.
+1. **On `V1.2-BindForge`:** read this brief and the specs, show the sources table, settle the questions.
+2. **Switch to `V1.1-Release-bf-foundation`** (`git fetch`, then check it is not behind). Write the code and its
+   tests; Alan runs the **whole** `.\gradlew app:test` there — V1.1's own suite is term 4 — commits and pushes.
+3. **Review** in a fresh session on that branch: `/check-code-integrity V1.1-Release..V1.1-Release-bf-foundation`.
+   Fixes are a follow-up commit; once pushed, never an amend.
+4. **Switch back to `V1.2-BindForge`** and record: the spec decisions, then this brief.
+
+**Git refuses a switch over uncommitted changes to a file that differs between the branches**, so commit or
+stash before each switch. A spec edit made before the code is written rides across in a stash.
+**Never `git add -A` on the foundation branch:** `V1.1-Release`'s `.gitignore` does not cover the V1.2 drafts
+(`commit-message.txt`, `version-diff.txt`, `scripts/__pycache__/`), and F1 shipped one by mistake. Alan's
+`.git/info/exclude` now lists them.
+
+**A slice is done when Krondor has merged it**, not when its tests pass. Until then it is *with Krondor*, and the
+slices it unblocks still wait; the merge-up reaching `V1.2-BindForge` is what releases them.
+**Never commit, push or merge** — Alan does, and Krondor merges into `V1.1-Release`.
 
 ## Spec
 
@@ -59,7 +68,9 @@ checkouts:
 
 | What | Where | State |
 |---|---|---|
-| Finding `StartPreset` | `bindforge.io.BindingsLoader.findStartPresetFile(Path)` | public, by prefix and extension; `findFirst()` on an unordered listing |
+| Finding `StartPreset` | `bindforge.io.BindingsLoader.findStartPresetFile(Path)` | public, by prefix and extension; `findFirst()` on an unordered listing. Unchanged; its Javadoc now says it can disagree with the live finder |
+| The live `StartPreset` | `BindingsLoader.findLiveStartPresetFile(Path)` — **F1, with Krondor** | highest `StartPreset.N.start`, else `StartPreset.start`; non-numeric lookalikes passed over; ties broken by name |
+| The four sections | `BindingsLoader.readStartPresetSections(Path)` → `bindforge.io.StartPresetSections` — **F1, with Krondor** | General, Ship, SRV, On Foot; pure `parse(String)`; empty `Optional` with no file, `IOException` on a read failure. Rules in [preset-editor.md](../02-features/bindforge/preset-editor.md#how-the-four-lines-are-read--settled-2026-10-12-alan-foundation-f1). Tests: `StartPresetSectionsTest`, `BindingsLoaderStartPresetTest`; specimens in `app/src/test/resources/bindforge/startpreset/`, `-text` |
 | The active preset | `BindingsLoader.getActivePresetName()` | **reads the first non-empty line only** — right for the assistant, wrong for a split preset. Callers: `BindingProfilePanel`, and `getLatestBindsFile` through the private `findActivePresetName` |
 | Writing a binding | `bindforge.io.BindingsWriter` — one keyboard slot or `{NoDevice}`, by raw-text replacement, BOM kept, stale-file check by time and size | **refuses any controller slot** (`isEditableMainSlot`). Tests: `BindingsWriterTest` |
 | `.binds` draft | `BindingsWorkingCopyRepository` — per-preset working copies in `elite-intel/bindings/`, a SHA-256 baseline per preset | **the master is only a hash** (core.md) |
@@ -89,9 +100,15 @@ checkouts:
   to a file Krondor maintains, and it depends on V1.2-only code, so it could not go on the foundation branch as
   written. His next edit to that file will conflict. **Raise with Alan and Krondor** — not fixed by any slice
   here.
-- **Two `StartPreset` files in one folder** — `StartPreset.start` (the single-line, pre-Odyssey form) and
-  `StartPreset.4.start` — and `findStartPresetFile` returns whichever the listing yields first. F1 must decide which wins
-  without changing what the existing method returns.
+- **Two `StartPreset` files in one folder.** F1's read is deterministic (the numbered one wins), but
+  `findStartPresetFile` still takes whichever the listing yields first, so in that folder the assistant's
+  `getActivePresetName` / `getLatestBindsFile` can name a different General preset from BindForge. Fixing that
+  changes a V1.1 method's behaviour — a maintenance fix for Krondor, not foundation work. *(F1 review, P1.)*
+- **A player backup copies one `StartPreset` only** — `PlayerBackupService` goes through `findStartPresetFile`, so
+  with both generations present a restore is incomplete, and which file is kept depends on listing order. Same
+  owner as the item above. *(F1 review, P2.)*
+- **`findActivePresetName` catches `IOException` and returns `""`** — deliberate degradation (it falls back to the
+  newest `.binds`) without the `// WHY:` comment the coding standard asks for. *(F1 review, P3.)*
 
 ## Boundaries
 
@@ -105,8 +122,8 @@ checkouts:
 
 | # | Slice | Changes | Unblocks | Status |
 |---|---|---|---|---|
-| F1 | **Read all four `StartPreset` lines** — General, Ship, SRV, On Foot, in that order — as a new method beside `getActivePresetName()` | `BindingsLoader` | Preset Editor (first job), [Core C7](core.md#slices) | **next** |
-| F2 | **The `.binds` device rewrite** — replace one `Device=` value with another across `.binds`: hex → name (onboarding), old name → new name (rename), name → hex (CLEAR) | `BindingsWriter` | [A6b, A11, CLEAR on a named device](alias-designer.md#slices) | waiting — two questions below |
+| F1 | **Read all four `StartPreset` lines** — General, Ship, SRV, On Foot, in that order — as a new method beside `getActivePresetName()` | `BindingsLoader` | Preset Editor (first job), [Core C7](core.md#slices) | **with Krondor** — built and pushed 2026-10-12 (`1fa8c1026`, review fixes `bbad46667`, `0718ba71b`); done when merged into `V1.1-Release` |
+| F2 | **The `.binds` device rewrite** — replace one `Device=` value with another across `.binds`: hex → name (onboarding), old name → new name (rename), name → hex (CLEAR) | `BindingsWriter` | [A6b, A11, CLEAR on a named device](alias-designer.md#slices) | **next** — once Alan answers the two questions below |
 | F3 | **Scope the `.binds` and `StartPreset` master** — what of C4's whole-file master must change an existing file, and what can be a new V1.2 class. A scoping slice: its output is a ruling and F3b's definition, not code | — | [Core C4](core.md#slices) | after F2 |
 | F4 | **The writer's user-edit path** — a deliberate edit may write any device; the existing keyboard-only path stays for everything automatic | `BindingsWriter` | Bind Editor: editing | when the Bind Editor section starts |
 | F5 | **`Joy_UAxis` and `Joy_VAxis`** in `ButtonInputMapper`'s axis tokens, so axis 6 and above stop throwing | `ButtonInputMapper` | the capture dialog | when the Bind Editor section starts |
@@ -139,6 +156,13 @@ checkouts:
 
 *Newest first. Two or three lines each: what was decided and where it is recorded, what was found, what the
 next slice needs.*
+
+- **2026-10-12 — F1 built, with Krondor.** `readStartPresetSections` and `findLiveStartPresetFile` beside the
+  unchanged one-line read; the five read rules, and the single-line rule tightened by the review, are in
+  [preset-editor.md](../02-features/bindforge/preset-editor.md#how-the-four-lines-are-read--settled-2026-10-12-alan-foundation-f1).
+  **Found:** the worktree was dropped for branch switching (above); a stray `commit-message.txt` rode in on
+  `git add -A` and took two commits to remove; the review's pre-existing issues are under Known issues.
+  Preset Editor and C7 wait for the merge-up. **F2 needs:** Alan's answers to its two questions, first.
 
 - **2026-10-12 — brief written.** Five slices from the specs of what Foundation unblocks; F1 next, as the
   smallest first change for Krondor to check. **Found:** `V1.1-Release` has no BindForge docs, so a foundation
