@@ -43,7 +43,9 @@ That one name is the first non-empty line, which is the right answer for the ass
 reads all four lines (General, Ship, SRV and On Foot) into a `StartPresetSections`, for a caller that needs
 each section's preset, such as a split preset with General on a different file. It reads the file the live game
 uses (`findLiveStartPresetFile`: the highest `StartPreset.N.start`, else `StartPreset.start`), and the
-pre-Odyssey single-line form counts as one preset for all four sections.
+pre-Odyssey single-line form counts as one preset for all four sections. In a folder holding both generations,
+`findStartPresetFile` (and so the assistant's single name) can still pick the other file, because it takes
+whichever the listing yields first; it is left that way for its V1.1 callers.
 
 ### `BindingsMonitor` (singleton)
 

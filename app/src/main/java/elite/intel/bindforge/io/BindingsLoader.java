@@ -73,6 +73,10 @@ public class BindingsLoader {
 
     /**
      * Locates the {@code StartPreset.*.start} file (e.g. {@code StartPreset.4.start}) in {@code bindingsDir}, if present.
+     * <p>
+     * When the folder holds both {@code StartPreset.start} and a numbered one, which it returns depends on listing
+     * order. It is kept as it is for its existing callers; code that needs the file the game reads uses
+     * {@link #findLiveStartPresetFile(Path)}, which can name a different file in that folder.
      */
     public Optional<Path> findStartPresetFile(Path bindingsDir) throws IOException {
         try (var stream = Files.list(bindingsDir)) {
@@ -90,15 +94,32 @@ public class BindingsLoader {
      * the highest-numbered {@code StartPreset.N.start}, else the pre-Odyssey {@code StartPreset.start}. Unlike
      * {@link #findStartPresetFile(Path)}, which returns whichever the listing yields first, the choice does not
      * depend on listing order. A {@code StartPreset.*.start} whose middle is not a version number is not a
-     * generation the game writes, and is passed over with a warning.
+     * generation the game writes, and is passed over.
      */
     public Optional<Path> findLiveStartPresetFile(Path bindingsDir) throws IOException {
+        List<Path> candidates;
         try (var stream = Files.list(bindingsDir)) {
-            return stream
-                    .filter(p -> startPresetGeneration(p.getFileName().toString()) >= 0)
-                    .max(Comparator.<Path>comparingInt(p -> startPresetGeneration(p.getFileName().toString()))
-                            .thenComparing(p -> p.getFileName().toString()));
+            candidates = stream.filter(p -> isStartPresetName(p.getFileName().toString())).toList();
         }
+
+        Path live = null;
+        int liveGeneration = -1;
+        for (Path candidate : candidates) {
+            String name = candidate.getFileName().toString();
+            int generation = startPresetGeneration(name);
+            if (generation < 0) {
+                log.debug("Passing over {}: not a StartPreset generation the game writes", name);
+                continue;
+            }
+            // Equal generations (StartPreset.4 and StartPreset.04) are broken by name, so the answer never depends
+            // on listing order.
+            if (generation > liveGeneration
+                    || (generation == liveGeneration && name.compareTo(live.getFileName().toString()) > 0)) {
+                live = candidate;
+                liveGeneration = generation;
+            }
+        }
+        return Optional.ofNullable(live);
     }
 
     /**
@@ -117,24 +138,6 @@ public class BindingsLoader {
         StartPresetSections sections = StartPresetSections.parse(Files.readString(startPresetFile.get()));
         log.debug("StartPreset sections from {}: {}", startPresetFile.get().getFileName(), sections);
         return Optional.of(sections);
-    }
-
-    // StartPreset.start is generation 0 (pre-Odyssey) and StartPreset.N.start is N + 1, so any numbered file
-    // outranks the unnumbered one. -1 when the name is not a StartPreset file the game writes. Nine digits at most
-    // keeps N + 1 inside an int.
-    private static int startPresetGeneration(String fileName) {
-        if (fileName.equals("StartPreset.start")) {
-            return 0;
-        }
-        if (!fileName.startsWith("StartPreset.") || !fileName.endsWith(".start")) {
-            return -1;
-        }
-        String version = fileName.substring("StartPreset.".length(), fileName.length() - ".start".length());
-        if (version.isEmpty() || version.length() > 9 || !version.chars().allMatch(c -> c >= '0' && c <= '9')) {
-            log.warn("Ignoring {}: not a StartPreset generation the game writes", fileName);
-            return -1;
-        }
-        return Integer.parseInt(version) + 1;
     }
 
     public String getActivePresetName() {
@@ -170,5 +173,23 @@ public class BindingsLoader {
             log.warn("Could not read StartPreset file: {}", e.getMessage());
             return "";
         }
+    }
+
+    private static boolean isStartPresetName(String fileName) {
+        return fileName.startsWith("StartPreset.") && fileName.endsWith(".start");
+    }
+
+    // StartPreset.start is generation 0 (pre-Odyssey) and StartPreset.N.start is N + 1, so any numbered file
+    // outranks the unnumbered one. -1 when the middle is not a version number. Nine digits at most keeps N + 1
+    // inside an int.
+    private static int startPresetGeneration(String fileName) {
+        if (fileName.equals("StartPreset.start")) {
+            return 0;
+        }
+        String version = fileName.substring("StartPreset.".length(), fileName.length() - ".start".length());
+        if (version.isEmpty() || version.length() > 9 || !version.chars().allMatch(c -> c >= '0' && c <= '9')) {
+            return -1;
+        }
+        return Integer.parseInt(version) + 1;
     }
 }

@@ -2,7 +2,6 @@ package elite.intel.bindforge.io;
 
 import elite.intel.bindforge.model.BindingSection;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
@@ -17,25 +16,30 @@ import java.util.Objects;
  * reported as it is.
  *
  * @param singleLine true when the file is the pre-Odyssey single-line form, whose one name applies to all four
- *                   sections; writing it back produces four lines
+ *                   sections; only then are the four names necessarily the same
  */
 public record StartPresetSections(String general, String ship, String srv, String onFoot, boolean singleLine) {
 
-    private static final char BOM = '﻿';
+    private static final char BOM = '\uFEFF';
 
     public StartPresetSections {
         Objects.requireNonNull(general, "general");
         Objects.requireNonNull(ship, "ship");
         Objects.requireNonNull(srv, "srv");
         Objects.requireNonNull(onFoot, "onFoot");
+        if (singleLine && !(general.equals(ship) && ship.equals(srv) && srv.equals(onFoot))) {
+            throw new IllegalArgumentException("A single-line StartPreset names one preset for all four sections, not "
+                    + general + " / " + ship + " / " + srv + " / " + onFoot);
+        }
     }
 
     /**
      * Parses the text of a {@code StartPreset} file.
      * <ul>
-     *   <li>Lines are read by position, each trimmed. Trailing blank lines (a final newline) are dropped, but a
-     *       blank line between two names is an empty value for its section, so nothing shifts up a section.</li>
-     *   <li>One line: the pre-Odyssey form, the same name for all four, {@link #singleLine()} true.</li>
+     *   <li>Lines are read by position, each trimmed. A blank line is an empty value for its section, wherever it
+     *       is, so nothing shifts up a section; a final line ending does not add a line.</li>
+     *   <li>Exactly one line, not blank: the pre-Odyssey form, the same name for all four, {@link #singleLine()}
+     *       true. A name followed by blank lines is the four-line form with sections missing, not this.</li>
      *   <li>Fewer than four lines: the missing sections are empty. More than four: the extra lines are ignored.</li>
      *   <li>A leading byte-order mark is stripped; CRLF and LF both end a line.</li>
      * </ul>
@@ -43,13 +47,9 @@ public record StartPresetSections(String general, String ship, String srv, Strin
     public static StartPresetSections parse(String text) {
         Objects.requireNonNull(text, "text");
         String body = !text.isEmpty() && text.charAt(0) == BOM ? text.substring(1) : text;
+        List<String> lines = body.lines().map(String::trim).toList();
 
-        List<String> lines = new ArrayList<>(body.lines().map(String::trim).toList());
-        while (!lines.isEmpty() && lines.getLast().isEmpty()) {
-            lines.removeLast();
-        }
-
-        if (lines.size() == 1) {
+        if (lines.size() == 1 && !lines.getFirst().isEmpty()) {
             String name = lines.getFirst();
             return new StartPresetSections(name, name, name, name, true);
         }

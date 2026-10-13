@@ -51,6 +51,14 @@ class BindingsLoaderStartPresetTest {
     }
 
     @Test
+    void equalGenerationsAreBrokenByNameNotByListingOrder() throws IOException {
+        write("StartPreset.04.start", "Padded");
+        write("StartPreset.4.start", "Plain");
+
+        assertEquals(Optional.of(bindingsDir.resolve("StartPreset.4.start")), loader.findLiveStartPresetFile(bindingsDir));
+    }
+
+    @Test
     void preOdysseyFileAloneIsReadAsOnePresetForAllFour() throws IOException {
         copySpecimen("StartPreset.start");
 

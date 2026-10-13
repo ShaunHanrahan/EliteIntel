@@ -31,7 +31,7 @@ class StartPresetSectionsTest {
     }
 
     @Test
-    void trailingNewlinesAreNotSections() {
+    void finalLineEndingAndBlankLinesAfterTheFourthChangeNothing() {
         StartPresetSections sections = StartPresetSections.parse("A\r\nB\r\nC\r\nD\r\n\r\n");
 
         assertEquals(new StartPresetSections("A", "B", "C", "D", false), sections);
@@ -41,6 +41,24 @@ class StartPresetSectionsTest {
     void singleLineWithFinalNewlineIsStillTheSingleLineForm() {
         assertEquals(new StartPresetSections("Custom", "Custom", "Custom", "Custom", true),
                 StartPresetSections.parse("Custom\r\n"));
+    }
+
+    @Test
+    void nameFollowedByBlankLinesIsFourLinesWithSectionsMissingNotOneForAll() {
+        // A four-line file that lost three lines must not read as a valid uniform preset.
+        assertEquals(new StartPresetSections("A", "", "", "", false), StartPresetSections.parse("A\n\n\n"));
+        assertEquals(new StartPresetSections("A", "B", "", "", false), StartPresetSections.parse("A\nB\n\n"));
+    }
+
+    @Test
+    void singleBlankLineIsNotTheSingleLineForm() {
+        assertEquals(new StartPresetSections("", "", "", "", false), StartPresetSections.parse("  \r\n"));
+    }
+
+    @Test
+    void singleLineWithDifferingNamesIsRefused() {
+        assertThrows(IllegalArgumentException.class, () -> new StartPresetSections("A", "B", "C", "D", true));
+        assertDoesNotThrow(() -> new StartPresetSections("A", "A", "A", "A", true));
     }
 
     @Test
@@ -70,7 +88,7 @@ class StartPresetSectionsTest {
 
     @Test
     void namesAreTrimmedAndALeadingBomIsDropped() {
-        StartPresetSections sections = StartPresetSections.parse("﻿  A \r\n\tB\r\nC  \r\nD");
+        StartPresetSections sections = StartPresetSections.parse("\uFEFF  A \r\n\tB\r\nC  \r\nD");
 
         assertEquals(new StartPresetSections("A", "B", "C", "D", false), sections);
     }
