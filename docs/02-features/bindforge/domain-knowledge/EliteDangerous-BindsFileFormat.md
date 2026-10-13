@@ -301,8 +301,11 @@ unnamed device in every specimen follows it.
 
 **Read defensively anyway.** Both halves are fixed-width, so accepting either order costs one extra
 comparison and covers a future version or platform that differs. A false match would need a second device
-whose VID and PID are the exact reverse pair. **BindForge never writes hex**, so this is a read concern
-only.
+whose VID and PID are the exact reverse pair. ~~**BindForge never writes hex**, so this is a read concern
+only.~~ **BindForge writes hex in one place: CLEAR on a device `.binds` names** (settled 2026-10-12, Alan,
+Foundation F2). Without its entry the device must be named the way the game names a device with none, so CLEAR
+rewrites the name to **VID then PID, upper case** — the form in every specimen. Everywhere else hex is only read,
+in either order, ignoring case. See [Alias Designer](../alias-designer.md#an-edit-binds-depends-on-updates-binds--2026-10-11-alan).
 
 A device with no matching `DeviceMappings.xml` entry uses a derived 8-hex-character identifier instead of a name:
 

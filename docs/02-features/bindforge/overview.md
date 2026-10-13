@@ -627,6 +627,23 @@ catch that, because it governs atomicity *within* an operation, not ownership *a
 
 **Under upgrade-in-place that failure cannot occur, because the second owner is never built.** The rule that keeps it that way is simple: BindForge adds no working copy, no writer and no working directory of its own. Where a capability is missing, the existing class grows it.
 
+#### Where the `.binds` and `StartPreset` master lives — settled 2026-10-12 (Alan, Foundation F3)
+
+Scoping [Core C4](../../05-build-plan/core.md#slices) against the rule above, and against the
+[foundation terms](../../05-build-plan/foundation.md): **only one piece of it changes a file V1.1 ships.**
+
+| Piece | Where | Why |
+|---|---|---|
+| Whole-file `.binds` master, one per preset | a **new V1.2 class**, files under `elite-intel/bindings/master/` | it is never edited, so it is not a second working copy; it edits no V1.1 file |
+| Which presets the master has seen | the master folder's listing | the folder is the record, as for [Edit History](file-manager.md#edit-history) — no table |
+| The `.binds` startup check, and the version-bump merge | **new V1.2 classes** | they read; the merge is pure |
+| `.binds` Edit History | the existing `AppPaths.getBindingsBackupDir()`, pruned by V1.2 to the retention setting | `BindingsApplyService.apply` already keeps the replaced file there under a timestamped name |
+| **Revert — the master pushed over the game's file** | **one new `BindingsApplyService` method**: the same validate, back up, atomic write, from a given source file | `apply` pushes only the working copy, so pushing the master through it would destroy the draft; writing it any other way would be a second writer |
+| `StartPreset` master, and writing `StartPreset` | **new V1.2 classes** | nothing writes `StartPreset` today, so there is no existing writer to grow |
+
+A master store that fails after an Apply succeeded fails safe: the next check reads the game's file as edited
+and asks, rather than adopting it.
+
 ### Two narrow boundaries — one stays, one widens
 
 `elite.intel.bindforge.io` holds two deliberate restrictions. Under the old plan BindForge sidestepped both by building its own. Under this one they have to be faced directly, and

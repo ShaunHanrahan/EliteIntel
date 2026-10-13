@@ -585,6 +585,23 @@ A row's Capture controls are coloured by slot state — empty, bound and clean, 
 each distinct. There is deliberately **no "always confirm" or skip-warnings option**, even though the base game
 has one: a skip option would defeat the purpose of warning at all.
 
+#### What the writer takes from the dialog — settled 2026-10-12 (Alan, Foundation F4)
+
+`BindingsWriter` grows a **user-edit path** beside the keyboard one, for
+[deliberate edits](overview.md#two-narrow-boundaries--one-stays-one-widens) only; the keyboard path stays for
+everything automatic, unchanged.
+
+- **A chord another slot uses is not refused.** The dialog warns — *"Conflicts with {0}; may not work"* — and the
+  user decides, as the game's own "Are you sure?" does; [Anomalies](#four-kinds-one-question) shows it afterwards.
+  The keyboard path keeps refusing with `KEY_OCCUPIED`.
+- **The edit carries Hold**, since it is the slot's inline toggle, written as a `<Hold Value="1" />` child
+  ([format §3.2](domain-knowledge/EliteDangerous-BindsFileFormat.md#32-hold)). The keyboard path keeps preserving
+  whatever Hold the slot had.
+- **A button slot** takes any device, its input, and up to three modifiers on any device, never one equal to the
+  input itself; never a whole axis. **An axis slot** takes a controller's whole axis only — `Joy_XAxis` to
+  `Joy_VAxis` — with Inverted and Deadzone, and no modifiers. Clearing writes `{NoDevice}`, as the game does.
+- **A slot with structure the writer does not know is refused**, never rewritten, and `ToggleOn` is never touched.
+
 #### Conflict warnings name one binding today
 
 Krondor's wording is *"Conflicts with {0}; may not work"*, and `CandidateConflict` carries a single
@@ -600,7 +617,7 @@ still holds one name, and making it a list is what remains.*
 | **A HOTAS slot never opens the dialog.** It shows *"This slot uses an advanced or unsupported binding. The basic editor will not modify it."* | `BindingProfilePanel.openAssignKeyboardBindingDialog` via `isBasicEditableSlot` | [`BindingsWriter` widens](overview.md#two-narrow-boundaries--one-stays-one-widens) |
 | **The dialog says keyboard throughout** — *Assign keyboard key*, *Keyboard Assignment*, *New key* | `bindings.assign.*` in the nine `gui*.properties` bundles | the source tabs arrive; the text changes, the class name does not |
 | **Hats cannot be captured.** The device layer has no hat handling at all | `elite.intel.devices` | hat events are read and mapped to `Joy_POV` tokens |
-| **U and V axes cannot be captured.** `AXIS_TOKENS` is exactly X, Y, Z, RX, RY, RZ, so a panel's A1/A2 dials make `axisToBindsToken` throw | `ButtonInputMapper` | the token list grows to `Joy_UAxis` and `Joy_VAxis` |
+| **U and V axes cannot be captured.** `AXIS_TOKENS` is exactly X, Y, Z, RX, RY, RZ, so a panel's A1/A2 dials make `axisToBindsToken` throw | ~~`ButtonInputMapper`~~ the capture dialog | ~~the token list grows to `Joy_UAxis` and `Joy_VAxis`~~ the dialog maps SDL's axis through `devices.hid.AxisSlots` to `GameAxis`, which names all eight. **Corrected 2026-10-12 (Alan, Foundation F5 withdrawn):** `axisToBindsToken` has no caller on either line, and taking SDL's axis number as the slot is wrong whenever a controller skips a slot — `AxisSlots` matches them by DirectInput slot. No V1.1 file changes |
 | **SELECTED BINDING shows the raw tag** | `AssignKeyboardBindingDialog.buildUi` | the title and CONTROL row land |
 
 ### Open items — capture dialog
