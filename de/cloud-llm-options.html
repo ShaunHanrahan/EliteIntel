@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Keine lokale Hardware? Nutze ein Cloud-LLM.  EliteIntel</title>
-    <meta name="description" content="Cloud-Option: Gib deinen API-Schlüssel für Mistral, xAI, OpenAI oder Anthropic/Claude ein. Die App verwendet pro Anbieter ein festes Modell:">
+    <meta name="description" content="Cloud-Option: Öffne Einstellungen → KI-Dienste → Cloud-Einrichtung, wähle deinen Anbieter in">
     <link rel="canonical" href="https://www.elite-intel.org/de/cloud-llm-options.html">
     <link rel="alternate" hreflang="en" href="https://www.elite-intel.org/cloud-llm-options.html">
     <link rel="alternate" hreflang="fr" href="https://www.elite-intel.org/fr/cloud-llm-options.html">
@@ -13,7 +13,7 @@
     <link rel="alternate" hreflang="uk" href="https://www.elite-intel.org/uk/cloud-llm-options.html">
     <link rel="alternate" hreflang="ru" href="https://www.elite-intel.org/ru/cloud-llm-options.html">
     <meta property="og:title" content="Keine lokale Hardware? Nutze ein Cloud-LLM.  EliteIntel">
-    <meta property="og:description" content="Cloud-Option: Gib deinen API-Schlüssel für Mistral, xAI, OpenAI oder Anthropic/Claude ein. Die App verwendet pro Anbieter ein festes Modell:">
+    <meta property="og:description" content="Cloud-Option: Öffne Einstellungen → KI-Dienste → Cloud-Einrichtung, wähle deinen Anbieter in">
     <meta property="og:url" content="https://www.elite-intel.org/de/cloud-llm-options.html">
     <meta property="og:type" content="website">
     <meta property="og:image" content="https://www.elite-intel.org/images/site-preview.png">
@@ -94,56 +94,86 @@
         <div class="content-inner markdown-body" id="content-inner">
 <h1>Keine lokale Hardware? Nutze ein Cloud-LLM.</h1>
 <p><strong>LLM (KI-Gehirn)</strong></p>
-<p><em>Cloud-Option:</em> Gib deinen API-Schlüssel für Mistral, xAI, OpenAI oder Anthropic/Claude ein. Die App verwendet pro Anbieter ein festes Modell:</p>
-<ul>
-<li><strong>Mistral</strong>: &#39;mistral-small-2506&#39; <strong>(Kostenloser Tarif)</strong></li>
-<li><strong>xAI</strong>: <code>grok-4-1-fast-non-reasoning</code></li>
-<li><strong>OpenAI</strong>: <code>gpt-4.1-mini</code> (Befehle) / <code>gpt-5.2</code> (Abfragen)</li>
-<li><strong>Gemini Generative Language API</strong>: <code>gemini-3.1-flash-lite-preview</code> für Befehle und Abfragen</li>
-<li><strong>Anthropic/Claude</strong></li>
-<li><strong>DeepSeek</strong></li>
-</ul>
-<p>Die Kosten variieren je nach gewähltem Cloud-Dienst und Spielzeit.</p>
+<p><em>Cloud-Option:</em> Öffne <strong>Einstellungen → KI-Dienste → Cloud-Einrichtung</strong>, wähle deinen Anbieter in
+der Liste <strong>Anbieter</strong>, füge den API-Schlüssel dieses Anbieters ein, setze den Haken bei
+<strong>Gesperrt</strong> und drücke <strong>Speichern</strong>.</p>
+<p>Den Anbieter wählst du selbst. Elite Intel errät ihn nicht am Schlüssel, denn die Anbieter ändern
+ihre Schlüsselformate zu oft, als dass das zuverlässig wäre. Ein Modell wählst du nicht: Elite
+Intel wählt es für deinen Anbieter aus:</p>
+<table>
+<thead>
+<tr>
+<th>Anbieter</th>
+<th>Verwendetes Modell</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Mistral</strong> <em>(kostenloses Kontingent)</em></td>
+<td><code>mistral-small-2506</code></td>
+</tr>
+<tr>
+<td><strong>xAI</strong></td>
+<td><code>grok-4-1-fast-non-reasoning</code></td>
+</tr>
+<tr>
+<td><strong>OpenAI</strong></td>
+<td><code>gpt-5.4-mini</code></td>
+</tr>
+<tr>
+<td><strong>Gemini</strong> (Generative Language API)</td>
+<td><code>gemini-3.1-flash-lite-preview</code></td>
+</tr>
+<tr>
+<td><strong>Anthropic / Claude</strong></td>
+<td><code>claude-haiku-4-5</code></td>
+</tr>
+<tr>
+<td><strong>DeepSeek</strong></td>
+<td><code>deepseek-v4-flash</code></td>
+</tr>
+</tbody></table>
+<p>Die Kosten hängen davon ab, welchen Cloud-Dienst du wählst und wie lange du spielst.</p>
 <h3>KOSTENLOSE Cloud-Option: Mistral</h3>
 <ol>
 <li>Gehe zur <a href="https://console.mistral.ai/">Mistral Console</a></li>
-<li>Erstelle ein Konto mit einer gültigen, verifizierbaren E-Mail-Adresse.</li>
-<li>KEINE KREDITKARTE ERFORDERLICH</li>
-<li>Erstelle eine „Organisation&quot; (beliebiger Name, z. B. „Elite Intel&quot;)</li>
-<li>Generiere einen API-Schlüssel. Trage diesen in die App ein und starte sie neu.</li>
+<li>Erstelle ein Konto mit einer gültigen E-Mail-Adresse, die du bestätigen kannst.</li>
+<li>KEINE KREDITKARTE NÖTIG</li>
+<li>Erstelle eine „Organisation“ (Name beliebig, zum Beispiel „Elite Intel“)</li>
+<li>Generiere einen API-Schlüssel.</li>
+<li>Wähle unter <strong>Einstellungen → KI-Dienste → Cloud-Einrichtung</strong> den Anbieter <strong>Mistral</strong>, füge den Schlüssel ein, drücke <strong>Speichern</strong> und starte die Dienste im Reiter Vega neu.</li>
 </ol>
-<h3>Option A: xAI API-Schlüssel</h3>
+<h3>Option A: xAI-API-Schlüssel</h3>
 <ol>
 <li>Gehe zur <a href="https://console.x.ai/">xAI Console</a>.</li>
 <li>Registriere dich oder melde dich an.</li>
 <li>Navigiere zum API-Bereich und generiere einen neuen API-Schlüssel.</li>
-<li>Lade dein Konto mit Guthaben auf.</li>
-<li>Füge den Schlüssel in das <strong>LLM</strong>-Feld ein und aktiviere das Schloss-Kontrollkästchen.</li>
+<li>Lade Guthaben auf dein Konto.</li>
+<li>Wähle unter <strong>Einstellungen → KI-Dienste → Cloud-Einrichtung</strong> den Anbieter <strong>xAI (Grok)</strong>, füge den Schlüssel in <strong>API-Schlüssel</strong> ein, setze den Haken bei <strong>Gesperrt</strong> und drücke <strong>Speichern</strong>.</li>
 </ol>
-<h3>Option B: OpenAI API-Schlüssel</h3>
+<h3>Option B: OpenAI-API-Schlüssel</h3>
 <ol>
 <li>Gehe zur <a href="https://platform.openai.com/">OpenAI Platform</a>.</li>
 <li>Registriere dich oder melde dich an.</li>
 <li>Navigiere zum API-Bereich und generiere einen neuen API-Schlüssel.</li>
-<li>Füge den Schlüssel in das <strong>LLM</strong>-Feld ein und aktiviere das Schloss-Kontrollkästchen.</li>
+<li>Wähle unter <strong>Einstellungen → KI-Dienste → Cloud-Einrichtung</strong> den Anbieter <strong>OpenAI</strong>, füge den Schlüssel in <strong>API-Schlüssel</strong> ein, setze den Haken bei <strong>Gesperrt</strong> und drücke <strong>Speichern</strong>.</li>
 </ol>
-<h3>Option C: Anthropic/Claude API-Schlüssel</h3>
+<h3>Option C: Anthropic/Claude-API-Schlüssel</h3>
 <ol>
 <li>Gehe zur <a href="https://platform.claude.com">Claude Platform</a>.</li>
-<li>Melde dich mit E-Mail oder Google an. Hinweis: Die Authentifizierung erfolgt über einen Magic Link, der an deine E-Mail gesendet wird.</li>
-<li>Gehe zu <strong>Einstellungen → Abrechnung</strong> und lade Guthaben auf, bevor du einen Schlüssel erstellst. Ein Schlüssel, der für ein Konto ohne Guthaben erstellt wurde, funktioniert nicht – auch wenn danach Guthaben hinzugefügt wird.</li>
-<li>Gehe zu <strong>API-Schlüssel</strong> und erstelle einen Schlüssel.</li>
-<li>Füge ihn in das <strong>LLM</strong>-Feld ein, aktiviere das Schloss-Kontrollkästchen und starte die Dienste auf dem KI-Tab.</li>
+<li>Melde dich per E-Mail oder Google an. Hinweis: Die Anmeldung läuft über einen Magic Link, der an deine E-Mail-Adresse geschickt wird.</li>
+<li>Gehe zu <strong>Settings → Billing</strong> und lade Guthaben auf, bevor du einen Schlüssel erstellst. Ein Schlüssel, der auf einem Konto ohne Guthaben erstellt wurde, funktioniert nicht, auch wenn später Guthaben hinzukommt.</li>
+<li>Gehe zu <strong>API Keys</strong> und erstelle einen Schlüssel.</li>
+<li>Wähle unter <strong>Einstellungen → KI-Dienste → Cloud-Einrichtung</strong> den Anbieter <strong>Anthropic (Claude)</strong>, füge den Schlüssel in <strong>API-Schlüssel</strong> ein, setze den Haken bei <strong>Gesperrt</strong>, drücke <strong>Speichern</strong> und starte dann die Dienste im Reiter Vega (neu).</li>
 </ol>
-<h3>Google TTS-Schlüssel erhalten (14 Stimmen)</h3>
+<h3>Einen Google-TTS-Schlüssel besorgen</h3>
 <ol>
 <li>Gehe zur <a href="https://console.cloud.google.com/">Google Cloud Console</a>.</li>
 <li>Melde dich an oder erstelle ein Konto.</li>
 <li>Erstelle ein neues Projekt.</li>
 <li>Aktiviere die <strong>Generative Language API</strong> für das LLM und/oder die <strong>Cloud Text-to-Speech API</strong> für TTS.</li>
-<li>Gehe zu <strong>Anmeldedaten</strong>, erstelle einen API-Schlüssel und kopiere ihn.</li>
-<li><strong>Schlüssel einschränken</strong>: Klicke auf den soeben erstellten Schlüssel. Klicke auf der Detailseite auf <strong>Schlüssel einschränken</strong>. Ein Dropdown-Menü erscheint. Wähle jede aktivierte API aus (STT und/oder TTS) und klicke auf <strong>Speichern</strong>.</li>
-<li>Füge den Schlüssel in die Felder <strong>Spracherkennung</strong> und/oder <strong>Sprachausgabe</strong> in der App ein. Aktiviere die Schloss-Kontrollkästchen.</li>
+<li>Gehe zu <strong>Credentials</strong>, erstelle einen API-Schlüssel und kopiere ihn.</li>
+<li><strong>Schränke den Schlüssel ein</strong>: Klicke auf den eben erstellten Schlüssel. Klicke auf der Detailseite auf <strong>Restrict key</strong>. Eine Auswahlliste erscheint. Hake jede API an, die du aktiviert hast (STT und/oder TTS), und klicke auf <strong>Save</strong>.</li>
+<li>Füge den Schlüssel unter <strong>Einstellungen → KI-Dienste → Sprache (TTS) → Google-TTS-Schlüssel</strong> ein, setze den Haken bei <strong>Gesperrt</strong> und drücke <strong>Speichern</strong>.</li>
 </ol>
 
         </div>

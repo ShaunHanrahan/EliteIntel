@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pas de matériel local ? Utilisez un LLM cloud.  EliteIntel</title>
-    <meta name="description" content="Option cloud : Entrez votre clé API pour Mistral, xAI, OpenAI ou Anthropic/Claude. L&#39;application utilise un modèle fixe par fournisseur :">
+    <meta name="description" content="Option cloud : ouvrez Paramètres → Services IA → Configuration cloud, choisissez votre">
     <link rel="canonical" href="https://www.elite-intel.org/fr/cloud-llm-options.html">
     <link rel="alternate" hreflang="en" href="https://www.elite-intel.org/cloud-llm-options.html">
     <link rel="alternate" hreflang="fr" href="https://www.elite-intel.org/fr/cloud-llm-options.html">
@@ -13,7 +13,7 @@
     <link rel="alternate" hreflang="uk" href="https://www.elite-intel.org/uk/cloud-llm-options.html">
     <link rel="alternate" hreflang="ru" href="https://www.elite-intel.org/ru/cloud-llm-options.html">
     <meta property="og:title" content="Pas de matériel local ? Utilisez un LLM cloud.  EliteIntel">
-    <meta property="og:description" content="Option cloud : Entrez votre clé API pour Mistral, xAI, OpenAI ou Anthropic/Claude. L&#39;application utilise un modèle fixe par fournisseur :">
+    <meta property="og:description" content="Option cloud : ouvrez Paramètres → Services IA → Configuration cloud, choisissez votre">
     <meta property="og:url" content="https://www.elite-intel.org/fr/cloud-llm-options.html">
     <meta property="og:type" content="website">
     <meta property="og:image" content="https://www.elite-intel.org/images/site-preview.png">
@@ -93,57 +93,87 @@
     <main class="content" id="content" role="main">
         <div class="content-inner markdown-body" id="content-inner">
 <h1>Pas de matériel local ? Utilisez un LLM cloud.</h1>
-<p><strong>LLM (Cerveau IA)</strong></p>
-<p><em>Option cloud :</em> Entrez votre clé API pour Mistral, xAI, OpenAI ou Anthropic/Claude. L&#39;application utilise un modèle fixe par fournisseur :</p>
-<ul>
-<li><strong>Mistral</strong>: &#39;mistral-small-2506&#39; <strong>(Niveau gratuit)</strong></li>
-<li><strong>xAI</strong>: <code>grok-4-1-fast-non-reasoning</code></li>
-<li><strong>OpenAI</strong>: <code>gpt-4.1-mini</code> (commandes) / <code>gpt-5.2</code> (requêtes)</li>
-<li><strong>Gemini Generative Language API</strong>: <code>gemini-3.1-flash-lite-preview</code> pour les commandes et requêtes</li>
-<li><strong>Anthropic/Claude</strong></li>
-<li><strong>DeepSeek</strong></li>
-</ul>
-<p>Le coût variera en fonction du service cloud choisi et de la durée de jeu.</p>
-<h3>Option CLOUD GRATUITE : Mistral</h3>
+<p><strong>LLM (cerveau de l&#39;IA)</strong></p>
+<p><em>Option cloud :</em> ouvrez <strong>Paramètres → Services IA → Configuration cloud</strong>, choisissez votre
+fournisseur dans la liste <strong>Fournisseur</strong>, collez la clé API de ce fournisseur, cochez
+<strong>Verrouillé</strong> et cliquez sur <strong>Enregistrer</strong>.</p>
+<p>C&#39;est vous qui choisissez le fournisseur. Elite Intel ne le devine pas à partir de la clé, car les
+fournisseurs changent trop souvent le format de leurs clés pour que ce soit fiable. Vous ne
+choisissez pas de modèle : Elite Intel le sélectionne pour votre fournisseur :</p>
+<table>
+<thead>
+<tr>
+<th>Fournisseur</th>
+<th>Modèle utilisé</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Mistral</strong> <em>(offre gratuite)</em></td>
+<td><code>mistral-small-2506</code></td>
+</tr>
+<tr>
+<td><strong>xAI</strong></td>
+<td><code>grok-4-1-fast-non-reasoning</code></td>
+</tr>
+<tr>
+<td><strong>OpenAI</strong></td>
+<td><code>gpt-5.4-mini</code></td>
+</tr>
+<tr>
+<td><strong>Gemini</strong> (Generative Language API)</td>
+<td><code>gemini-3.1-flash-lite-preview</code></td>
+</tr>
+<tr>
+<td><strong>Anthropic / Claude</strong></td>
+<td><code>claude-haiku-4-5</code></td>
+</tr>
+<tr>
+<td><strong>DeepSeek</strong></td>
+<td><code>deepseek-v4-flash</code></td>
+</tr>
+</tbody></table>
+<p>Le coût dépend du service cloud choisi et de votre temps de jeu.</p>
+<h3>Option cloud GRATUITE : Mistral</h3>
 <ol>
-<li>Rendez-vous sur la <a href="https://console.mistral.ai/">Console Mistral</a></li>
+<li>Allez sur la <a href="https://console.mistral.ai/">Mistral Console</a></li>
 <li>Créez un compte avec une adresse e-mail valide que vous pouvez vérifier.</li>
 <li>AUCUNE CARTE BANCAIRE NÉCESSAIRE</li>
-<li>Créez une « Organisation » (appelez-la comme vous voulez, par exemple « Elite Intel »)</li>
-<li>Générez une clé API. Entrez cette clé dans l&#39;application et redémarrez l&#39;application.</li>
+<li>Créez une « Organisation » (nommez-la comme vous voulez, par exemple « Elite Intel »)</li>
+<li>Générez une clé API.</li>
+<li>Dans <strong>Paramètres → Services IA → Configuration cloud</strong>, choisissez <strong>Mistral</strong> comme fournisseur, collez la clé, cliquez sur <strong>Enregistrer</strong> et redémarrez les services dans l&#39;onglet Vega.</li>
 </ol>
-<h3>Option A : Clé API xAI</h3>
+<h3>Option A : clé API xAI</h3>
 <ol>
-<li>Rendez-vous sur la <a href="https://console.x.ai/">Console xAI</a>.</li>
+<li>Allez sur la <a href="https://console.x.ai/">xAI Console</a>.</li>
 <li>Inscrivez-vous ou connectez-vous.</li>
 <li>Accédez à la section API et générez une nouvelle clé API.</li>
 <li>Ajoutez des crédits à votre compte.</li>
-<li>Collez la clé dans le champ <strong>LLM</strong> et cochez la case de verrouillage.</li>
+<li>Dans <strong>Paramètres → Services IA → Configuration cloud</strong>, choisissez <strong>xAI (Grok)</strong> comme fournisseur, collez la clé dans <strong>Clé API</strong>, cochez <strong>Verrouillé</strong> et cliquez sur <strong>Enregistrer</strong>.</li>
 </ol>
-<h3>Option B : Clé API OpenAI</h3>
+<h3>Option B : clé API OpenAI</h3>
 <ol>
-<li>Rendez-vous sur la <a href="https://platform.openai.com/">Plateforme OpenAI</a>.</li>
+<li>Allez sur l&#39;<a href="https://platform.openai.com/">OpenAI Platform</a>.</li>
 <li>Inscrivez-vous ou connectez-vous.</li>
 <li>Accédez à la section API et générez une nouvelle clé API.</li>
-<li>Collez la clé dans le champ <strong>LLM</strong> et cochez la case de verrouillage.</li>
+<li>Dans <strong>Paramètres → Services IA → Configuration cloud</strong>, choisissez <strong>OpenAI</strong> comme fournisseur, collez la clé dans <strong>Clé API</strong>, cochez <strong>Verrouillé</strong> et cliquez sur <strong>Enregistrer</strong>.</li>
 </ol>
-<h3>Option C : Clé API Anthropic/Claude</h3>
+<h3>Option C : clé API Anthropic/Claude</h3>
 <ol>
-<li>Rendez-vous sur la <a href="https://platform.claude.com">Plateforme Claude</a>.</li>
-<li>Connectez-vous avec votre e-mail ou Google. Remarque : l&#39;authentification utilise un lien magique envoyé à votre adresse e-mail.</li>
-<li>Accédez à <strong>Paramètres → Facturation</strong> et ajoutez des crédits avant de créer une clé. Une clé créée sur un compte non approvisionné ne fonctionne pas même si des crédits sont ajoutés ultérieurement.</li>
-<li>Accédez à <strong>Clés API</strong> et créez une clé.</li>
-<li>Collez-la dans le champ <strong>LLM</strong>, cochez la case de verrouillage, puis démarrez ou redémarrez les services dans l&#39;onglet IA.</li>
+<li>Allez sur la <a href="https://platform.claude.com">Claude Platform</a>.</li>
+<li>Connectez-vous par e-mail ou avec Google. Remarque : la connexion se fait par un lien magique envoyé à votre adresse e-mail.</li>
+<li>Allez dans <strong>Settings → Billing</strong> et ajoutez des crédits avant de créer une clé. Une clé créée sur un compte non approvisionné ne fonctionne pas, même si des crédits sont ajoutés ensuite.</li>
+<li>Allez dans <strong>API Keys</strong> et créez une clé.</li>
+<li>Dans <strong>Paramètres → Services IA → Configuration cloud</strong>, choisissez <strong>Anthropic (Claude)</strong> comme fournisseur, collez la clé dans <strong>Clé API</strong>, cochez <strong>Verrouillé</strong>, cliquez sur <strong>Enregistrer</strong>, puis démarrez ou redémarrez les services dans l&#39;onglet Vega.</li>
 </ol>
-<h3>Obtenir une clé Google TTS (14 voix)</h3>
+<h3>Obtenir une clé Google TTS</h3>
 <ol>
-<li>Rendez-vous sur la <a href="https://console.cloud.google.com/">Console Google Cloud</a>.</li>
+<li>Allez sur la <a href="https://console.cloud.google.com/">Google Cloud Console</a>.</li>
 <li>Connectez-vous ou créez un compte.</li>
 <li>Créez un nouveau projet.</li>
-<li>Activez l&#39;<strong>API Generative Language</strong> pour le LLM et/ou l&#39;<strong>API Cloud Text-to-Speech</strong> pour la TTS.</li>
-<li>Accédez à <strong>Identifiants</strong>, créez une clé API et copiez-la.</li>
-<li><strong>Restreindre la clé</strong> : Cliquez sur la clé que vous venez de créer. Sur la page de détail de la clé, cliquez sur <strong>Restreindre la clé</strong>. Un menu déroulant apparaît. Cochez chaque API activée (STT et/ou TTS), puis cliquez sur <strong>Enregistrer</strong>.</li>
-<li>Collez la clé dans les champs <strong>Reconnaissance vocale</strong> et/ou <strong>Synthèse vocale</strong> de l&#39;application. Cochez les cases de verrouillage.</li>
+<li>Activez la <strong>Generative Language API</strong> pour le LLM et/ou la <strong>Cloud Text-to-Speech API</strong> pour le TTS.</li>
+<li>Allez dans <strong>Credentials</strong>, créez une clé API et copiez-la.</li>
+<li><strong>Restreignez la clé</strong> : cliquez sur la clé que vous venez de créer. Sur la page de détails, cliquez sur <strong>Restrict key</strong>. Une liste déroulante apparaît. Cochez chaque API que vous avez activée (STT et/ou TTS), puis cliquez sur <strong>Save</strong>.</li>
+<li>Collez la clé dans <strong>Paramètres → Services IA → Voix (TTS) → Clé Google TTS</strong>, cochez <strong>Verrouillé</strong> et cliquez sur <strong>Enregistrer</strong>.</li>
 </ol>
 
         </div>

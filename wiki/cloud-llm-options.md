@@ -4,9 +4,12 @@
 
 **LLM (AI Brain)**
 
-*Cloud option:* paste your API key into **Settings → AI Services → Cloud Setup** and press
-**Save**. You do not pick a model — Elite Intel recognises the provider from your key and
-selects the model itself:
+*Cloud option:* open **Settings → AI Services → Cloud Setup**, pick your provider from the
+**Provider** list, paste that provider's API key, tick **Locked**, and press **Save**.
+
+You choose the provider yourself. Elite Intel does not guess it from the key, because providers
+change their key formats too often for that to be reliable. You don't choose a model: Elite Intel
+selects it for your provider:
 
 | Provider | Model used |
 |----------|------------|
@@ -25,7 +28,8 @@ Cost will be different depending on which Cloud service you choose, and how long
 2. Create account with a valid email you can verify.
 3. NO CREDIT CARD NECESSARY
 4. Create a "Organisation" (Call it whatever you want. For example "Elite Intel")
-5. Generate an API key. Paste it into **Settings → AI Services → Cloud Setup**, press **Save**, and restart services on the Vega tab.
+5. Generate an API key.
+6. In **Settings → AI Services → Cloud Setup**, pick **Mistral** as the provider, paste the key, press **Save**, and restart services on the Vega tab.
 
 
 ### Option A: xAI API Key
@@ -33,20 +37,20 @@ Cost will be different depending on which Cloud service you choose, and how long
 2. Sign up or log in.
 3. Navigate to the API section and generate a new API key.
 4. Add credits to your account.
-5. Paste the key into the **API Key** field on *Settings → AI Services*, tick **Locked**, and press **Save**.
+5. In **Settings → AI Services → Cloud Setup**, pick **xAI (Grok)** as the provider, paste the key into **API Key**, tick **Locked**, and press **Save**.
 
 ### Option B: OpenAI API Key
 1. Go to the [OpenAI Platform](https://platform.openai.com/).
 2. Sign up or log in.
 3. Navigate to the API section and generate a new API key.
-4. Paste the key into the **API Key** field on *Settings → AI Services*, tick **Locked**, and press **Save**.
+4. In **Settings → AI Services → Cloud Setup**, pick **OpenAI** as the provider, paste the key into **API Key**, tick **Locked**, and press **Save**.
 
 ### Option C: Anthropic/Claude API Key
 1. Go to the [Claude Platform](https://platform.claude.com).
 2. Sign in with email or Google. Note: authentication uses a magic link sent to your email.
 3. Go to **Settings → Billing** and add credits before creating a key. A key created on an unfunded account does not function even if credits are added afterward.
 4. Go to **API Keys** and create a key.
-5. Paste it into the **API Key** field on *Settings → AI Services*, tick **Locked**, press **Save**, then start or restart services on the Vega tab.
+5. In **Settings → AI Services → Cloud Setup**, pick **Anthropic (Claude)** as the provider, paste the key into **API Key**, tick **Locked**, press **Save**, then start or restart services on the Vega tab.
 
 ### Getting a Google TTS Key
 

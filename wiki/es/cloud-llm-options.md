@@ -1,54 +1,63 @@
-
 # ¿Sin hardware local? Usa un LLM en la nube.
 
 
-**LLM (cerebro de IA)**
+**LLM (cerebro de la IA)**
 
-*Opción en la nube:* Introduce tu clave API para Mistral, xAI, OpenAI o Anthropic/Claude. La aplicación utiliza un modelo fijo por proveedor:
-- **Mistral**: 'mistral-small-2506' **(Plan gratuito)**
-- **xAI**: `grok-4-1-fast-non-reasoning`
-- **OpenAI**: `gpt-4.1-mini` (comandos) / `gpt-5.2` (consultas)
-- **Gemini Generative Language API**: `gemini-3.1-flash-lite-preview` para comandos y consultas
-- **Anthropic/Claude**
-- **DeepSeek**
+*Opción en la nube:* abre **Ajustes → Servicios de IA → Configuración en la nube**, elige tu
+proveedor en la lista **Proveedor**, pega la clave API de ese proveedor, marca **Bloqueado** y
+pulsa **Guardar**.
+
+El proveedor lo eliges tú. Elite Intel no lo adivina a partir de la clave, porque los proveedores
+cambian el formato de sus claves con demasiada frecuencia como para que eso sea fiable. El modelo
+no lo eliges: Elite Intel lo selecciona para tu proveedor:
+
+| Proveedor | Modelo usado |
+|-----------|--------------|
+| **Mistral** *(nivel gratuito)* | `mistral-small-2506` |
+| **xAI** | `grok-4-1-fast-non-reasoning` |
+| **OpenAI** | `gpt-5.4-mini` |
+| **Gemini** (Generative Language API) | `gemini-3.1-flash-lite-preview` |
+| **Anthropic / Claude** | `claude-haiku-4-5` |
+| **DeepSeek** | `deepseek-v4-flash` |
 
 
-El coste variará según el servicio en la nube que elijas y el tiempo que juegues.
+El coste varía según el servicio en la nube que elijas y el tiempo que juegues.
 
 ### Opción GRATUITA en la nube: Mistral
-1. Ve a la [consola de Mistral](https://console.mistral.ai/)
-2. Crea una cuenta con un correo electrónico válido que puedas verificar.
-3. NO ES NECESARIA TARJETA DE CRÉDITO
-4. Crea una "Organización" (ponle el nombre que quieras, por ejemplo "Elite Intel")
-5. Genera una clave API. Introduce esa clave en la aplicación y reiníciala.
+1. Ve a la [Mistral Console](https://console.mistral.ai/)
+2. Crea una cuenta con un correo válido que puedas verificar.
+3. NO HACE FALTA TARJETA DE CRÉDITO
+4. Crea una «Organización» (llámala como quieras, por ejemplo «Elite Intel»)
+5. Genera una clave API.
+6. En **Ajustes → Servicios de IA → Configuración en la nube**, elige **Mistral** como proveedor, pega la clave, pulsa **Guardar** y reinicia los servicios en la pestaña Vega.
 
 
-### Opción A: Clave API de xAI
-1. Ve a la [consola de xAI](https://console.x.ai/).
+### Opción A: clave API de xAI
+1. Ve a la [xAI Console](https://console.x.ai/).
 2. Regístrate o inicia sesión.
 3. Ve a la sección de API y genera una nueva clave API.
-4. Añade créditos a tu cuenta.
-5. Pega la clave en el campo **LLM** y marca la casilla de bloqueo.
+4. Añade saldo a tu cuenta.
+5. En **Ajustes → Servicios de IA → Configuración en la nube**, elige **xAI (Grok)** como proveedor, pega la clave en **Clave API**, marca **Bloqueado** y pulsa **Guardar**.
 
-### Opción B: Clave API de OpenAI
-1. Ve a la [plataforma de OpenAI](https://platform.openai.com/).
+### Opción B: clave API de OpenAI
+1. Ve a la [OpenAI Platform](https://platform.openai.com/).
 2. Regístrate o inicia sesión.
 3. Ve a la sección de API y genera una nueva clave API.
-4. Pega la clave en el campo **LLM** y marca la casilla de bloqueo.
+4. En **Ajustes → Servicios de IA → Configuración en la nube**, elige **OpenAI** como proveedor, pega la clave en **Clave API**, marca **Bloqueado** y pulsa **Guardar**.
 
-### Opción C: Clave API de Anthropic/Claude
-1. Ve a la [plataforma de Claude](https://platform.claude.com).
-2. Inicia sesión con correo electrónico o Google. Nota: la autenticación utiliza un enlace mágico enviado a tu correo.
-3. Ve a **Configuración → Facturación** y añade créditos antes de crear una clave. Una clave creada en una cuenta sin fondos no funciona aunque se añadan créditos después.
-4. Ve a **Claves API** y crea una clave.
-5. Pégala en el campo **LLM**, marca la casilla de bloqueo e inicia o reinicia los servicios en la pestaña de IA.
+### Opción C: clave API de Anthropic/Claude
+1. Ve a la [Claude Platform](https://platform.claude.com).
+2. Inicia sesión con tu correo o con Google. Nota: el acceso se hace con un enlace mágico que se envía a tu correo.
+3. Ve a **Settings → Billing** y añade saldo antes de crear una clave. Una clave creada en una cuenta sin saldo no funciona, aunque añadas saldo después.
+4. Ve a **API Keys** y crea una clave.
+5. En **Ajustes → Servicios de IA → Configuración en la nube**, elige **Anthropic (Claude)** como proveedor, pega la clave en **Clave API**, marca **Bloqueado**, pulsa **Guardar** y luego inicia o reinicia los servicios en la pestaña Vega.
 
-### Obtener una clave de Google TTS (14 voces)
+### Conseguir una clave de Google TTS
 
-1. Ve a la [consola de Google Cloud](https://console.cloud.google.com/).
+1. Ve a la [Google Cloud Console](https://console.cloud.google.com/).
 2. Inicia sesión o crea una cuenta.
-3. Crea un nuevo proyecto.
+3. Crea un proyecto nuevo.
 4. Activa la **Generative Language API** para el LLM y/o la **Cloud Text-to-Speech API** para TTS.
-5. Ve a **Credenciales**, crea una clave API y cópiala.
-6. **Restringe la clave**: Haz clic en la clave que acabas de crear. En la página de detalles, haz clic en **Restringir clave**. Aparecerá un menú desplegable. Marca cada API que hayas activado (STT y/o TTS) y haz clic en **Guardar**.
-7. Pega la clave en los campos **Reconocimiento de voz** y/o **Síntesis de voz** en la aplicación. Marca las casillas de bloqueo.
+5. Ve a **Credentials**, crea una clave API y cópiala.
+6. **Restringe la clave**: haz clic en la clave que acabas de crear. En la página de detalles, haz clic en **Restrict key**. Aparece una lista desplegable. Marca cada API que hayas activado (STT y/o TTS) y haz clic en **Save**.
+7. Pega la clave en **Ajustes → Servicios de IA → Voz (TTS) → Clave de Google TTS**, marca **Bloqueado** y pulsa **Guardar**.

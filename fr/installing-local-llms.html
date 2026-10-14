@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Choisir un serveur d&#39;inférence local  EliteIntel</title>
-    <meta name="description" content="Pour exécuter un LLM local avec Elite Intel, un serveur d&#39;inférence est requis. Il s&#39;agit d&#39;un logiciel qui charge le modèle IA et le sert via une API locale. C">
+    <title>Choisir votre LLM  EliteIntel</title>
+    <meta name="description" content="Elite Intel a besoin d&#39;un modèle de langage (LLM) pour comprendre vos commandes et répondre à vos">
     <link rel="canonical" href="https://www.elite-intel.org/fr/installing-local-llms.html">
     <link rel="alternate" hreflang="en" href="https://www.elite-intel.org/installing-local-llms.html">
     <link rel="alternate" hreflang="fr" href="https://www.elite-intel.org/fr/installing-local-llms.html">
@@ -12,8 +12,8 @@
     <link rel="alternate" hreflang="de" href="https://www.elite-intel.org/de/installing-local-llms.html">
     <link rel="alternate" hreflang="uk" href="https://www.elite-intel.org/uk/installing-local-llms.html">
     <link rel="alternate" hreflang="ru" href="https://www.elite-intel.org/ru/installing-local-llms.html">
-    <meta property="og:title" content="Choisir un serveur d&#39;inférence local  EliteIntel">
-    <meta property="og:description" content="Pour exécuter un LLM local avec Elite Intel, un serveur d&#39;inférence est requis. Il s&#39;agit d&#39;un logiciel qui charge le modèle IA et le sert via une API locale. C">
+    <meta property="og:title" content="Choisir votre LLM  EliteIntel">
+    <meta property="og:description" content="Elite Intel a besoin d&#39;un modèle de langage (LLM) pour comprendre vos commandes et répondre à vos">
     <meta property="og:url" content="https://www.elite-intel.org/fr/installing-local-llms.html">
     <meta property="og:type" content="website">
     <meta property="og:image" content="https://www.elite-intel.org/images/site-preview.png">
@@ -92,130 +92,165 @@
     </aside>
     <main class="content" id="content" role="main">
         <div class="content-inner markdown-body" id="content-inner">
-<h1>Choisir un serveur d&#39;inférence local</h1>
-<p>Pour exécuter un LLM local avec Elite Intel, un <strong>serveur d&#39;inférence</strong> est requis. Il s&#39;agit d&#39;un logiciel qui charge le modèle IA et le sert via une API locale. C&#39;est l&#39;équivalent local d&#39;un service IA cloud, fonctionnant entièrement sur votre propre matériel.</p>
-<p>Elite Intel utilise <strong>LM Studio</strong> comme serveur d&#39;inférence. Il fonctionne sous Windows et Linux et expose une API compatible OpenAI.</p>
-<p><img src="../images/local-llm.png" alt="loca llm ui"></p>
-<h2>Exigences GPU</h2>
-<p>Configuration matérielle requise pour faire tourner le jeu et le LLM sur la même machine :</p>
+<h1>Choisir votre LLM</h1>
+<p>Elite Intel a besoin d&#39;un modèle de langage (LLM) pour comprendre vos commandes et répondre à vos
+questions. Il y a deux façons d&#39;en obtenir un, et les deux se configurent dans <strong>Paramètres →
+Services IA → Modèle de langage (LLM)</strong> :</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Ce qu&#39;il vous faut</th>
+<th>Coût</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Local : LM Studio</strong></td>
+<td>Un GPU puissant, <a href="https://lmstudio.ai">LM Studio</a> et le modèle <code>google/gemma-4-e4b</code></td>
+<td>Gratuit. Tout reste sur votre PC</td>
+</tr>
+<tr>
+<td><strong>Cloud</strong></td>
+<td>Un compte et une clé API chez un fournisseur pris en charge</td>
+<td>Gratuit avec Mistral. Les autres fournisseurs facturent votre consommation</td>
+</tr>
+</tbody></table>
+<p><img src="../images/llm-setup.png" alt="Configuration du LLM"></p>
+<hr>
+<h2>Option 1 : local (LM Studio)</h2>
+<p>La partie gauche du panneau, <strong>LMStudio</strong> :</p>
+<table>
+<thead>
+<tr>
+<th>Champ</th>
+<th>Valeur</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Adresse</strong></td>
+<td><code>http://localhost:1234/v1/chat/completions</code>. Si LM Studio tourne sur un autre PC de votre réseau, remplacez <code>localhost</code> par l&#39;adresse IP de ce PC</td>
+</tr>
+<tr>
+<td><strong>Modèle</strong></td>
+<td><code>google/gemma-4-e4b</code></td>
+</tr>
+</tbody></table>
+<p>LM Studio est le seul serveur d&#39;inférence local pris en charge par Elite Intel, et
+<code>google/gemma-4-e4b</code> le seul modèle local pris en charge.</p>
+<h3>Exigences GPU</h3>
+<p>Le matériel nécessaire pour faire tourner le jeu et le LLM sur la même machine :</p>
 <ul>
 <li>RTX 3090 24 Go VRAM</li>
 <li>AMD RX 7800 XT</li>
 </ul>
-<p>Si vous ne disposez pas du matériel suffisant, utilisez le <strong>service cloud gratuit</strong> sur
-👉 <strong><a href="https://console.mistral.ai/">console.mistral.ai</a></strong> 👈 — offre gratuite, sans carte bancaire.
-Étapes de configuration : <a href="cloud-llm-options.html">LLM cloud gratuit</a>.</p>
-<p>Un tableau de référence GPU fourni par <strong>Kevin Rank</strong> est disponible ici :
+<p>La VRAM compte plus que la vitesse du GPU. Une carte avec seulement 12 Go de VRAM ne suffit pas,
+aussi récente soit-elle. Si vous avez un second PC équipé d&#39;un GPU puissant, faites-y tourner LM
+Studio et pointez Elite Intel dessus. Le PC de jeu n&#39;a alors aucun travail d&#39;inférence à faire.</p>
+<p>Un tableau de référence des GPU réalisé par <strong>Kevin Rank</strong> est disponible ici :
 <a href="https://docs.google.com/spreadsheets/d/1ZyPgTvlVg7ueemHEV-3J3j3tAynShIyxTs8rd59rips/edit?usp=sharing">Guide de référence GPU</a></p>
-<hr>
 <h3>Guides d&#39;installation</h3>
 <table>
 <thead>
 <tr>
-<th>Serveur d&#39;inférence</th>
+<th>Guide</th>
 <th></th>
 </tr>
 </thead>
 <tbody><tr>
-<td><a href="Install-LM-Studio-Linux.html">✅ LM Studio - Linux</a></td>
-<td>Rapide, plus de flexibilité pour les modèles - le guide montre comment le configurer comme serveur</td>
+<td><a href="Install-LM-Studio-Linux.html">LM Studio - Linux</a></td>
+<td>Installation de bureau, et comment le faire tourner en serveur</td>
 </tr>
 <tr>
-<td><a href="Install-LM-Studio-Windows.html">✅ LM Studio - Windows</a></td>
-<td>Rapide, plus de flexibilité pour les modèles - interface graphique disponible</td>
+<td><a href="Install-LM-Studio-Windows.html">LM Studio - Windows</a></td>
+<td>Application de bureau avec interface graphique</td>
 </tr>
 <tr>
-<td><a href="cloud-llm-options.html">🆓 LLM cloud gratuit</a></td>
-<td>Aucun GPU requis - offre gratuite Mistral, sans carte bancaire</td>
+<td><a href="AMD-RX-7800XT-LLM-Setup.html">LLM sur la série AMD RX</a></td>
+<td>Configuration propre à AMD</td>
+</tr>
+<tr>
+<td><a href="LM-Studio-Ubuntu-Server.html">LM Studio sur Ubuntu Server</a></td>
+<td>Installation headless sur une machine d&#39;inférence dédiée</td>
 </tr>
 </tbody></table>
+<h3>Pourquoi <code>google/gemma-4-e4b</code> précisément ?</h3>
+<p>Elite Intel est un analyseur de commandes et un outil d&#39;analyse de données, pas un chatbot de
+conversation. Savoir bavarder de façon naturelle ne suffit pas. Le modèle doit déduire la bonne
+action de ce que vous dites, analyser les données du jeu et renvoyer des résultats structurés
+plutôt qu&#39;une dissertation ou du HTML. Tous les modèles de cette taille n&#39;y arrivent pas de façon
+fiable.</p>
+<p>L&#39;exigence incontournable est le <strong>function calling</strong> (appel de fonctions). Le companion d&#39;Elite
+Intel ne demande pas au modèle de décrire ce qu&#39;il ferait. Il lui donne un ensemble d&#39;outils et
+attend qu&#39;il en appelle un, avec des arguments. Un modèle incapable de produire un appel d&#39;outil
+bien formé ne peut pas piloter l&#39;application du tout, aussi bien qu&#39;il écrive.
+<code>google/gemma-4-e4b</code> prend en charge le function calling.</p>
+<p>Avec environ 6,3 Go, il tient dans la VRAM à côté du jeu sur une carte de 24 Go, avec de la marge.
+Rien n&#39;est déporté sur le CPU, donc les réponses restent rapides.</p>
+<blockquote>
+<p><strong>À propos du modèle retiré de la V1.0.</strong> Les versions précédentes recommandaient
+<code>tulu-3.1-8b-supernova</code>. Il ne prend pas en charge le function calling, ne peut donc pas faire
+tourner le companion et ne fonctionne plus avec Elite Intel. Si vous suivez un ancien guide,
+ignorez-le et installez <code>google/gemma-4-e4b</code>.</p>
+</blockquote>
 <hr>
-<h3>LM Studio en un coup d&#39;œil</h3>
+<h2>Option 2 : cloud</h2>
+<p>La partie droite du panneau, <strong>Configuration cloud</strong> :</p>
+<ol>
+<li>Choisissez votre fournisseur dans la liste <strong>Fournisseur</strong>.</li>
+<li>Collez la clé de ce fournisseur dans <strong>Clé API</strong>.</li>
+<li>Cochez <strong>Verrouillé</strong> pour que la clé enregistrée ne puisse pas être modifiée par accident.</li>
+<li>Cliquez sur <strong>Enregistrer</strong>, puis démarrez ou redémarrez les services dans l&#39;onglet Vega.</li>
+</ol>
+<p>C&#39;est vous qui choisissez le fournisseur. Elite Intel n&#39;essaie pas de le deviner à partir de la
+clé, car les fournisseurs changent trop souvent le format de leurs clés pour que ce soit fiable.
+Vous ne choisissez pas de modèle : Elite Intel prend celui qui convient à votre fournisseur.</p>
 <table>
 <thead>
 <tr>
-<th></th>
-<th>LM Studio</th>
+<th>Fournisseur</th>
+<th>Remarques</th>
 </tr>
 </thead>
 <tbody><tr>
-<td><strong>Modèle requis</strong></td>
-<td><code>google/gemma-4-e4b</code></td>
+<td><strong>Mistral</strong></td>
+<td>Offre gratuite, sans carte bancaire. Le moyen le plus simple de commencer</td>
 </tr>
 <tr>
-<td><strong>Installation</strong></td>
-<td>Un script, c&#39;est tout</td>
+<td><strong>Anthropic (Claude)</strong></td>
+<td>Payant</td>
 </tr>
 <tr>
-<td><strong>Fonctionne en tant que</strong></td>
-<td>Démarrage manuel, ou démarrage auto optionnel</td>
+<td><strong>OpenAI</strong></td>
+<td>Payant</td>
 </tr>
 <tr>
-<td><strong>Réglage du modèle</strong></td>
-<td>Options au moment du chargement</td>
+<td><strong>Google (Gemini)</strong></td>
+<td>Payant</td>
 </tr>
 <tr>
-<td><strong>Démarrage auto Windows</strong></td>
-<td>Nécessite l&#39;application de bureau ou le Planificateur de tâches</td>
+<td><strong>xAI (Grok)</strong></td>
+<td>Payant</td>
 </tr>
 <tr>
-<td><strong>Démarrage auto Linux</strong></td>
-<td>Configuration systemd manuelle (voir le guide Linux)</td>
-</tr>
-<tr>
-<td><strong>Source du modèle</strong></td>
-<td>HuggingFace (GGUF)</td>
-</tr>
-<tr>
-<td><strong>Port API</strong></td>
-<td><code>1234</code></td>
-</tr>
-<tr>
-<td><strong>Interface graphique</strong></td>
-<td>Application de bureau optionnelle</td>
+<td><strong>DeepSeek</strong></td>
+<td>Payant</td>
 </tr>
 </tbody></table>
+<p>Comment obtenir une clé chez chaque fournisseur : <a href="cloud-llm-options.html">Configurer un LLM cloud</a>.</p>
 <hr>
-<h3>Guide de sélection</h3>
-<p><strong>Utilisez LM Studio en local quand :</strong></p>
+<h2>Lequel choisir ?</h2>
+<p><strong>Faites tourner LM Studio en local si :</strong></p>
 <ul>
-<li>Vous disposez d&#39;un NVIDIA RTX 3090 24 Go équivalent ou supérieur. La VRAM est le facteur critique, pas la vitesse du GPU. Un GPU avec seulement 12 Go de VRAM est insuffisant quelle que soit sa génération.</li>
-<li>Vous exécutez Elite Dangerous et le LLM sur la même machine</li>
-<li>Vous souhaitez pointer Elite Intel vers un PC séparé sur votre réseau</li>
-<li>Vous souhaitez une interface graphique pour parcourir, télécharger et gérer les modèles, ou un serveur headless propre sur une machine dédiée à l&#39;inférence</li>
+<li>vous avez une RTX 3090 24 Go ou équivalent, ou un second PC sur votre réseau qui en a une</li>
+<li>vous voulez que tout reste sur votre propre matériel</li>
 </ul>
-<p><strong>Utilisez plutôt le <a href="cloud-llm-options.html">LLM cloud gratuit</a> quand :</strong></p>
+<p><strong>Utilisez un fournisseur cloud si :</strong></p>
 <ul>
-<li>Votre GPU n&#39;a pas assez de VRAM pour faire tourner un modèle en même temps que le jeu</li>
-<li>Vous préférez ne pas gérer de serveur d&#39;inférence local</li>
+<li>votre GPU n&#39;a pas assez de VRAM pour faire tourner un modèle à côté du jeu</li>
+<li>vous préférez ne pas gérer de serveur d&#39;inférence du tout</li>
 </ul>
-<hr>
-<h2>Recommandation du développeur</h2>
-<p>Le développeur utilise LM Studio avec <code>google/gemma-4-e4b</code> (~6,3 Go). D&#39;autres modèles peuvent
-fonctionner, sans garantie. Signalez vos retours de compatibilité sur Matrix.</p>
-<h2>Pourquoi <code>google/gemma-4-e4b</code> en particulier ?</h2>
-<p>Elite Intel est un analyseur de commandes et un outil d&#39;analyse de données, pas un chatbot
-conversationnel. Cela impose des exigences précises au modèle. Produire une conversation naturelle
-ne suffit pas. Le modèle doit déduire correctement les actions à partir de la voix, effectuer une
-analyse de données structurée et renvoyer les résultats sous forme de données structurées, pas d&#39;un
-essai en markdown ou en HTML. Tous les modèles de cette taille n&#39;y parviennent pas de façon fiable.</p>
-<p>L&#39;exigence incontournable est le <strong>function calling</strong>. Le compagnon d&#39;Elite Intel ne demande pas au
-modèle de décrire ce qu&#39;il ferait : il lui propose un ensemble d&#39;outils et attend qu&#39;il en appelle
-un, avec des arguments. Un modèle incapable d&#39;émettre un appel d&#39;outil bien formé ne peut pas
-piloter l&#39;application du tout, aussi bien écrive-t-il. <code>google/gemma-4-e4b</code> le prend en charge.</p>
-<p>Avec environ 6,3 Go, il tient en VRAM à côté du jeu sur une carte de 24 Go avec de la marge, ce qui
-évite le déport vers le CPU et maintient le débit d&#39;inférence.</p>
-<blockquote>
-<p><strong>À propos du modèle retiré de la V1.0.</strong> Les versions précédentes recommandaient
-<code>tulu-3.1-8b-supernova</code>. Il ne prend pas en charge le function calling, ne peut donc pas exécuter
-le compagnon et n&#39;est plus utilisable avec Elite Intel. Si vous suivez un guide ancien,
-ignorez-le et installez <code>google/gemma-4-e4b</code>.</p>
-</blockquote>
-<h2>Puis-je utiliser un modèle différent ?</h2>
-<p>D&#39;autres modèles peuvent être utilisés, mais ils doivent prendre en charge le function calling.
-Sans cela, l&#39;application ne peut rien exécuter.</p>
-<p>L&#39;échec le plus fréquent avec un modèle alternatif est un format de réponse incorrect : le modèle
-renvoie de la prose décrivant une action au lieu d&#39;appeler réellement l&#39;outil.</p>
+<p>Vous hésitez ? Commencez par l&#39;offre gratuite de Mistral. Cela prend quelques minutes, et vous
+pouvez passer en local à tout moment sans réinstaller.</p>
 <hr>
 <p>Community 👉<a href="https://matrix.to/#/#krondor:matrix.org"><strong>Matrix</strong></a>👈</p>
 

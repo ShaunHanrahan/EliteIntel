@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Вибір локального сервера інференції  EliteIntel</title>
-    <meta name="description" content="Для запуску локального LLM з Elite Intel потрібен сервер інференції. Це програмне забезпечення, яке завантажує модель ШІ та надає до неї доступ через локальний ">
+    <title>Вибір LLM  EliteIntel</title>
+    <meta name="description" content="Elite Intel потрібна мовна модель (LLM), щоб розуміти ваші команди й відповідати на запитання.">
     <link rel="canonical" href="https://www.elite-intel.org/uk/installing-local-llms.html">
     <link rel="alternate" hreflang="en" href="https://www.elite-intel.org/installing-local-llms.html">
     <link rel="alternate" hreflang="fr" href="https://www.elite-intel.org/fr/installing-local-llms.html">
@@ -12,8 +12,8 @@
     <link rel="alternate" hreflang="de" href="https://www.elite-intel.org/de/installing-local-llms.html">
     <link rel="alternate" hreflang="uk" href="https://www.elite-intel.org/uk/installing-local-llms.html">
     <link rel="alternate" hreflang="ru" href="https://www.elite-intel.org/ru/installing-local-llms.html">
-    <meta property="og:title" content="Вибір локального сервера інференції  EliteIntel">
-    <meta property="og:description" content="Для запуску локального LLM з Elite Intel потрібен сервер інференції. Це програмне забезпечення, яке завантажує модель ШІ та надає до неї доступ через локальний ">
+    <meta property="og:title" content="Вибір LLM  EliteIntel">
+    <meta property="og:description" content="Elite Intel потрібна мовна модель (LLM), щоб розуміти ваші команди й відповідати на запитання.">
     <meta property="og:url" content="https://www.elite-intel.org/uk/installing-local-llms.html">
     <meta property="og:type" content="website">
     <meta property="og:image" content="https://www.elite-intel.org/images/site-preview.png">
@@ -92,129 +92,163 @@
     </aside>
     <main class="content" id="content" role="main">
         <div class="content-inner markdown-body" id="content-inner">
-<h1>Вибір локального сервера інференції</h1>
-<p>Для запуску локального LLM з Elite Intel потрібен <strong>сервер інференції</strong>. Це програмне забезпечення, яке завантажує модель ШІ та надає до неї доступ через локальний API. Це локальний еквівалент хмарного сервісу ШІ, що працює повністю на твоєму власному залізі.</p>
-<p>Elite Intel використовує <strong>LM Studio</strong> як сервер інференції. Він працює у Windows і Linux та надає OpenAI-сумісний API.</p>
-<p><img src="../images/local-llm.png" alt="loca llm ui"></p>
-<h2>Вимоги до GPU</h2>
-<p>Вимоги до заліза для запуску гри та LLM на одній машині:</p>
+<h1>Вибір LLM</h1>
+<p>Elite Intel потрібна мовна модель (LLM), щоб розуміти ваші команди й відповідати на запитання.
+Підключити її можна двома способами, і обидва налаштовуються в розділі <strong>Налаштування → Сервіси
+ШІ → Мовна модель (LLM)</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Варіант</th>
+<th>Що потрібно</th>
+<th>Вартість</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Локально: LM Studio</strong></td>
+<td>Потужна відеокарта, <a href="https://lmstudio.ai">LM Studio</a> і модель <code>google/gemma-4-e4b</code></td>
+<td>Безкоштовно. Усе залишається на вашому ПК</td>
+</tr>
+<tr>
+<td><strong>Хмара</strong></td>
+<td>Акаунт і API-ключ у підтримуваного провайдера</td>
+<td>Безкоштовно з Mistral. Інші провайдери беруть плату за використання</td>
+</tr>
+</tbody></table>
+<p><img src="../images/llm-setup.png" alt="Налаштування LLM"></p>
+<hr>
+<h2>Варіант 1: локально (LM Studio)</h2>
+<p>Ліва частина панелі, <strong>LMStudio</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Поле</th>
+<th>Значення</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Адреса</strong></td>
+<td><code>http://localhost:1234/v1/chat/completions</code>. Якщо LM Studio працює на іншому ПК у вашій мережі, вкажіть IP-адресу цього ПК замість <code>localhost</code></td>
+</tr>
+<tr>
+<td><strong>Модель</strong></td>
+<td><code>google/gemma-4-e4b</code></td>
+</tr>
+</tbody></table>
+<p>LM Studio — єдиний локальний сервер інференції, який підтримує Elite Intel, а
+<code>google/gemma-4-e4b</code> — єдина підтримувана локальна модель.</p>
+<h3>Вимоги до GPU</h3>
+<p>Залізо, потрібне для запуску гри та LLM на одній машині:</p>
 <ul>
 <li>RTX 3090 24 ГБ VRAM</li>
 <li>AMD RX 7800 XT</li>
 </ul>
-<p>Якщо у тебе недостатньо заліза, скористайся <strong>безкоштовним хмарним сервісом</strong> на
-👉 <strong><a href="https://console.mistral.ai/">console.mistral.ai</a></strong> 👈 — безкоштовний рівень, без кредитної картки.
-Кроки налаштування: <a href="cloud-llm-options.html">Безкоштовний хмарний LLM</a>.</p>
-<p>Таблиця порівняння GPU від <strong>Kevin Rank</strong> доступна тут:
+<p>Обсяг VRAM важливіший за швидкість відеокарти. Карти з 12 ГБ VRAM недостатньо, хоч би якою новою
+вона була. Якщо у вас є другий ПК з потужною відеокартою, запустіть LM Studio на ньому й спрямуйте
+на нього Elite Intel. Тоді ігровий ПК зовсім не займається інференцією.</p>
+<p>Довідкова таблиця відеокарт від <strong>Kevin Rank</strong>:
 <a href="https://docs.google.com/spreadsheets/d/1ZyPgTvlVg7ueemHEV-3J3j3tAynShIyxTs8rd59rips/edit?usp=sharing">Довідник з GPU</a></p>
-<hr>
-<h3>Посібники з встановлення</h3>
+<h3>Посібники зі встановлення</h3>
 <table>
 <thead>
 <tr>
-<th>Сервер інференції</th>
+<th>Посібник</th>
 <th></th>
 </tr>
 </thead>
 <tbody><tr>
-<td><a href="Install-LM-Studio-Linux.html">✅ LM Studio - Linux</a></td>
-<td>Швидкий, більша гнучкість моделей - посібник показує налаштування як сервера</td>
+<td><a href="Install-LM-Studio-Linux.html">LM Studio — Linux</a></td>
+<td>Встановлення на робочий стіл і запуск у режимі сервера</td>
 </tr>
 <tr>
-<td><a href="Install-LM-Studio-Windows.html">✅ LM Studio - Windows</a></td>
-<td>Швидкий, більша гнучкість моделей - є графічний інтерфейс</td>
+<td><a href="Install-LM-Studio-Windows.html">LM Studio — Windows</a></td>
+<td>Настільний застосунок із графічним інтерфейсом</td>
 </tr>
 <tr>
-<td><a href="cloud-llm-options.html">🆓 Безкоштовний хмарний LLM</a></td>
-<td>GPU не потрібен - безкоштовний рівень Mistral, без кредитної картки</td>
+<td><a href="AMD-RX-7800XT-LLM-Setup.html">LLM на відеокартах AMD RX</a></td>
+<td>Налаштування для AMD</td>
+</tr>
+<tr>
+<td><a href="LM-Studio-Ubuntu-Server.html">LM Studio на Ubuntu Server</a></td>
+<td>Встановлення без GUI на окрему машину для інференції</td>
 </tr>
 </tbody></table>
-<hr>
-<h3>LM Studio: коротко</h3>
-<table>
-<thead>
-<tr>
-<th></th>
-<th>LM Studio</th>
-</tr>
-</thead>
-<tbody><tr>
-<td><strong>Потрібна модель</strong></td>
-<td><code>google/gemma-4-e4b</code></td>
-</tr>
-<tr>
-<td><strong>Встановлення</strong></td>
-<td>Один скрипт, і готово</td>
-</tr>
-<tr>
-<td><strong>Запускається як</strong></td>
-<td>Ручний запуск або опційний автозапуск</td>
-</tr>
-<tr>
-<td><strong>Налаштування моделі</strong></td>
-<td>Прапорці під час завантаження</td>
-</tr>
-<tr>
-<td><strong>Автозапуск у Windows</strong></td>
-<td>Потрібен застосунок або Планувальник завдань</td>
-</tr>
-<tr>
-<td><strong>Автозапуск у Linux</strong></td>
-<td>Ручне налаштування systemd (див. посібник для Linux)</td>
-</tr>
-<tr>
-<td><strong>Джерело моделей</strong></td>
-<td>HuggingFace (GGUF)</td>
-</tr>
-<tr>
-<td><strong>Порт API</strong></td>
-<td><code>1234</code></td>
-</tr>
-<tr>
-<td><strong>Графічний інтерфейс</strong></td>
-<td>Опційний застосунок для робочого столу</td>
-</tr>
-</tbody></table>
-<hr>
-<h3>Посібник з вибору</h3>
-<p><strong>Запускай LM Studio локально, якщо:</strong></p>
-<ul>
-<li>У тебе є NVIDIA RTX 3090 24 ГБ або аналог чи краще. VRAM - критичний фактор, а не швидкість GPU. GPU лише з 12 ГБ VRAM є недостатнім незалежно від покоління.</li>
-<li>Ти запускаєш Elite Dangerous та LLM на одній машині</li>
-<li>Хочеш вказати Elite Intel на окремий ПК у своїй мережі</li>
-<li>Тобі потрібен графічний інтерфейс для перегляду, завантаження та управління моделями або чистий headless-сервер на виділеній машині</li>
-</ul>
-<p><strong>Краще скористайся <a href="cloud-llm-options.html">безкоштовним хмарним LLM</a>, якщо:</strong></p>
-<ul>
-<li>Твоїй відеокарті бракує VRAM, щоб тримати модель разом із грою</li>
-<li>Ти взагалі не хочеш обслуговувати локальний сервер інференції</li>
-</ul>
-<hr>
-<h2>Рекомендація розробника</h2>
-<p>Розробник використовує LM Studio з <code>google/gemma-4-e4b</code> (~6,3 ГБ). Інші моделі можуть працювати,
-але це не гарантовано. Повідомляйте про результати сумісності в Matrix.</p>
-<h2>Чому саме <code>google/gemma-4-e4b</code>?</h2>
-<p>Elite Intel — це парсер команд та інструмент аналізу даних, а не розмовний чат-бот. Це висуває до
-моделі конкретні вимоги. Уміння вести природну бесіду недостатньо. Модель має правильно виводити
-дії з голосового введення, виконувати структурований аналіз даних і повертати результати у вигляді
-структурованих даних, а не есе в markdown чи HTML. Не всі моделі такого розміру роблять це надійно.</p>
+<h3>Чому саме <code>google/gemma-4-e4b</code>?</h3>
+<p>Elite Intel — це парсер команд та інструмент аналізу даних, а не чат-бот для розмов. Уміння
+природно підтримувати розмову недостатньо. Модель має за вашими словами визначити потрібну дію,
+проаналізувати ігрові дані й повернути структурований результат, а не твір чи HTML. Не всі моделі
+такого розміру роблять це надійно.</p>
 <p>Жорстка вимога — <strong>виклик функцій</strong> (function calling). Компаньйон Elite Intel не просить модель
-описати, що вона зробила б: він пропонує їй набір інструментів і очікує виклику одного з них з
+описати, що вона зробила б. Він дає їй набір інструментів і очікує, що вона викличе один із них з
 аргументами. Модель, яка не вміє формувати коректний виклик інструмента, взагалі не зможе керувати
-застосунком, хоч би як добре вона писала. <code>google/gemma-4-e4b</code> це підтримує.</p>
-<p>За обсягу близько 6,3 ГБ вона вміщується у VRAM поряд із грою на карті з 24 ГБ із запасом, що
-виключає вивантаження на CPU і зберігає високу швидкість інференсу.</p>
+застосунком, хоч би як добре вона писала. <code>google/gemma-4-e4b</code> підтримує виклик функцій.</p>
+<p>Маючи близько 6,3 ГБ, вона із запасом вміщується у VRAM поруч із грою на карті з 24 ГБ. Нічого не
+вивантажується на CPU, тож відповіді залишаються швидкими.</p>
 <blockquote>
 <p><strong>Про зняту з підтримки модель V1.0.</strong> Ранні версії рекомендували <code>tulu-3.1-8b-supernova</code>. Вона
-не підтримує виклик функцій, тому не може працювати з компаньйоном і більше не придатна для
-Elite Intel. Якщо ви користуєтесь старим посібником, не використовуйте його та встановіть
+не підтримує виклик функцій, тому не може працювати з компаньйоном і більше не підходить для
+Elite Intel. Якщо ви дотримуєтеся старого посібника, не використовуйте його та встановіть
 <code>google/gemma-4-e4b</code>.</p>
 </blockquote>
-<h2>Чи можу я використовувати іншу модель?</h2>
-<p>Можна використовувати альтернативні моделі, але вони мають підтримувати виклик функцій. Без цього
-застосунок не зможе нічого виконати.</p>
-<p>Найчастіший збій з альтернативною моделлю — неправильний формат відповіді: модель повертає текст з
-описом дії замість фактичного виклику інструмента.</p>
+<hr>
+<h2>Варіант 2: хмара</h2>
+<p>Права частина панелі, <strong>Хмарне налаштування</strong>:</p>
+<ol>
+<li>Оберіть провайдера у списку <strong>Провайдер</strong>.</li>
+<li>Вставте ключ цього провайдера в поле <strong>API-ключ</strong>.</li>
+<li>Встановіть прапорець <strong>Заблоковано</strong>, щоб збережений ключ не можна було випадково змінити.</li>
+<li>Натисніть <strong>Зберегти</strong>, потім запустіть або перезапустіть сервіси на вкладці «Вега».</li>
+</ol>
+<p>Провайдера ви обираєте самі. Elite Intel не намагається визначити його за ключем: провайдери надто
+часто змінюють формат ключів, щоб на це можна було покладатися. Модель ви не обираєте: Elite Intel
+бере відповідну для вашого провайдера.</p>
+<table>
+<thead>
+<tr>
+<th>Провайдер</th>
+<th>Примітки</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Mistral</strong></td>
+<td>Безкоштовний тариф, банківська картка не потрібна. Найпростіший спосіб почати</td>
+</tr>
+<tr>
+<td><strong>Anthropic (Claude)</strong></td>
+<td>Платно</td>
+</tr>
+<tr>
+<td><strong>OpenAI</strong></td>
+<td>Платно</td>
+</tr>
+<tr>
+<td><strong>Google (Gemini)</strong></td>
+<td>Платно</td>
+</tr>
+<tr>
+<td><strong>xAI (Grok)</strong></td>
+<td>Платно</td>
+</tr>
+<tr>
+<td><strong>DeepSeek</strong></td>
+<td>Платно</td>
+</tr>
+</tbody></table>
+<p>Як отримати ключ у кожного провайдера: <a href="cloud-llm-options.html">Налаштування хмарної LLM</a>.</p>
+<hr>
+<h2>Що обрати?</h2>
+<p><strong>Запускайте LM Studio локально, якщо:</strong></p>
+<ul>
+<li>у вас RTX 3090 24 ГБ або аналог, чи другий ПК у мережі з такою картою</li>
+<li>ви хочете, щоб усе залишалося на вашому власному залізі</li>
+</ul>
+<p><strong>Використовуйте хмарного провайдера, якщо:</strong></p>
+<ul>
+<li>вашій відеокарті бракує VRAM, щоб запускати модель поруч із грою</li>
+<li>ви не хочете морочитися із сервером інференції</li>
+</ul>
+<p>Вагаєтеся? Почніть із безкоштовного тарифу Mistral. Це займе кілька хвилин, а перейти на локальну
+модель можна будь-коли без перевстановлення.</p>
 <hr>
 <p>Community 👉<a href="https://matrix.to/#/#krondor:matrix.org"><strong>Matrix</strong></a>👈</p>
 

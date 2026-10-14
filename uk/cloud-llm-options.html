@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Немає локального заліза? Скористайся хмарним LLM.  EliteIntel</title>
-    <meta name="description" content="Хмарний варіант: Введи свій API-ключ для Mistral, xAI, OpenAI або Anthropic/Claude. Застосунок використовує фіксовану модель для кожного провайдера:">
+    <title>Немає потужного заліза? Використовуйте хмарну LLM.  EliteIntel</title>
+    <meta name="description" content="Хмарний варіант: відкрийте Налаштування → Сервіси ШІ → Хмарне налаштування, оберіть">
     <link rel="canonical" href="https://www.elite-intel.org/uk/cloud-llm-options.html">
     <link rel="alternate" hreflang="en" href="https://www.elite-intel.org/cloud-llm-options.html">
     <link rel="alternate" hreflang="fr" href="https://www.elite-intel.org/fr/cloud-llm-options.html">
@@ -12,8 +12,8 @@
     <link rel="alternate" hreflang="de" href="https://www.elite-intel.org/de/cloud-llm-options.html">
     <link rel="alternate" hreflang="uk" href="https://www.elite-intel.org/uk/cloud-llm-options.html">
     <link rel="alternate" hreflang="ru" href="https://www.elite-intel.org/ru/cloud-llm-options.html">
-    <meta property="og:title" content="Немає локального заліза? Скористайся хмарним LLM.  EliteIntel">
-    <meta property="og:description" content="Хмарний варіант: Введи свій API-ключ для Mistral, xAI, OpenAI або Anthropic/Claude. Застосунок використовує фіксовану модель для кожного провайдера:">
+    <meta property="og:title" content="Немає потужного заліза? Використовуйте хмарну LLM.  EliteIntel">
+    <meta property="og:description" content="Хмарний варіант: відкрийте Налаштування → Сервіси ШІ → Хмарне налаштування, оберіть">
     <meta property="og:url" content="https://www.elite-intel.org/uk/cloud-llm-options.html">
     <meta property="og:type" content="website">
     <meta property="og:image" content="https://www.elite-intel.org/images/site-preview.png">
@@ -92,58 +92,88 @@
     </aside>
     <main class="content" id="content" role="main">
         <div class="content-inner markdown-body" id="content-inner">
-<h1>Немає локального заліза? Скористайся хмарним LLM.</h1>
+<h1>Немає потужного заліза? Використовуйте хмарну LLM.</h1>
 <p><strong>LLM (мозок ШІ)</strong></p>
-<p><em>Хмарний варіант:</em> Введи свій API-ключ для Mistral, xAI, OpenAI або Anthropic/Claude. Застосунок використовує фіксовану модель для кожного провайдера:</p>
-<ul>
-<li><strong>Mistral</strong>: &#39;mistral-small-2506&#39; <strong>(Безкоштовний рівень)</strong></li>
-<li><strong>xAI</strong>: <code>grok-4-1-fast-non-reasoning</code></li>
-<li><strong>OpenAI</strong>: <code>gpt-4.1-mini</code> (команди) / <code>gpt-5.2</code> (запити)</li>
-<li><strong>Gemini Generative Language API</strong>: <code>gemini-3.1-flash-lite-preview</code> для команд і запитів</li>
-<li><strong>Anthropic/Claude</strong></li>
-<li><strong>DeepSeek</strong></li>
-</ul>
-<p>Вартість залежатиме від обраного хмарного сервісу та тривалості гри.</p>
+<p><em>Хмарний варіант:</em> відкрийте <strong>Налаштування → Сервіси ШІ → Хмарне налаштування</strong>, оберіть
+провайдера у списку <strong>Провайдер</strong>, вставте API-ключ цього провайдера, встановіть прапорець
+<strong>Заблоковано</strong> й натисніть <strong>Зберегти</strong>.</p>
+<p>Провайдера ви обираєте самі. Elite Intel не вгадує його за ключем: провайдери надто часто змінюють
+формат ключів, щоб на це можна було покладатися. Модель ви не обираєте: Elite Intel обирає її для
+вашого провайдера:</p>
+<table>
+<thead>
+<tr>
+<th>Провайдер</th>
+<th>Модель, що використовується</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Mistral</strong> <em>(безкоштовний тариф)</em></td>
+<td><code>mistral-small-2506</code></td>
+</tr>
+<tr>
+<td><strong>xAI</strong></td>
+<td><code>grok-4-1-fast-non-reasoning</code></td>
+</tr>
+<tr>
+<td><strong>OpenAI</strong></td>
+<td><code>gpt-5.4-mini</code></td>
+</tr>
+<tr>
+<td><strong>Gemini</strong> (Generative Language API)</td>
+<td><code>gemini-3.1-flash-lite-preview</code></td>
+</tr>
+<tr>
+<td><strong>Anthropic / Claude</strong></td>
+<td><code>claude-haiku-4-5</code></td>
+</tr>
+<tr>
+<td><strong>DeepSeek</strong></td>
+<td><code>deepseek-v4-flash</code></td>
+</tr>
+</tbody></table>
+<p>Вартість залежить від обраного хмарного сервісу та від того, скільки ви граєте.</p>
 <h3>БЕЗКОШТОВНИЙ хмарний варіант: Mistral</h3>
 <ol>
-<li>Перейди до <a href="https://console.mistral.ai/">консолі Mistral</a></li>
-<li>Створи обліковий запис із дійсною електронною адресою, яку можна підтвердити.</li>
-<li>КРЕДИТНА КАРТКА НЕ ПОТРІБНА</li>
-<li>Створи «Організацію» (назви як завгодно, наприклад «Elite Intel»)</li>
-<li>Згенеруй API-ключ. Введи його в застосунок і перезапусти його.</li>
+<li>Перейдіть до <a href="https://console.mistral.ai/">Mistral Console</a></li>
+<li>Створіть акаунт із чинною адресою електронної пошти, яку можна підтвердити.</li>
+<li>БАНКІВСЬКА КАРТКА НЕ ПОТРІБНА</li>
+<li>Створіть «Організацію» (назвіть як завгодно, наприклад «Elite Intel»)</li>
+<li>Згенеруйте API-ключ.</li>
+<li>У <strong>Налаштування → Сервіси ШІ → Хмарне налаштування</strong> оберіть провайдера <strong>Mistral</strong>, вставте ключ, натисніть <strong>Зберегти</strong> й перезапустіть сервіси на вкладці «Вега».</li>
 </ol>
 <h3>Варіант А: API-ключ xAI</h3>
 <ol>
-<li>Перейди до <a href="https://console.x.ai/">консолі xAI</a>.</li>
-<li>Зареєструйся або увійди в систему.</li>
-<li>Перейди до розділу API та згенеруй новий API-ключ.</li>
-<li>Поповни рахунок у своєму обліковому записі.</li>
-<li>Встав ключ у поле <strong>LLM</strong> і встанови прапорець блокування.</li>
+<li>Перейдіть до <a href="https://console.x.ai/">xAI Console</a>.</li>
+<li>Зареєструйтеся або увійдіть в акаунт.</li>
+<li>Перейдіть до розділу API та згенеруйте новий API-ключ.</li>
+<li>Поповніть баланс акаунта.</li>
+<li>У <strong>Налаштування → Сервіси ШІ → Хмарне налаштування</strong> оберіть провайдера <strong>xAI (Grok)</strong>, вставте ключ у поле <strong>API-ключ</strong>, встановіть прапорець <strong>Заблоковано</strong> й натисніть <strong>Зберегти</strong>.</li>
 </ol>
 <h3>Варіант Б: API-ключ OpenAI</h3>
 <ol>
-<li>Перейди до <a href="https://platform.openai.com/">платформи OpenAI</a>.</li>
-<li>Зареєструйся або увійди в систему.</li>
-<li>Перейди до розділу API та згенеруй новий API-ключ.</li>
-<li>Встав ключ у поле <strong>LLM</strong> і встанови прапорець блокування.</li>
+<li>Перейдіть на <a href="https://platform.openai.com/">OpenAI Platform</a>.</li>
+<li>Зареєструйтеся або увійдіть в акаунт.</li>
+<li>Перейдіть до розділу API та згенеруйте новий API-ключ.</li>
+<li>У <strong>Налаштування → Сервіси ШІ → Хмарне налаштування</strong> оберіть провайдера <strong>OpenAI</strong>, вставте ключ у поле <strong>API-ключ</strong>, встановіть прапорець <strong>Заблоковано</strong> й натисніть <strong>Зберегти</strong>.</li>
 </ol>
 <h3>Варіант В: API-ключ Anthropic/Claude</h3>
 <ol>
-<li>Перейди до <a href="https://platform.claude.com">платформи Claude</a>.</li>
-<li>Увійди через електронну пошту або Google. Примітка: автентифікація здійснюється за допомогою чарівного посилання, надісланого на твою пошту.</li>
-<li>Перейди до <strong>Налаштування → Виставлення рахунків</strong> і поповни рахунок, перш ніж створювати ключ. Ключ, створений на незадіяному обліковому записі, не працюватиме навіть після поповнення.</li>
-<li>Перейди до <strong>API-ключів</strong> і створи ключ.</li>
-<li>Встав його в поле <strong>LLM</strong>, встанови прапорець блокування та запусти або перезапусти служби на вкладці ШІ.</li>
+<li>Перейдіть на <a href="https://platform.claude.com">Claude Platform</a>.</li>
+<li>Увійдіть через електронну пошту або Google. Примітка: вхід виконується за магічним посиланням, яке надходить на пошту.</li>
+<li>Перейдіть до <strong>Settings → Billing</strong> і поповніть баланс, перш ніж створювати ключ. Ключ, створений на акаунті без коштів, не працює, навіть якщо кошти додати пізніше.</li>
+<li>Перейдіть до <strong>API Keys</strong> і створіть ключ.</li>
+<li>У <strong>Налаштування → Сервіси ШІ → Хмарне налаштування</strong> оберіть провайдера <strong>Anthropic (Claude)</strong>, вставте ключ у поле <strong>API-ключ</strong>, встановіть прапорець <strong>Заблоковано</strong>, натисніть <strong>Зберегти</strong>, потім запустіть або перезапустіть сервіси на вкладці «Вега».</li>
 </ol>
-<h3>Отримання ключа Google TTS (14 голосів)</h3>
+<h3>Отримання ключа Google TTS</h3>
 <ol>
-<li>Перейди до <a href="https://console.cloud.google.com/">консолі Google Cloud</a>.</li>
-<li>Увійди або створи обліковий запис.</li>
-<li>Створи новий проєкт.</li>
-<li>Увімкни <strong>Generative Language API</strong> для LLM та/або <strong>Cloud Text-to-Speech API</strong> для TTS.</li>
-<li>Перейди до <strong>Облікові дані</strong>, створи API-ключ і скопіюй його.</li>
-<li><strong>Обмеж ключ</strong>: Натисни на щойно створений ключ. На сторінці деталей натисни <strong>Обмежити ключ</strong>. З&#39;явиться випадаючий список. Відмітьте кожен API, який ти увімкнув (STT та/або TTS), і натисни <strong>Зберегти</strong>.</li>
-<li>Встав ключ у поля <strong>Розпізнавання мовлення</strong> та/або <strong>Синтез мовлення</strong> в застосунку. Встанови прапорці блокування.</li>
+<li>Перейдіть до <a href="https://console.cloud.google.com/">Google Cloud Console</a>.</li>
+<li>Увійдіть або створіть акаунт.</li>
+<li>Створіть новий проєкт.</li>
+<li>Увімкніть <strong>Generative Language API</strong> для LLM та/або <strong>Cloud Text-to-Speech API</strong> для TTS.</li>
+<li>Перейдіть до <strong>Credentials</strong>, створіть API-ключ і скопіюйте його.</li>
+<li><strong>Обмежте ключ</strong>: натисніть на щойно створений ключ. На сторінці відомостей натисніть <strong>Restrict key</strong>. З&#39;явиться випадний список. Позначте кожен API, який ви увімкнули (STT та/або TTS), і натисніть <strong>Save</strong>.</li>
+<li>Вставте ключ у <strong>Налаштування → Сервіси ШІ → Мовлення (TTS) → Ключ Google TTS</strong>, встановіть прапорець <strong>Заблоковано</strong> й натисніть <strong>Зберегти</strong>.</li>
 </ol>
 
         </div>

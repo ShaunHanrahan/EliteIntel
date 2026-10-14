@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Einen lokalen Inferenzserver wählen  EliteIntel</title>
-    <meta name="description" content="Um ein lokales LLM mit Elite Intel zu betreiben, ist ein Inferenzserver erforderlich. Das ist eine Software, die das KI-Modell lädt und es über eine lokale API ">
+    <title>LLM auswählen  EliteIntel</title>
+    <meta name="description" content="Elite Intel braucht ein Sprachmodell (LLM), um deine Befehle zu verstehen und deine Fragen zu">
     <link rel="canonical" href="https://www.elite-intel.org/de/installing-local-llms.html">
     <link rel="alternate" hreflang="en" href="https://www.elite-intel.org/installing-local-llms.html">
     <link rel="alternate" hreflang="fr" href="https://www.elite-intel.org/fr/installing-local-llms.html">
@@ -12,8 +12,8 @@
     <link rel="alternate" hreflang="de" href="https://www.elite-intel.org/de/installing-local-llms.html">
     <link rel="alternate" hreflang="uk" href="https://www.elite-intel.org/uk/installing-local-llms.html">
     <link rel="alternate" hreflang="ru" href="https://www.elite-intel.org/ru/installing-local-llms.html">
-    <meta property="og:title" content="Einen lokalen Inferenzserver wählen  EliteIntel">
-    <meta property="og:description" content="Um ein lokales LLM mit Elite Intel zu betreiben, ist ein Inferenzserver erforderlich. Das ist eine Software, die das KI-Modell lädt und es über eine lokale API ">
+    <meta property="og:title" content="LLM auswählen  EliteIntel">
+    <meta property="og:description" content="Elite Intel braucht ein Sprachmodell (LLM), um deine Befehle zu verstehen und deine Fragen zu">
     <meta property="og:url" content="https://www.elite-intel.org/de/installing-local-llms.html">
     <meta property="og:type" content="website">
     <meta property="og:image" content="https://www.elite-intel.org/images/site-preview.png">
@@ -92,131 +92,164 @@
     </aside>
     <main class="content" id="content" role="main">
         <div class="content-inner markdown-body" id="content-inner">
-<h1>Einen lokalen Inferenzserver wählen</h1>
-<p>Um ein lokales LLM mit Elite Intel zu betreiben, ist ein <strong>Inferenzserver</strong> erforderlich. Das ist eine Software, die das KI-Modell lädt und es über eine lokale API bereitstellt. Es ist das lokale Äquivalent eines Cloud-KI-Dienstes und läuft vollständig auf deiner eigenen Hardware.</p>
-<p>Elite Intel nutzt <strong>LM Studio</strong> als Inferenzserver. Er läuft unter Windows und Linux und stellt eine OpenAI-kompatible API bereit.</p>
-<p><img src="../images/local-llm.png" alt="loca llm ui"></p>
-<h2>GPU-Anforderungen</h2>
-<p>Hardwareanforderungen, um Spiel und LLM auf demselben Rechner zu betreiben:</p>
+<h1>LLM auswählen</h1>
+<p>Elite Intel braucht ein Sprachmodell (LLM), um deine Befehle zu verstehen und deine Fragen zu
+beantworten. Es gibt zwei Wege dorthin, und beide richtest du unter <strong>Einstellungen → KI-Dienste →
+Sprachmodell (LLM)</strong> ein:</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Was du brauchst</th>
+<th>Kosten</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Lokal: LM Studio</strong></td>
+<td>Eine leistungsfähige GPU, <a href="https://lmstudio.ai">LM Studio</a> und das Modell <code>google/gemma-4-e4b</code></td>
+<td>Kostenlos. Alles bleibt auf deinem PC</td>
+</tr>
+<tr>
+<td><strong>Cloud</strong></td>
+<td>Ein Konto und einen API-Schlüssel bei einem unterstützten Anbieter</td>
+<td>Mit Mistral kostenlos. Die anderen Anbieter berechnen dir deine Nutzung</td>
+</tr>
+</tbody></table>
+<p><img src="../images/llm-setup.png" alt="LLM-Einrichtung"></p>
+<hr>
+<h2>Option 1: Lokal (LM Studio)</h2>
+<p>Die linke Seite des Bereichs, <strong>LMSTudio</strong>:</p>
+<table>
+<thead>
+<tr>
+<th>Feld</th>
+<th>Wert</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Adresse</strong></td>
+<td><code>http://localhost:1234/v1/chat/completions</code>. Läuft LM Studio auf einem anderen PC in deinem Netzwerk, ersetze <code>localhost</code> durch dessen IP-Adresse</td>
+</tr>
+<tr>
+<td><strong>Modell</strong></td>
+<td><code>google/gemma-4-e4b</code></td>
+</tr>
+</tbody></table>
+<p>LM Studio ist der einzige lokale Inferenzserver, den Elite Intel unterstützt, und
+<code>google/gemma-4-e4b</code> das einzige unterstützte lokale Modell.</p>
+<h3>GPU-Anforderungen</h3>
+<p>Diese Hardware brauchst du, um Spiel und LLM auf demselben Rechner zu betreiben:</p>
 <ul>
 <li>RTX 3090 24 GB VRAM</li>
 <li>AMD RX 7800 XT</li>
 </ul>
-<p>Wenn du nicht genug Hardware hast, nutze den <strong>kostenlosen Cloud-Dienst</strong> unter
-👉 <strong><a href="https://console.mistral.ai/">console.mistral.ai</a></strong> 👈 — kostenloser Tarif, ohne Kreditkarte.
-Einrichtungsschritte: <a href="cloud-llm-options.html">Kostenloses Cloud-LLM</a>.</p>
-<p>Eine GPU-Referenztabelle von <strong>Kevin Rank</strong> ist hier verfügbar:
+<p>Der VRAM zählt mehr als die GPU-Geschwindigkeit. Eine Karte mit nur 12 GB VRAM reicht nicht, egal
+wie neu sie ist. Hast du einen zweiten PC mit einer leistungsfähigen GPU, lass LM Studio dort laufen
+und richte Elite Intel darauf aus. Dann leistet der Spiele-PC keine Inferenzarbeit.</p>
+<p>Eine GPU-Referenztabelle von <strong>Kevin Rank</strong> findest du hier:
 <a href="https://docs.google.com/spreadsheets/d/1ZyPgTvlVg7ueemHEV-3J3j3tAynShIyxTs8rd59rips/edit?usp=sharing">GPU-Referenzleitfaden</a></p>
-<hr>
 <h3>Installationsanleitungen</h3>
 <table>
 <thead>
 <tr>
-<th>Inferenzserver</th>
+<th>Anleitung</th>
 <th></th>
 </tr>
 </thead>
 <tbody><tr>
-<td><a href="Install-LM-Studio-Linux.html">✅ LM Studio - Linux</a></td>
-<td>Schnell, mehr Modellflexibilität – Anleitung zeigt die Server-Einrichtung</td>
+<td><a href="Install-LM-Studio-Linux.html">LM Studio – Linux</a></td>
+<td>Desktop-Installation und Betrieb als Server</td>
 </tr>
 <tr>
-<td><a href="Install-LM-Studio-Windows.html">✅ LM Studio - Windows</a></td>
-<td>Schnell, mehr Modellflexibilität – mit GUI</td>
+<td><a href="Install-LM-Studio-Windows.html">LM Studio – Windows</a></td>
+<td>Desktop-App mit GUI</td>
 </tr>
 <tr>
-<td><a href="cloud-llm-options.html">🆓 Kostenloses Cloud-LLM</a></td>
-<td>Keine GPU nötig – kostenloser Mistral-Tarif, ohne Kreditkarte</td>
+<td><a href="AMD-RX-7800XT-LLM-Setup.html">LLMs auf der AMD-RX-Serie</a></td>
+<td>AMD-spezifische Einrichtung</td>
+</tr>
+<tr>
+<td><a href="LM-Studio-Ubuntu-Server.html">LM Studio auf Ubuntu Server</a></td>
+<td>Headless-Installation auf einem eigenen Inferenzrechner</td>
 </tr>
 </tbody></table>
+<h3>Warum gerade <code>google/gemma-4-e4b</code>?</h3>
+<p>Elite Intel ist ein Befehlsparser und ein Werkzeug zur Datenanalyse, kein Chatbot für Plaudereien.
+Natürlich klingendes Geplänkel reicht nicht. Das Modell muss aus deinen Worten die richtige Aktion
+ableiten, Spieldaten analysieren und strukturierte Ergebnisse liefern statt eines Aufsatzes oder
+HTML. Nicht jedes Modell dieser Größe schafft das zuverlässig.</p>
+<p>Die harte Anforderung ist <strong>Function Calling</strong>. Der Companion von Elite Intel bittet das Modell
+nicht, zu beschreiben, was es tun würde. Er gibt ihm eine Reihe von Werkzeugen und erwartet, dass
+es eines davon mit Argumenten aufruft. Ein Modell, das keinen sauberen Werkzeugaufruf erzeugen
+kann, kann die App überhaupt nicht steuern, egal wie gut es schreibt. <code>google/gemma-4-e4b</code>
+unterstützt Function Calling.</p>
+<p>Mit rund 6,3 GB passt es auf einer 24-GB-Karte mit reichlich Reserve neben dem Spiel in den VRAM.
+Nichts wird auf die CPU ausgelagert, also bleiben die Antworten schnell.</p>
+<blockquote>
+<p><strong>Zum ausgemusterten V1.0-Modell.</strong> Frühere Versionen empfahlen <code>tulu-3.1-8b-supernova</code>. Es
+unterstützt kein Function Calling, kann den Companion also nicht betreiben und funktioniert nicht
+mehr mit Elite Intel. Folgst du einer älteren Anleitung, ignoriere sie und installiere
+<code>google/gemma-4-e4b</code>.</p>
+</blockquote>
 <hr>
-<h3>LM Studio auf einen Blick</h3>
+<h2>Option 2: Cloud</h2>
+<p>Die rechte Seite des Bereichs, <strong>Cloud-Einrichtung</strong>:</p>
+<ol>
+<li>Wähle deinen Anbieter in der Liste <strong>Anbieter</strong>.</li>
+<li>Füge den Schlüssel dieses Anbieters in <strong>API-Schlüssel</strong> ein.</li>
+<li>Setze den Haken bei <strong>Gesperrt</strong>, damit der gespeicherte Schlüssel nicht versehentlich geändert wird.</li>
+<li>Drücke <strong>Speichern</strong> und starte dann die Dienste im Reiter Vega (neu).</li>
+</ol>
+<p>Den Anbieter wählst du selbst. Elite Intel versucht nicht, ihn am Schlüssel zu erkennen, denn die
+Anbieter ändern ihre Schlüsselformate zu oft, als dass das zuverlässig wäre. Ein Modell wählst du
+nicht: Elite Intel nimmt das passende für deinen Anbieter.</p>
 <table>
 <thead>
 <tr>
-<th></th>
-<th>LM Studio</th>
+<th>Anbieter</th>
+<th>Hinweise</th>
 </tr>
 </thead>
 <tbody><tr>
-<td><strong>Benötigtes Modell</strong></td>
-<td><code>google/gemma-4-e4b</code></td>
+<td><strong>Mistral</strong></td>
+<td>Kostenloses Kontingent, keine Kreditkarte nötig. Der einfachste Einstieg</td>
 </tr>
 <tr>
-<td><strong>Installation</strong></td>
-<td>Ein Skript, fertig</td>
+<td><strong>Anthropic (Claude)</strong></td>
+<td>Kostenpflichtig</td>
 </tr>
 <tr>
-<td><strong>Läuft als</strong></td>
-<td>Manueller Start, oder optionaler Autostart</td>
+<td><strong>OpenAI</strong></td>
+<td>Kostenpflichtig</td>
 </tr>
 <tr>
-<td><strong>Modell-Tuning</strong></td>
-<td>Flags beim Laden</td>
+<td><strong>Google (Gemini)</strong></td>
+<td>Kostenpflichtig</td>
 </tr>
 <tr>
-<td><strong>Windows-Autostart</strong></td>
-<td>Erfordert Desktop-App oder Aufgabenplanung</td>
+<td><strong>xAI (Grok)</strong></td>
+<td>Kostenpflichtig</td>
 </tr>
 <tr>
-<td><strong>Linux-Autostart</strong></td>
-<td>Manuelle systemd-Einrichtung (siehe Linux-Anleitung)</td>
-</tr>
-<tr>
-<td><strong>Modellquelle</strong></td>
-<td>HuggingFace (GGUF)</td>
-</tr>
-<tr>
-<td><strong>API-Port</strong></td>
-<td><code>1234</code></td>
-</tr>
-<tr>
-<td><strong>GUI</strong></td>
-<td>Optionale Desktop-App</td>
+<td><strong>DeepSeek</strong></td>
+<td>Kostenpflichtig</td>
 </tr>
 </tbody></table>
+<p>Wie du bei jedem Anbieter einen Schlüssel bekommst: <a href="cloud-llm-options.html">Cloud-LLM einrichten</a>.</p>
 <hr>
-<h3>Auswahlhilfe</h3>
-<p><strong>LM Studio lokal betreiben, wenn:</strong></p>
+<h2>Was soll ich nehmen?</h2>
+<p><strong>Nimm LM Studio lokal, wenn:</strong></p>
 <ul>
-<li>Du eine NVIDIA RTX 3090 24 GB oder besser hast. VRAM ist der entscheidende Faktor, nicht die GPU-Geschwindigkeit. Eine GPU mit nur 12 GB VRAM ist unzureichend, unabhängig von der Generation.</li>
-<li>Du Elite Dangerous und das LLM auf demselben Rechner betreibst</li>
-<li>Du Elite Intel auf einen separaten PC in deinem Netzwerk verweisen möchtest</li>
-<li>Du eine Desktop-GUI zum Durchsuchen, Herunterladen und Verwalten von Modellen möchtest oder einen sauberen Headless-Server auf einem dedizierten Inferenzrechner</li>
+<li>du eine RTX 3090 24 GB oder Gleichwertiges hast, oder einen zweiten PC im Netzwerk mit einer solchen Karte</li>
+<li>alles auf deiner eigenen Hardware bleiben soll</li>
 </ul>
-<p><strong>Stattdessen das <a href="cloud-llm-options.html">kostenlose Cloud-LLM</a> nutzen, wenn:</strong></p>
+<p><strong>Nimm einen Cloud-Anbieter, wenn:</strong></p>
 <ul>
-<li>Deine GPU nicht genug VRAM hat, um ein Modell neben dem Spiel zu betreiben</li>
-<li>Du keinen lokalen Inferenzserver betreiben möchtest</li>
+<li>deine GPU nicht genug VRAM hat, um ein Modell neben dem Spiel zu betreiben</li>
+<li>du überhaupt keinen Inferenzserver betreiben willst</li>
 </ul>
-<hr>
-<h2>Empfehlung des Entwicklers</h2>
-<p>Der Entwickler verwendet LM Studio mit <code>google/gemma-4-e4b</code> (~6,3 GB). Andere Modelle können
-funktionieren, sind aber nicht garantiert. Melde Kompatibilitätsergebnisse auf Matrix.</p>
-<h2>Warum genau <code>google/gemma-4-e4b</code>?</h2>
-<p>Elite Intel ist ein Befehls-Parser und ein Datenanalyse-Tool, kein konversationeller Chatbot. Das
-stellt spezifische Anforderungen an das Modell. Natürlich klingende Unterhaltung zu erzeugen reicht
-nicht aus. Das Modell muss Aktionen aus Spracheingabe korrekt ableiten, strukturierte Datenanalyse
-durchführen und Ergebnisse als strukturierte Daten zurückgeben – nicht als Markdown-Essay oder
-HTML. Nicht alle Modelle dieser Größe erfüllen das zuverlässig.</p>
-<p>Die harte Anforderung ist <strong>Function Calling</strong>. Der Begleiter von Elite Intel bittet das Modell
-nicht, zu beschreiben, was es tun würde – er bietet ihm eine Reihe von Werkzeugen an und erwartet,
-dass es eines davon mit Argumenten aufruft. Ein Modell, das keinen wohlgeformten Tool-Aufruf
-erzeugen kann, kann die App überhaupt nicht steuern, ganz gleich, wie gut es formuliert.
-<code>google/gemma-4-e4b</code> unterstützt das.</p>
-<p>Mit rund 6,3 GB passt es auf einer 24-GB-Karte neben dem Spiel in den VRAM, mit etwas Reserve. Das
-vermeidet CPU-Offload und hält den Inferenzdurchsatz hoch.</p>
-<blockquote>
-<p><strong>Zum eingestellten V1.0-Modell.</strong> Frühere Versionen empfahlen <code>tulu-3.1-8b-supernova</code>. Es
-unterstützt kein Function Calling, kann den Begleiter also nicht ausführen und ist mit Elite
-Intel nicht mehr verwendbar. Wenn du einer älteren Anleitung folgst, ignoriere sie und
-installiere <code>google/gemma-4-e4b</code>.</p>
-</blockquote>
-<h2>Kann ich ein anderes Modell verwenden?</h2>
-<p>Alternative Modelle können verwendet werden, müssen aber Function Calling unterstützen. Ohne das
-kann die App nichts ausführen.</p>
-<p>Der häufigste Fehlschlag mit einem alternativen Modell ist ein falsches Antwortformat – das Modell
-gibt Prosa zurück, die eine Aktion beschreibt, statt das Werkzeug tatsächlich aufzurufen.</p>
+<p>Unsicher? Fang mit dem kostenlosen Kontingent von Mistral an. Das dauert ein paar Minuten, und du
+kannst jederzeit ohne Neuinstallation auf lokal umsteigen.</p>
 <hr>
 <p>Community 👉<a href="https://matrix.to/#/#krondor:matrix.org"><strong>Matrix</strong></a>👈</p>
 

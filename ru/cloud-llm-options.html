@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Нет локального железа? Используй облачный LLM.  EliteIntel</title>
-    <meta name="description" content="Облачный вариант: Введи свой API-ключ для Mistral, xAI, OpenAI или Anthropic/Claude. Приложение использует фиксированную модель для каждого провайдера:">
+    <title>Нет мощного железа? Используйте облачную LLM.  EliteIntel</title>
+    <meta name="description" content="Облачный вариант: откройте Настройки → Сервисы ИИ → Облачная настройка, выберите провайдера в">
     <link rel="canonical" href="https://www.elite-intel.org/ru/cloud-llm-options.html">
     <link rel="alternate" hreflang="en" href="https://www.elite-intel.org/cloud-llm-options.html">
     <link rel="alternate" hreflang="fr" href="https://www.elite-intel.org/fr/cloud-llm-options.html">
@@ -12,8 +12,8 @@
     <link rel="alternate" hreflang="de" href="https://www.elite-intel.org/de/cloud-llm-options.html">
     <link rel="alternate" hreflang="uk" href="https://www.elite-intel.org/uk/cloud-llm-options.html">
     <link rel="alternate" hreflang="ru" href="https://www.elite-intel.org/ru/cloud-llm-options.html">
-    <meta property="og:title" content="Нет локального железа? Используй облачный LLM.  EliteIntel">
-    <meta property="og:description" content="Облачный вариант: Введи свой API-ключ для Mistral, xAI, OpenAI или Anthropic/Claude. Приложение использует фиксированную модель для каждого провайдера:">
+    <meta property="og:title" content="Нет мощного железа? Используйте облачную LLM.  EliteIntel">
+    <meta property="og:description" content="Облачный вариант: откройте Настройки → Сервисы ИИ → Облачная настройка, выберите провайдера в">
     <meta property="og:url" content="https://www.elite-intel.org/ru/cloud-llm-options.html">
     <meta property="og:type" content="website">
     <meta property="og:image" content="https://www.elite-intel.org/images/site-preview.png">
@@ -92,58 +92,88 @@
     </aside>
     <main class="content" id="content" role="main">
         <div class="content-inner markdown-body" id="content-inner">
-<h1>Нет локального железа? Используй облачный LLM.</h1>
+<h1>Нет мощного железа? Используйте облачную LLM.</h1>
 <p><strong>LLM (мозг ИИ)</strong></p>
-<p><em>Облачный вариант:</em> Введи свой API-ключ для Mistral, xAI, OpenAI или Anthropic/Claude. Приложение использует фиксированную модель для каждого провайдера:</p>
-<ul>
-<li><strong>Mistral</strong>: &#39;mistral-small-2506&#39; <strong>(Бесплатный уровень)</strong></li>
-<li><strong>xAI</strong>: <code>grok-4-1-fast-non-reasoning</code></li>
-<li><strong>OpenAI</strong>: <code>gpt-4.1-mini</code> (команды) / <code>gpt-5.2</code> (запросы)</li>
-<li><strong>Gemini Generative Language API</strong>: <code>gemini-3.1-flash-lite-preview</code> для команд и запросов</li>
-<li><strong>Anthropic/Claude</strong></li>
-<li><strong>DeepSeek</strong></li>
-</ul>
-<p>Стоимость будет зависеть от выбранного облачного сервиса и продолжительности игровых сессий.</p>
+<p><em>Облачный вариант:</em> откройте <strong>Настройки → Сервисы ИИ → Облачная настройка</strong>, выберите провайдера в
+списке <strong>Провайдер</strong>, вставьте API-ключ этого провайдера, установите флажок <strong>Заблокировано</strong> и
+нажмите <strong>Сохранить</strong>.</p>
+<p>Провайдера вы выбираете сами. Elite Intel не угадывает его по ключу: провайдеры слишком часто меняют
+формат ключей, чтобы на это можно было полагаться. Модель вы не выбираете: Elite Intel выбирает её
+для вашего провайдера:</p>
+<table>
+<thead>
+<tr>
+<th>Провайдер</th>
+<th>Используемая модель</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Mistral</strong> <em>(бесплатный тариф)</em></td>
+<td><code>mistral-small-2506</code></td>
+</tr>
+<tr>
+<td><strong>xAI</strong></td>
+<td><code>grok-4-1-fast-non-reasoning</code></td>
+</tr>
+<tr>
+<td><strong>OpenAI</strong></td>
+<td><code>gpt-5.4-mini</code></td>
+</tr>
+<tr>
+<td><strong>Gemini</strong> (Generative Language API)</td>
+<td><code>gemini-3.1-flash-lite-preview</code></td>
+</tr>
+<tr>
+<td><strong>Anthropic / Claude</strong></td>
+<td><code>claude-haiku-4-5</code></td>
+</tr>
+<tr>
+<td><strong>DeepSeek</strong></td>
+<td><code>deepseek-v4-flash</code></td>
+</tr>
+</tbody></table>
+<p>Стоимость зависит от выбранного облачного сервиса и от того, сколько вы играете.</p>
 <h3>БЕСПЛАТНЫЙ облачный вариант: Mistral</h3>
 <ol>
-<li>Перейди в <a href="https://console.mistral.ai/">консоль Mistral</a></li>
-<li>Создай аккаунт с действующим адресом электронной почты, который можно подтвердить.</li>
+<li>Перейдите в <a href="https://console.mistral.ai/">Mistral Console</a></li>
+<li>Создайте аккаунт с действующим адресом электронной почты, который можно подтвердить.</li>
 <li>БАНКОВСКАЯ КАРТА НЕ НУЖНА</li>
-<li>Создай «Организацию» (назови как угодно, например «Elite Intel»)</li>
-<li>Сгенерируй API-ключ. Введи его в приложение и перезапусти его.</li>
+<li>Создайте «Организацию» (назовите как угодно, например «Elite Intel»)</li>
+<li>Сгенерируйте API-ключ.</li>
+<li>В <strong>Настройки → Сервисы ИИ → Облачная настройка</strong> выберите провайдера <strong>Mistral</strong>, вставьте ключ, нажмите <strong>Сохранить</strong> и перезапустите сервисы на вкладке «Вега».</li>
 </ol>
 <h3>Вариант А: API-ключ xAI</h3>
 <ol>
-<li>Перейди в <a href="https://console.x.ai/">консоль xAI</a>.</li>
-<li>Зарегистрируйся или войди в аккаунт.</li>
-<li>Перейди в раздел API и сгенерируй новый API-ключ.</li>
-<li>Пополни баланс аккаунта.</li>
-<li>Вставь ключ в поле <strong>LLM</strong> и установи флажок блокировки.</li>
+<li>Перейдите в <a href="https://console.x.ai/">xAI Console</a>.</li>
+<li>Зарегистрируйтесь или войдите в аккаунт.</li>
+<li>Перейдите в раздел API и сгенерируйте новый API-ключ.</li>
+<li>Пополните баланс аккаунта.</li>
+<li>В <strong>Настройки → Сервисы ИИ → Облачная настройка</strong> выберите провайдера <strong>xAI (Grok)</strong>, вставьте ключ в поле <strong>API-ключ</strong>, установите флажок <strong>Заблокировано</strong> и нажмите <strong>Сохранить</strong>.</li>
 </ol>
 <h3>Вариант Б: API-ключ OpenAI</h3>
 <ol>
-<li>Перейди на <a href="https://platform.openai.com/">платформу OpenAI</a>.</li>
-<li>Зарегистрируйся или войди в аккаунт.</li>
-<li>Перейди в раздел API и сгенерируй новый API-ключ.</li>
-<li>Вставь ключ в поле <strong>LLM</strong> и установи флажок блокировки.</li>
+<li>Перейдите на <a href="https://platform.openai.com/">OpenAI Platform</a>.</li>
+<li>Зарегистрируйтесь или войдите в аккаунт.</li>
+<li>Перейдите в раздел API и сгенерируйте новый API-ключ.</li>
+<li>В <strong>Настройки → Сервисы ИИ → Облачная настройка</strong> выберите провайдера <strong>OpenAI</strong>, вставьте ключ в поле <strong>API-ключ</strong>, установите флажок <strong>Заблокировано</strong> и нажмите <strong>Сохранить</strong>.</li>
 </ol>
 <h3>Вариант В: API-ключ Anthropic/Claude</h3>
 <ol>
-<li>Перейди на <a href="https://platform.claude.com">платформу Claude</a>.</li>
-<li>Войди через электронную почту или Google. Примечание: аутентификация выполняется через магическую ссылку, отправленную на почту.</li>
-<li>Перейди в <strong>Настройки → Платежи</strong> и пополни баланс, прежде чем создавать ключ. Ключ, созданный на аккаунте без средств, не работает, даже если средства будут добавлены позже.</li>
-<li>Перейди в <strong>API-ключи</strong> и создай ключ.</li>
-<li>Вставь его в поле <strong>LLM</strong>, установи флажок блокировки и запусти или перезапусти сервисы на вкладке ИИ.</li>
+<li>Перейдите на <a href="https://platform.claude.com">Claude Platform</a>.</li>
+<li>Войдите через электронную почту или Google. Примечание: вход выполняется по магической ссылке, которая приходит на почту.</li>
+<li>Перейдите в <strong>Settings → Billing</strong> и пополните баланс, прежде чем создавать ключ. Ключ, созданный на аккаунте без средств, не работает, даже если средства добавить позже.</li>
+<li>Перейдите в <strong>API Keys</strong> и создайте ключ.</li>
+<li>В <strong>Настройки → Сервисы ИИ → Облачная настройка</strong> выберите провайдера <strong>Anthropic (Claude)</strong>, вставьте ключ в поле <strong>API-ключ</strong>, установите флажок <strong>Заблокировано</strong>, нажмите <strong>Сохранить</strong>, затем запустите или перезапустите сервисы на вкладке «Вега».</li>
 </ol>
-<h3>Получение ключа Google TTS (14 голосов)</h3>
+<h3>Получение ключа Google TTS</h3>
 <ol>
-<li>Перейди в <a href="https://console.cloud.google.com/">консоль Google Cloud</a>.</li>
-<li>Войди или создай аккаунт.</li>
-<li>Создай новый проект.</li>
-<li>Включи <strong>Generative Language API</strong> для LLM и/или <strong>Cloud Text-to-Speech API</strong> для TTS.</li>
-<li>Перейди в <strong>Учётные данные</strong>, создай API-ключ и скопируй его.</li>
-<li><strong>Ограничь ключ</strong>: нажми на только что созданный ключ. На странице сведений нажми <strong>Ограничить ключ</strong>. Появится выпадающий список. Отметь каждый API, который ты включил (STT и/или TTS), и нажми <strong>Сохранить</strong>.</li>
-<li>Вставь ключ в поля <strong>Распознавание речи</strong> и/или <strong>Синтез речи</strong> в приложении. Установи флажки блокировки.</li>
+<li>Перейдите в <a href="https://console.cloud.google.com/">Google Cloud Console</a>.</li>
+<li>Войдите или создайте аккаунт.</li>
+<li>Создайте новый проект.</li>
+<li>Включите <strong>Generative Language API</strong> для LLM и/или <strong>Cloud Text-to-Speech API</strong> для TTS.</li>
+<li>Перейдите в <strong>Credentials</strong>, создайте API-ключ и скопируйте его.</li>
+<li><strong>Ограничьте ключ</strong>: нажмите на только что созданный ключ. На странице сведений нажмите <strong>Restrict key</strong>. Появится выпадающий список. Отметьте каждый API, который вы включили (STT и/или TTS), и нажмите <strong>Save</strong>.</li>
+<li>Вставьте ключ в <strong>Настройки → Сервисы ИИ → Речь (TTS) → Ключ Google TTS</strong>, установите флажок <strong>Заблокировано</strong> и нажмите <strong>Сохранить</strong>.</li>
 </ol>
 
         </div>
