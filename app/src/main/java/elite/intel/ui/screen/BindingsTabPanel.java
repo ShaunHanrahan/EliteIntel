@@ -8,6 +8,7 @@ import elite.intel.ui.theme.HudPalette;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.HierarchyEvent;
 
 import static elite.intel.ui.i18n.MultiLingualTextProvider.getText;
 
@@ -24,6 +25,13 @@ public class BindingsTabPanel extends JPanel {
 
     public BindingsTabPanel() {
         buildUi();
+        // WHY: activation is the first opening of the BindForge tab - this one, not the Alias Designer sub-tab
+        // (Alan, 2026-10-13, A1b). Opening BindForge is the user coming to it; first setup may open over whichever
+        // sub-tab is showing.
+        addHierarchyListener(event -> {
+            if ((event.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) == 0 || !isShowing()) return;
+            aliasDesignerPanel.activateOnFirstShowing();
+        });
     }
 
     private void buildUi() {

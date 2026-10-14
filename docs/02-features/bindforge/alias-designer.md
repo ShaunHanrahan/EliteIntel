@@ -248,6 +248,36 @@ does. Never again after that.
 named and wait for Apply from the first visit. A6b's planned "not before first setup" rule for the hex case is
 withdrawn.
 
+#### Built — 2026-10-13 (Alan, A1b)
+
+Built as `bindforge.devicefiles.Activation`, run by `AliasDesignerPanel.activateOnFirstShowing()`, which the
+outer BindForge tab (`BindingsTabPanel`) calls the first time it is shown. The fact is the `bindforge_activation`
+table (migration `12005`, `BindForgeActivationManager`).
+
+- **The BindForge tab is the outer one**, not the Alias Designer sub-tab (Alan). First setup may open over
+  whichever sub-tab is showing.
+- **Tried once per run.** First setup abandoned is then **SET UP**'s, and the next run's first opening offers it
+  again. A backup that cannot be taken stops activation, logged, for the next run to retry.
+- **"Identical" is the push's own test:** nothing for first setup to ask, nothing shadowed, and
+  `DeviceFilesPush.plan` would write nothing to any reachable installation. An installation with no
+  `DeviceMappings.xml` is therefore not identical — the push would seed it — and opens first setup with nothing to
+  ask, whose **Continue** now stays offered so that write can be confirmed.
+- **The installations are detected again before activation reads them** (`InstallationRegistry.rescan()`), since
+  on a fresh database nothing is stored until detection runs, and the startup scan may still be running.
+- **Activated is written in the same transaction that fills the master**
+  (`BindForgeDeviceDraftManager.establish`), which now refuses once activated as well as when the master has rows.
+  The migration marks a master that already has rows as activated.
+- **The backup is taken once ever**, its folder recorded in `bindforge_activation.backup_folder`, as
+  `<time>_before-bindforge` in the default player backups folder: each installation's device files, and the
+  bindings folder's `.binds` and `StartPreset` files under `bindings\`. Only one bindings folder is known today —
+  there is no Linux installation provider yet.
+- **Told when the backup is taken** — that is the one time — spoken (`speech.bindforgeBackedUp`) and logged with
+  the folder.
+- **Every "empty master means not set up" test reads the fact now:** the gear, APPLY and **SET UP** on the screen,
+  and `DeviceFilesCheck` (whose `Report.setUp()` now means activated).
+- **Nothing prunes player backups yet.** When File Manager adds retention, the folder recorded in `backup_folder`
+  must be exempt.
+
 ### What it reads
 
 Every install's `DeviceMappings.xml` and `.buttonMap` files, plus two references that decide how rows are

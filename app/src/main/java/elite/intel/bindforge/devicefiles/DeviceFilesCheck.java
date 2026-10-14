@@ -5,6 +5,7 @@ import elite.intel.bindforge.devicefiles.DeviceFilesPush.MasterDevice;
 import elite.intel.bindforge.devicefiles.DeviceFilesPush.Target;
 import elite.intel.bindforge.install.GameInstallation;
 import elite.intel.db.dao.BindForgeDeviceMasterDao.DeviceRow;
+import elite.intel.db.managers.BindForgeActivationManager;
 import elite.intel.db.managers.BindForgeDeviceMasterManager;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
@@ -23,6 +24,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
 /**
@@ -124,9 +126,11 @@ public final class DeviceFilesCheck {
     }
 
     /**
-     * @param setUp       whether there is a master to compare against. Without one, first setup has not run, and
-     *                    nothing is compared - every custom entry would read as an edit, and nothing is forced on a
-     *                    user who has not asked (Alan, 2026-10-05)
+     * @param setUp       whether BindForge is activated, so there is a master to compare against - possibly an empty
+     *                    one. Before activation nothing is compared: every custom entry would read as an edit, and
+     *                    nothing is forced on a user who has not asked (Alan, 2026-10-05). <em>Activated, not "the
+     *                    master has rows"</em> (Alan, 2026-10-13, A1b): a user who owns nothing is activated with an
+     *                    empty master
      * @param masterNames every device name in the master the installations were compared against
      * @param userNames   those of them Frontier does not ship - what a reset to Frontier's file loses
      */
@@ -139,6 +143,7 @@ public final class DeviceFilesCheck {
         }
     }
 
+    private final BooleanSupplier activated;
     private final Supplier<List<Target>> targets;
     private final Supplier<List<MasterDevice>> master;
     private final Supplier<Set<String>> expectedLeftovers;
@@ -146,19 +151,22 @@ public final class DeviceFilesCheck {
 
     /** Checks the stored installations against the stored master. */
     public DeviceFilesCheck() {
-        this(DeviceFilesPush::storedInstallations,
+        this(BindForgeActivationManager.getInstance()::isActivated,
+                DeviceFilesPush::storedInstallations,
                 DeviceFilesPush::storedMaster,
                 DeviceFilesCheck::storedLeftovers,
                 FrontierStockDevices.getInstance());
     }
 
     /**
+     * @param activated         whether BindForge is activated - nothing is compared until it is
      * @param expectedLeftovers element names expected to linger in an installation after an Apply, which are not
      *                          the user adding anything: pending removals, and the old name of a rename not yet
      *                          carried out. Apply never removes, so these stay until something does
      */
-    DeviceFilesCheck(Supplier<List<Target>> targets, Supplier<List<MasterDevice>> master,
+    DeviceFilesCheck(BooleanSupplier activated, Supplier<List<Target>> targets, Supplier<List<MasterDevice>> master,
                      Supplier<Set<String>> expectedLeftovers, FrontierStockDevices stock) {
+        this.activated = activated;
         this.targets = targets;
         this.master = master;
         this.expectedLeftovers = expectedLeftovers;
@@ -167,8 +175,8 @@ public final class DeviceFilesCheck {
 
     /** Every installation against the master. */
     public Report check() {
+        if (!activated.getAsBoolean()) return new Report(false, Set.of(), Set.of(), List.of());
         List<MasterDevice> devices = master.get();
-        if (devices.isEmpty()) return new Report(false, Set.of(), Set.of(), List.of());
 
         Set<String> leftovers = expectedLeftovers.get();
         List<InstallationCheck> results = new ArrayList<>();
@@ -192,11 +200,11 @@ public final class DeviceFilesCheck {
      * One installation against the master - what adopt re-reads, so it acts on the files as they are now rather
      * than as they were when the user was shown them.
      *
-     * @return empty when no stored installation has that id, or when there is no master
+     * @return empty when no stored installation has that id, or before activation
      */
     public Optional<InstallationCheck> check(long installId) {
+        if (!activated.getAsBoolean()) return Optional.empty();
         List<MasterDevice> devices = master.get();
-        if (devices.isEmpty()) return Optional.empty();
         return targets.get().stream()
                 .filter(target -> target.installId() == installId)
                 .findFirst()

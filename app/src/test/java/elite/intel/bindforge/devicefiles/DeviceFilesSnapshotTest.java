@@ -57,6 +57,31 @@ class DeviceFilesSnapshotTest {
         assertNotEquals(first, second);
     }
 
+    /** Activation's "before BindForge" backup: all of the user's input data, the bindings folder included. */
+    @Test
+    void theBindingsFoldersPresetsAndStartPresetAreCopiedAndNothingElse() throws IOException {
+        Target steam = installation(1, "STEAM", "<Root/>");
+        Path bindings = Files.createDirectories(temp.resolve("Bindings"));
+        Files.writeString(bindings.resolve("Custom.4.2.binds"), "<Root/>");
+        Files.writeString(bindings.resolve("StartPreset.4.start"), "Custom\nCustom\nCustom\nCustom");
+        Files.writeString(bindings.resolve("StartPreset.start"), "Custom");
+        Files.writeString(bindings.resolve("notes.txt"), "not input data");
+        Path proton = Files.createDirectories(temp.resolve("ProtonBindings"));
+        Files.writeString(proton.resolve("Other.binds"), "<Root/>");
+
+        Path folder = new DeviceFilesSnapshot(temp.resolve("backups"), CLOCK)
+                .take("before-bindforge", List.of(steam), List.of(bindings, temp.resolve("never-made"), proton));
+
+        Path copied = folder.resolve("bindings");
+        assertTrue(Files.isRegularFile(copied.resolve("Custom.4.2.binds")));
+        assertTrue(Files.isRegularFile(copied.resolve("StartPreset.4.start")));
+        assertTrue(Files.isRegularFile(copied.resolve("StartPreset.start")));
+        assertFalse(Files.exists(copied.resolve("notes.txt")));
+        assertTrue(Files.isRegularFile(folder.resolve("bindings-2").resolve("Other.binds")),
+                "a missing folder takes no number");
+        assertTrue(Files.isRegularFile(folder.resolve("1-STEAM").resolve("DeviceMappings.xml")));
+    }
+
     /** A half-written snapshot would pass for a restore point in the backups list, so it is removed. */
     @Test
     void aCopyThatFailsLeavesNoSnapshotBehind() throws IOException {

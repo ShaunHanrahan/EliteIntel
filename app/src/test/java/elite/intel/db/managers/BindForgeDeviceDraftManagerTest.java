@@ -6,6 +6,8 @@ import elite.intel.db.managers.BindForgeDeviceDraftManager.AdoptionWrite;
 import elite.intel.db.managers.BindForgeDeviceDraftManager.DraftWrite;
 import elite.intel.db.managers.BindForgeDeviceDraftManager.Stored;
 import elite.intel.db.managers.BindForgeDeviceDraftManager.StoredDevice;
+import elite.intel.db.util.Database;
+import org.jdbi.v3.core.Handle;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -37,6 +39,7 @@ class BindForgeDeviceDraftManagerTest {
         draft.discard();
         master.findAll().forEach(row -> master.remove(row.id()));
         master.pendingRemovals().forEach(master::clearPendingRemoval);
+        notActivated();
         lvwap = master.record("LVWAP", "3344", "83F4", true).id();
         master.replaceLabels(lvwap, labels("Joy_1", "LV MAIN TRIGGER", "Joy_2", "PINKY"));
         master.record("RVWAP", "3344", "03F5", true);
@@ -406,6 +409,28 @@ class BindForgeDeviceDraftManagerTest {
         assertFalse(draft.isStarted(), "a draft left started would replace the new master with its empty copy");
     }
 
+    @Test
+    void establishingActivatesInTheSameTransaction() {
+        master.findAll().forEach(row -> master.remove(row.id()));
+
+        assertTrue(draft.establish(List.of(), List.of()), "a user who owns nothing is still activated");
+
+        assertTrue(BindForgeActivationManager.getInstance().isActivated());
+        assertTrue(master.findAll().isEmpty());
+    }
+
+    /** Activation happens once: an activated BindForge with an empty master is not filled again (Alan, 2026-10-13). */
+    @Test
+    void establishingRefusesOnceActivatedEvenWithAnEmptyMaster() {
+        master.findAll().forEach(row -> master.remove(row.id()));
+        BindForgeActivationManager.getInstance().activate();
+
+        assertFalse(draft.establish(List.of(new StoredDevice(null, "STICK2", "1234", "0001", true, null, Map.of())),
+                List.of()));
+
+        assertTrue(master.findAll().isEmpty());
+    }
+
     /** CLEAR: the device leaves the draft, and applying makes it a pending removal for the cleanup (A10). */
     @Test
     void clearingADeviceMakesItAPendingRemovalOnApply() {
@@ -471,5 +496,12 @@ class BindForgeDeviceDraftManagerTest {
             labels.put(tokenThenLabel[i], tokenThenLabel[i + 1]);
         }
         return labels;
+    }
+
+    /** The suite shares one database, and activation is a stored fact - each test starts before it. */
+    static void notActivated() {
+        try (Handle handle = Database.init()) {
+            handle.execute("UPDATE bindforge_activation SET activated_at = NULL, backup_folder = NULL WHERE id = 1");
+        }
     }
 }

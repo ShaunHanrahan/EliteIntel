@@ -1,6 +1,7 @@
 package elite.intel.ui.screen.bindings;
 
 import com.google.common.eventbus.Subscribe;
+import elite.intel.bindforge.devicefiles.Activation;
 import elite.intel.bindforge.devicefiles.BindsDeviceReferences;
 import elite.intel.bindforge.devicefiles.DeviceApply;
 import elite.intel.bindforge.devicefiles.DeviceDivergence;
@@ -33,6 +34,7 @@ import elite.intel.bindforge.install.WindowsGameInstallationProvider;
 import elite.intel.db.dao.BindForgeInstallationsDao.InstallationRow;
 import elite.intel.db.dao.BindForgeDeviceDraftDao.DraftRow;
 import elite.intel.db.dao.BindForgeDeviceMasterDao.DeviceRow;
+import elite.intel.db.managers.BindForgeActivationManager;
 import elite.intel.db.managers.BindForgeDeviceDraftManager;
 import elite.intel.db.managers.BindForgeDeviceMasterManager;
 import elite.intel.devices.DeviceService;
@@ -84,8 +86,13 @@ import static elite.intel.ui.theme.HudPalette.HUD_TABLE_ROW_HEIGHT;
 
 /**
  * Alias Designer, being built in stages: My Devices above the divergence list, and first setup opened from here
- * while the master is empty. The list compares each installation with the master, or before first setup, the
+ * until BindForge is activated. The list compares each installation with the master, or before activation, the
  * installations with each other.
+ * <p>
+ * <strong>Activation runs from here</strong> the first time the BindForge tab is shown in a run (Alan, 2026-10-13,
+ * A1b; {@link Activation}): the master filled with no prompt when the installations are identical, first setup
+ * opened when they are not. Every test of "set up" here is "activated", never "the master has rows" - a user who
+ * owns nothing is activated with an empty master.
  * <p>
  * Every installation is supposed to hold the same device files, so anywhere they disagree is something to
  * resolve. <strong>One list, not three</strong> - every kind of disagreement appears together, because
@@ -104,7 +111,7 @@ import static elite.intel.ui.theme.HudPalette.HUD_TABLE_ROW_HEIGHT;
  * shipped entries from the reference in the jar, read-only, with the divergence list beneath both (Alan, 2026-10-08).
  * <p>
  * <strong>A gear ends every My Devices row</strong> and opens the Device Editor for that device - the one record,
- * edited in a dialog and saved to the draft (Alan, 2026-10-10). Before first setup it says SET UP comes first and
+ * edited in a dialog and saved to the draft (Alan, 2026-10-10). Before activation it says SET UP comes first and
  * offers it: first setup throws any draft away as it fills the master, so edits saved before then would be lost.
  * <p>
  * <strong>APPLY and DISCARD are the screen's</strong>, in its footer (Alan, 2026-10-11, A10). APPLY writes the master
@@ -178,7 +185,10 @@ public class AliasDesignerPanel extends JPanel {
     private JButton applyButton;
     private JButton discardButton;
     private JLabel pendingLine;
-    private boolean masterEmpty;
+    /** Whether BindForge is activated, as of the last refresh. Written and read on the EDT only. */
+    private boolean activated;
+    /** Activation is tried once per run - abandoned first setup is then SET UP's, and the next run's to offer again. */
+    private final AtomicBoolean activationTried = new AtomicBoolean();
     private List<String> currentChanges = List.of();
     private boolean screenActionRunning;
 
@@ -280,8 +290,8 @@ public class AliasDesignerPanel extends JPanel {
         JButton rescanButton = makeButton(getText("bindings.aliasDesigner.button.recheck"));
         rescanButton.addActionListener(e -> initData());
 
-        // WHY: offered only while the master is empty - first setup runs once, and offered, never forced: the
-        // user opens it when they choose to.
+        // WHY: offered only until BindForge is activated - first setup runs once. Activation opens it on its own the
+        // first time the tab is shown; abandoned, it waits here for the user (Alan, 2026-10-13).
         setUpButton = makeButton(getText("bindings.aliasDesigner.firstSetup.button"));
         setUpButton.setEnabled(false);
         setUpButton.addActionListener(e -> openFirstSetup());
@@ -313,11 +323,11 @@ public class AliasDesignerPanel extends JPanel {
     }
 
     /**
-     * APPLY once the master exists, DISCARD while the draft changes something - and neither while one of them, or a
+     * APPLY once BindForge is activated, DISCARD while the draft changes something - and neither while one of them, or a
      * way out, is running.
      */
     private void refreshScreenActions() {
-        applyButton.setEnabled(!masterEmpty && !screenActionRunning);
+        applyButton.setEnabled(activated && !screenActionRunning);
         discardButton.setEnabled(!currentChanges.isEmpty() && !screenActionRunning);
         pendingLine.setText(currentChanges.isEmpty()
                 ? ""
@@ -344,12 +354,12 @@ public class AliasDesignerPanel extends JPanel {
             List<MyDevice> myDevices = List.of();
             List<BuiltInDevice> builtIn = List.of();
             Markers markers = Markers.NONE;
-            boolean empty = false;
+            boolean isActivated = false;
             List<String> changes = List.of();
             // WHY: null until read, so a refresh that failed before the hardware leaves the last answer on screen.
             Boolean running = null;
             try {
-                empty = BindForgeDeviceMasterManager.getInstance().findAll().isEmpty();
+                isActivated = BindForgeActivationManager.getInstance().isActivated();
                 changes = DraftChanges.stored();
                 List<InstallationRow> rows = registry.currentWithStartupScan();
                 labels = labelsFor(rows);
@@ -381,16 +391,16 @@ public class AliasDesignerPanel extends JPanel {
             List<MyDevice> loadedMyDevices = myDevices;
             List<BuiltInDevice> loadedBuiltIn = builtIn;
             Markers loadedMarkers = markers;
-            boolean loadedEmpty = empty;
+            boolean loadedActivated = isActivated;
             List<String> loadedChanges = changes;
             Boolean loadedRunning = running;
             SwingUtilities.invokeLater(() -> {
                 if (loadedRunning != null) deviceServiceRunning = loadedRunning;
                 installLabels = loadedLabels;
                 installPaths = loadedPaths;
-                masterEmpty = loadedEmpty;
+                activated = loadedActivated;
                 currentChanges = loadedChanges;
-                setUpButton.setEnabled(masterEmpty);
+                setUpButton.setEnabled(!activated);
                 refreshScreenActions();
                 showMyDevices(loadedMyDevices, loadedMarkers);
                 showBuiltIn(loadedBuiltIn);
@@ -734,18 +744,58 @@ public class AliasDesignerPanel extends JPanel {
             FirstSetup.Reading loadedReading = reading;
             String loadedFailure = failure;
             SwingUtilities.invokeLater(() -> {
-                setUpButton.setEnabled(masterEmpty);
-                // WHY: decided on the reading, not the message. An exception can carry no message, and keyed on
-                // that, a failed read would open the dialog with nothing to show.
-                if (loadedSetup == null || loadedReading == null) {
-                    HudConfirmDialog.info(this, getText("bindings.aliasDesigner.firstSetup.title"),
-                            getText("bindings.aliasDesigner.firstSetup.readFailed", loadedFailure),
-                            getText("bindings.aliasDesigner.firstSetup.close"));
-                    return;
-                }
-                new FirstSetupDialog(this, loadedSetup, loadedReading, names, this::initData).showDialog();
+                setUpButton.setEnabled(!activated);
+                showFirstSetup(loadedSetup, loadedReading, loadedFailure, names);
             });
         }, "BindForge-FirstSetupRead").start();
+    }
+
+    /** First setup's dialog for a reading - or, where the installations could not be read, why. On the EDT. */
+    private void showFirstSetup(FirstSetup setup, FirstSetup.Reading reading, String failure,
+                                Map<String, String> names) {
+        // WHY: decided on the reading, not the message. An exception can carry no message, and keyed on that, a
+        // failed read would open the dialog with nothing to show.
+        if (setup == null || reading == null) {
+            HudConfirmDialog.info(this, getText("bindings.aliasDesigner.firstSetup.title"),
+                    getText("bindings.aliasDesigner.firstSetup.readFailed", failure),
+                    getText("bindings.aliasDesigner.firstSetup.close"));
+            return;
+        }
+        new FirstSetupDialog(this, setup, reading, names, this::initData).showDialog();
+    }
+
+    /**
+     * Activation, the first time the BindForge tab is shown in a run (Alan, 2026-10-13, A1b): a "before BindForge"
+     * backup, then the master filled with no prompt when the installations are identical, or first setup opened when
+     * they are not. Called by the tab; does nothing once tried in this run or once activated.
+     */
+    public void activateOnFirstShowing() {
+        if (!activationTried.compareAndSet(false, true)) return;
+        new Thread(() -> {
+            Activation.Result result;
+            Map<String, String> names = Map.of();
+            try {
+                // WHY: a detection of its own, not currentWithStartupScan(). Activation reads the stored list, and on a
+                // fresh database nothing is stored until detection has run; the startup scan may still be running on
+                // the refresh thread, and the call that loses that race returns the list as it was - so the user
+                // would activate with an empty master. Once per run, so the cost is one more detection.
+                List<InstallationRow> rows = registry.rescan();
+                names = labelsFor(rows);
+                result = Activation.stored().run();
+            } catch (RuntimeException e) {
+                // WHY: broad on purpose - a thread boundary. Not activated, so SET UP stays offered.
+                log.warn("BindForge could not be activated", e);
+                result = null;
+            }
+            Activation.Result loadedResult = result;
+            Map<String, String> loadedNames = names;
+            SwingUtilities.invokeLater(() -> {
+                if (loadedResult != null && loadedResult.outcome() == Activation.Outcome.FIRST_SETUP) {
+                    showFirstSetup(loadedResult.setup(), loadedResult.reading(), loadedResult.reason(), loadedNames);
+                }
+                initData();
+            });
+        }, "BindForge-Activation").start();
     }
 
     /**
@@ -926,14 +976,15 @@ public class AliasDesignerPanel extends JPanel {
     }
 
     /**
-     * Opens the Device Editor for one My Devices row. Before first setup there is no master for its edits to be saved
+     * Opens the Device Editor for one My Devices row. Before activation there is no master for its edits to be saved
      * against - first setup throws any draft away - so it says SET UP comes first, and offers it (Alan, 2026-10-10).
      */
     private void openDeviceEditor(int row) {
         if (row < 0 || row >= currentMyDevices.size()) return;
-        // WHY: the master, not the report - a refresh that failed also leaves no report, and with a master present
-        // that is no reason to send the user to first setup (review, 2026-10-11).
-        if (masterEmpty) {
+        // WHY: the stored fact, not the report - a refresh that failed also leaves no report, and once activated that is
+        // no reason to send the user to first setup (review, 2026-10-11). Activated, not "the master has rows": a
+        // user who owns nothing is activated with an empty master (Alan, 2026-10-13).
+        if (!activated) {
             if (HudConfirmDialog.confirm(this, getText("bindings.aliasDesigner.editor.heading"),
                     getText("bindings.aliasDesigner.editor.beforeSetUp.message"),
                     getText("bindings.aliasDesigner.firstSetup.button"),

@@ -95,9 +95,11 @@ final class FirstSetupDialog extends JDialog {
         cancel.addActionListener(e -> dispose());
 
         if (reading.plan().isEmpty()) {
+            // WHY: Continue stays offered. Activation opens first setup whenever filling the master would write a game
+            // file, even with nothing to ask - an installation missing its DeviceMappings.xml - and the dialog's last
+            // button is how the user says yes to that write, and how BindForge is activated (Alan, 2026-10-13).
             body.add(HudBanner.multiline(getText("bindings.aliasDesigner.firstSetup.nothing"),
                     StatusBadge.State.IDLE), BorderLayout.CENTER);
-            continueButton.setEnabled(false);
         } else {
             body.add(HudTable.dataPlaneScrollPane(buildTable()), BorderLayout.CENTER);
             JPanel bottom = transparentPanel(new GridLayout(0, 1, 0, 6));

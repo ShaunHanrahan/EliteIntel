@@ -1,5 +1,6 @@
 package elite.intel.db.managers;
 
+import elite.intel.db.dao.BindForgeActivationDao;
 import elite.intel.db.dao.BindForgeDeviceDraftDao;
 import elite.intel.db.dao.BindForgeDeviceDraftDao.DraftRow;
 import elite.intel.db.dao.BindForgeDeviceMasterDao;
@@ -372,21 +373,23 @@ public class BindForgeDeviceDraftManager {
     }
 
     /**
-     * First setup: the master is filled for the first time, in one transaction (Alan, 2026-10-07).
+     * Activation: the master is filled for the first time, and BindForge is activated, in one transaction - by
+     * first setup (Alan, 2026-10-07), or with no prompt when the installations agree (Alan, 2026-10-13, A1b).
      * <p>
-     * Only into an empty master - first setup runs once, and a master that filled meanwhile is not overwritten.
-     * <strong>Any draft is thrown away</strong> in the same transaction: with the master empty it can hold no
+     * Only once - a BindForge already activated, or a master that filled meanwhile, is not overwritten. The master
+     * may be filled with nothing: a user who owns nothing is still activated.
+     * <strong>Any draft is thrown away</strong> in the same transaction: before activation it can hold no
      * edits of the user's, and left started it would replace the new master with its empty copy on the next
      * Apply.
      *
-     * @param devices         the master as it is to be. Ids are ignored
+     * @param devices         the master as it is to be, possibly none. Ids are ignored
      * @param pendingRemovals names whose entries are in the installations but not the master
-     * @return {@code false}, writing nothing, when the master was not empty
+     * @return {@code false}, writing nothing, when BindForge was already activated or the master was not empty
      */
     public boolean establish(List<StoredDevice> devices, List<String> pendingRemovals) {
         return inTransaction(daos -> {
             BindForgeDeviceMasterDao master = daos.master();
-            if (!master.findAll().isEmpty()) return false;
+            if (daos.activation().isActivated() || !master.findAll().isEmpty()) return false;
             daos.draft().deleteAll();
             daos.draft().clearStarted();
             for (StoredDevice device : devices) {
@@ -396,6 +399,7 @@ public class BindForgeDeviceDraftManager {
                 master.clearPendingRemoval(device.deviceName());
             }
             pendingRemovals.forEach(master::addPendingRemoval);
+            daos.activation().activate();
             return true;
         });
     }
@@ -455,11 +459,13 @@ public class BindForgeDeviceDraftManager {
     private static <R> R inTransaction(Function<Daos, R> work) {
         try (Handle handle = Database.init()) {
             return handle.inTransaction(h -> work.apply(
-                    new Daos(h.attach(BindForgeDeviceDraftDao.class), h.attach(BindForgeDeviceMasterDao.class))));
+                    new Daos(h.attach(BindForgeDeviceDraftDao.class), h.attach(BindForgeDeviceMasterDao.class),
+                            h.attach(BindForgeActivationDao.class))));
         }
     }
 
-    private record Daos(BindForgeDeviceDraftDao draft, BindForgeDeviceMasterDao master) {
+    private record Daos(BindForgeDeviceDraftDao draft, BindForgeDeviceMasterDao master,
+                        BindForgeActivationDao activation) {
     }
 
     private record PromotedDevice(DraftRow row, Map<String, String> labels) {

@@ -51,15 +51,29 @@ class DeviceFilesCheckTest {
     Path temp;
 
     private final Set<String> leftovers = new HashSet<>();
+    private boolean activated = true;
 
     @Test
-    void anEmptyMasterMeansFirstSetupHasNotRunAndNothingIsCompared() throws IOException {
+    void beforeActivationNothingIsCompared() throws IOException {
         Target steam = installation(1, "STEAM");
+        activated = false;
 
-        Report report = check(List.of(steam), List.of());
+        Report report = check(List.of(steam), List.of(RVWAP));
 
         assertFalse(report.setUp());
         assertTrue(report.installations().isEmpty());
+        assertTrue(checker(List.of(steam), List.of(RVWAP)).check(1).isEmpty());
+    }
+
+    /** A user who owns nothing is activated with an empty master, and is compared against it (Alan, 2026-10-13). */
+    @Test
+    void anActivatedEmptyMasterIsCompared() throws IOException {
+        Target steam = pushed(installation(1, "STEAM"), List.of());
+
+        Report report = check(List.of(steam), List.of());
+
+        assertTrue(report.setUp());
+        assertEquals(State.UNCHANGED, only(report).state());
     }
 
     @Test
@@ -265,7 +279,8 @@ class DeviceFilesCheckTest {
     }
 
     private DeviceFilesCheck checker(List<Target> targets, List<MasterDevice> master) {
-        return new DeviceFilesCheck(() -> targets, () -> master, () -> leftovers, FrontierStockDevices.getInstance());
+        return new DeviceFilesCheck(() -> activated, () -> targets, () -> master, () -> leftovers,
+                FrontierStockDevices.getInstance());
     }
 
     private Target pushed(Target target, List<MasterDevice> master) {

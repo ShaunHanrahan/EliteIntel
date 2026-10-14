@@ -50,7 +50,7 @@ public final class FirstSetup {
     public enum Outcome {
         /** The master is set up and was pushed; the report says how each installation fared. */
         APPLIED,
-        /** The master was no longer empty. Nothing was written. */
+        /** BindForge was already activated, or the master was no longer empty. Nothing was written. */
         ALREADY_SET_UP,
         /** The backup could not be taken. Nothing was written. */
         BACKUP_FAILED,
@@ -92,10 +92,13 @@ public final class FirstSetup {
         FirstSetupPlan.Installation read(Target target) throws IOException;
     }
 
-    /** Fills the master, only while it is empty - {@link BindForgeDeviceDraftManager#establish}. */
+    /**
+     * Fills the master and activates BindForge, only before activation - {@link BindForgeDeviceDraftManager#establish}.
+     * Activation without a prompt uses it too.
+     */
     @FunctionalInterface
     interface Establish {
-        /** @return {@code false}, writing nothing, when the master was not empty */
+        /** @return {@code false}, writing nothing, when BindForge was already activated or the master was not empty */
         boolean intoEmptyMaster(List<StoredDevice> devices, List<String> pendingRemovals);
     }
 
@@ -172,7 +175,7 @@ public final class FirstSetup {
         }
         try {
             if (!establish.intoEmptyMaster(resolution.devices(), resolution.pendingRemovals())) {
-                return new Result(Outcome.ALREADY_SET_UP, "the master is no longer empty", taken, resolution, null,
+                return new Result(Outcome.ALREADY_SET_UP, "BindForge is already activated", taken, resolution, null,
                         true);
             }
         } catch (RuntimeException e) {
