@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LM Studio on a Headless Ubuntu Server  EliteIntel</title>
+    <meta name="description" content="&gt; Elite Intel: this guide builds a dedicated LAN machine that runs LM Studio for Elite Intel. When it is done, set Address in the Settings Tab to `http://SERVER">
+    <link rel="canonical" href="https://www.elite-intel.org/LM-Studio-Ubuntu-Server.html">
+    <link rel="alternate" hreflang="en" href="https://www.elite-intel.org/LM-Studio-Ubuntu-Server.html">
+    <link rel="alternate" hreflang="fr" href="https://www.elite-intel.org/fr/LM-Studio-Ubuntu-Server.html">
+    <link rel="alternate" hreflang="es" href="https://www.elite-intel.org/es/LM-Studio-Ubuntu-Server.html">
+    <link rel="alternate" hreflang="de" href="https://www.elite-intel.org/de/LM-Studio-Ubuntu-Server.html">
+    <link rel="alternate" hreflang="uk" href="https://www.elite-intel.org/uk/LM-Studio-Ubuntu-Server.html">
+    <link rel="alternate" hreflang="ru" href="https://www.elite-intel.org/ru/LM-Studio-Ubuntu-Server.html">
+    <meta property="og:title" content="LM Studio on a Headless Ubuntu Server  EliteIntel">
+    <meta property="og:description" content="&gt; Elite Intel: this guide builds a dedicated LAN machine that runs LM Studio for Elite Intel. When it is done, set Address in the Settings Tab to `http://SERVER">
+    <meta property="og:url" content="https://www.elite-intel.org/LM-Studio-Ubuntu-Server.html">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="https://www.elite-intel.org/images/site-preview.png">
+    <meta property="og:image:type" content="image/png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="https://www.elite-intel.org/images/site-preview.png">
+    <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+
+<header class="site-header">
+    <button class="hamburger" id="hamburger" aria-label="Toggle navigation" aria-expanded="false">
+        <span></span><span></span><span></span>
+    </button>
+    <a class="site-logo" href="index.html">ELITE<span>INTEL</span></a>
+    <nav class="header-actions">
+        <img src="images/windows.png" alt="Windows" class="os-icon" title="Windows">
+        <img src="images/linux.png" alt="Linux" class="os-icon" title="Linux">
+        <a class="btn-primary" href="https://github.com/SudoKrondor/EliteIntel/releases/latest" target="_blank" rel="noopener">Download</a>
+        <a class="btn-secondary" href="https://matrix.to/#/#krondor:matrix.org" target="_blank" rel="noopener">Community</a>
+        <a class="btn-donate" href="https://www.paypal.com/donate/?business=44LZZ6RDNK4AJ&no_recurring=0&item_name=Support+Elite+Intel+development+today+with+your+generous+donation%21&currency_code=USD" target="_blank" rel="noopener">Donate</a>
+        <a class="btn-patreon" href="https://www.patreon.com/cw/SudoKrondor" target="_blank" rel="noopener">Patreon</a>
+        <a class="btn-ghost" href="https://github.com/SudoKrondor/EliteIntel" target="_blank" rel="noopener">GitHub</a>
+        <div class="locale-switcher"><span class="locale-current">EN</span><a href="fr/LM-Studio-Ubuntu-Server.html" class="locale-link">FR</a><a href="es/LM-Studio-Ubuntu-Server.html" class="locale-link">ES</a><a href="de/LM-Studio-Ubuntu-Server.html" class="locale-link">DE</a><a href="uk/LM-Studio-Ubuntu-Server.html" class="locale-link">UK</a><a href="ru/LM-Studio-Ubuntu-Server.html" class="locale-link">RU</a></div>
+    </nav>
+</header>
+
+<div class="sidebar-overlay" id="overlay"></div>
+
+<div class="layout">
+    <aside class="sidebar" id="sidebar" aria-label="Wiki navigation">
+        <nav class="wiki-nav">
+
+            <a href="index.html" class="nav-link"><img src="images/elite-logo.png" class="inline" height="20" alt=""> Home</a>
+
+            <div class="nav-section">App</div>
+            <a href="Installation.html" class="nav-link"><img src="images/release.png" class="inline" height="20" alt=""> Installation</a>
+            <a href="UI.html" class="nav-link"><img src="images/microchip-ai.png" class="inline" height="20" alt=""> User Interface</a>
+            <a href="UI-Vega-Tab.html" class="nav-link nav-sub"><img src="images/ai.png" class="inline" height="20" alt=""> Vega Tab</a>
+            <a href="UI-Commander-Tab.html" class="nav-link nav-sub"><img src="images/controller.png" class="inline" height="20" alt=""> Commander Tab</a>
+            <a href="UI-Actions-Tab.html" class="nav-link nav-sub"><img src="images/keys-binding.png" class="inline" height="20" alt=""> Actions Tab</a>
+            <a href="UI-Bindings-Tab.html" class="nav-link nav-sub"><img src="images/keys-binding.png" class="inline" height="20" alt=""> Bindings Tab</a>
+            <a href="UI-Settings-Tab.html" class="nav-link nav-sub"><img src="images/settings.png" class="inline" height="20" alt=""> Settings Tab</a>
+            <a href="UI-Jukebox-Tab.html" class="nav-link nav-sub"><img src="images/speaker.png" class="inline" height="20" alt=""> Jukebox Tab</a>
+            <a href="UI-Stats-Tab.html" class="nav-link nav-sub"><img src="images/stats.png" class="inline" height="20" alt=""> Stats Tab</a>
+            <a href="UI-HUD-Overlay.html" class="nav-link nav-sub"><img src="images/microchip-ai.png" class="inline" height="20" alt=""> HUD Overlay</a>
+
+            <div class="nav-section">Wiki</div>
+            <a href="installing-local-llms.html" class="nav-link"><img src="images/microchip-ai.png" class="inline" height="20" alt=""> Choose your LLM</a>
+            <a href="cloud-llm-options.html" class="nav-link nav-sub"><img src="images/ai.png" class="inline" height="20" alt=""> 🆓 Free Cloud LLM</a>
+            <a href="Install-LM-Studio-Linux.html" class="nav-link nav-sub"><img src="images/ai.png" class="inline" height="20" alt=""> LM Studio  Linux</a>
+            <a href="Install-LM-Studio-Windows.html" class="nav-link nav-sub"><img src="images/ai.png" class="inline" height="20" alt=""> LM Studio  Windows</a>
+            <a href="AMD-RX-7800XT-LLM-Setup.html" class="nav-link nav-sub"><img src="images/ai.png" class="inline" height="20" alt=""> AMD RX Series</a>
+            <a href="LM-Studio-Ubuntu-Server.html" class="nav-link nav-sub active"><img src="images/ai.png" class="inline" height="20" alt=""> Headless Ubuntu Server</a>
+
+            <div class="nav-section">How Do I…?</div>
+            <a href="General-Operation.html" class="nav-link"><img src="images/manual.png" class="inline" height="20" alt=""> General Operation</a>
+            <a href="AllCommands.html" class="nav-link"><img src="images/manual.png" class="inline" height="20" alt=""> All Commands &amp; Queries</a>
+            <a href="Obscure-System-Commands.html" class="nav-link"><img src="images/manual.png" class="inline" height="20" alt=""> System Commands</a>
+            <a href="Custom-Commands.html" class="nav-link"><img src="images/manual.png" class="inline" height="20" alt=""> Make Your Own Commands</a>
+            <a href="TradeRoutePlotting.html" class="nav-link"><img src="images/manual.png" class="inline" height="20" alt=""> Trade &amp; Profit</a>
+            <a href="Search-galaxy-with-EliteIntel.html" class="nav-link"><img src="images/manual.png" class="inline" height="20" alt=""> Search the Galaxy</a>
+            <a href="Discovery-Assistance.html" class="nav-link"><img src="images/manual.png" class="inline" height="20" alt=""> Discovery &amp; ExoBiology</a>
+            <a href="Colonisation.html" class="nav-link"><img src="images/manual.png" class="inline" height="20" alt=""> Colonisation</a>
+            <a href="Navigation-Assistance.html" class="nav-link"><img src="images/manual.png" class="inline" height="20" alt=""> Navigation</a>
+            <a href="Pirate-Massacre-Mission-Tracking.html" class="nav-link"><img src="images/manual.png" class="inline" height="20" alt=""> Pirate Missions</a>
+
+            <div class="nav-section">Community</div>
+            <a href="https://matrix.to/#/#krondor:matrix.org" class="nav-link nav-external" target="_blank" rel="noopener"><img src="images/communications.png" class="inline" height="20" alt=""> Matrix Chat ↗</a>
+            <a href="https://www.youtube.com/@SudoKrondor" class="nav-link nav-external" target="_blank" rel="noopener">&#9654; YouTube &#8599;</a>
+            <a href="https://github.com/SudoKrondor/EliteIntel" class="nav-link nav-external" target="_blank" rel="noopener">&#8903; GitHub &#8599;</a>
+
+            <a href="Privacy.html" class="nav-link">🔒 Privacy Policy</a>
+            <a href="Contact.html" class="nav-link">📧 Contact Developer</a>
+        </nav>
+    </aside>
+    <main class="content" id="content" role="main">
+        <div class="content-inner markdown-body" id="content-inner">
+<h1>LM Studio on a Headless Ubuntu Server</h1>
+<blockquote>
+<p>Guide is provided by <strong>Wim</strong></p>
+</blockquote>
+<blockquote>
+<p><strong>Elite Intel:</strong> this guide builds a dedicated LAN machine that runs LM Studio for Elite Intel. When it is done, set <strong>Address</strong> in the <a href="UI-Settings-Tab.html">Settings Tab</a> to <code>http://SERVER_IP:1234/v1/chat/completions</code> and load the supported model, <strong><code>google/gemma-4-e4b</code></strong>. The server must listen beyond localhost (<code>--bind 0.0.0.0</code>, see Part 2 § 9) and the firewall must allow the gaming PC.</p>
+</blockquote>
+<hr>
+<h1>Part 1: Ubuntu Server for a Local AI / LM Studio Host</h1>
+<p><strong>Clean baseline installation guide</strong><br><strong>Recommended baseline:</strong> Ubuntu Server 24.04 LTS (amd64)<br><strong>Document date:</strong> 12 September 2026</p>
+<h2>1. Purpose</h2>
+<p>This guide prepares a clean Ubuntu Server machine for a headless local-AI workload such as LM Studio / llmster. It deliberately stops before installing LM Studio itself. The goal is a small, understandable server with working networking, SSH, updates, firewalling, and - when applicable - a validated NVIDIA GPU driver.</p>
+<p>This is not a recovery or hardware-troubleshooting guide. It assumes the machine is stable at stock CPU/RAM settings and that important data has already been backed up.</p>
+<h2>2. Which Ubuntu version?</h2>
+<p>For a conservative, long-lived AI server, this guide uses <strong>Ubuntu Server 24.04 LTS (Noble Numbat)</strong>. Canonical provides standard security maintenance for Ubuntu 24.04 LTS through May 2029. Ubuntu 26.04 LTS is also available and is the current newer LTS, but 24.04 remains fully supported and is a mature baseline for systems where stability is more important than having the newest kernel and userspace.</p>
+<p>For a brand-new deployment where newer hardware requires the latest kernel/driver stack, Ubuntu 26.04 LTS is also a reasonable choice. The commands in this guide are intentionally conventional and should remain very similar.</p>
+<p>Official references:</p>
+<ul>
+<li><a href="https://ubuntu.com/about/release-cycle">https://ubuntu.com/about/release-cycle</a></li>
+<li><a href="https://documentation.ubuntu.com/release-notes/24.04/">https://documentation.ubuntu.com/release-notes/24.04/</a></li>
+<li><a href="https://ubuntu.com/server/docs/tutorial/basic-installation/">https://ubuntu.com/server/docs/tutorial/basic-installation/</a></li>
+</ul>
+<h2>3. Before installation</h2>
+<p>Have the following ready:</p>
+<ul>
+<li>A 64-bit Intel/AMD machine (amd64) for this guide.</li>
+<li>A USB stick containing the Ubuntu Server ISO.</li>
+<li>Wired Ethernet if possible.</li>
+<li>The intended hostname, username, and a strong password.</li>
+<li>A decision about which disk Ubuntu may erase.</li>
+<li>For GPU inference, a supported NVIDIA GPU installed and powered correctly.</li>
+</ul>
+<p>If the machine previously ran overclocked CPU or RAM settings, return it to stable stock settings before commissioning it as a server. AI runtimes and kernel-module compilation can expose instability that lighter workloads do not.</p>
+<h2>4. Install Ubuntu Server</h2>
+<p>Boot the Ubuntu Server installer and follow the normal installer flow. For a simple dedicated server:</p>
+<ol>
+<li>Select the language and keyboard layout.</li>
+<li>Allow the installer to configure wired networking with DHCP initially.</li>
+<li>Use the intended system disk. <strong>Disk partitioning can destroy existing data</strong>, so verify the selected disk carefully.</li>
+<li>Create the administrator user and hostname.</li>
+<li>Select <strong>Install OpenSSH server</strong> when offered. If it was not selected, it can be installed after the first boot.</li>
+<li>Skip optional server snaps unless you specifically need them.</li>
+<li>Complete the installation and reboot.</li>
+</ol>
+<h2>5. First login and system update</h2>
+<p>Log in locally or by SSH, then update the package index and installed packages:</p>
+<pre><code class="language-bash">sudo apt update
+sudo apt upgrade -y
+</code></pre>
+<p>If Ubuntu reports that a reboot is required:</p>
+<pre><code class="language-bash">sudo reboot
+</code></pre>
+<p>After reconnecting, confirm the release and kernel:</p>
+<pre><code class="language-bash">lsb_release -a
+uname -r
+</code></pre>
+<h2>6. Install a small administration toolkit</h2>
+<p>The following packages are useful on a headless AI server:</p>
+<pre><code class="language-bash">sudo apt install -y \
+  openssh-server \
+  curl \
+  ca-certificates \
+  jq \
+  htop \
+  nvtop \
+  ufw
+</code></pre>
+<p><code>curl</code> is used by the LM Studio installer and API tests, <code>jq</code> makes JSON output readable, <code>htop</code> monitors CPU/RAM, <code>nvtop</code> monitors GPUs, and <code>ufw</code> provides a simple host firewall.</p>
+<p>Confirm SSH is enabled:</p>
+<pre><code class="language-bash">systemctl status ssh --no-pager
+</code></pre>
+<h2>7. SSH access</h2>
+<p>Find the server&#39;s current address:</p>
+<pre><code class="language-bash">ip -br address
+</code></pre>
+<p>From another machine on the LAN:</p>
+<pre><code class="language-bash">ssh YOUR_USER@SERVER_IP
+</code></pre>
+<p>For regular use, SSH public-key authentication is preferable to repeatedly entering a password. On the client machine:</p>
+<pre><code class="language-bash">ssh-keygen -t ed25519
+ssh-copy-id YOUR_USER@SERVER_IP
+</code></pre>
+<p>Test a new SSH session before changing any password-authentication settings. Do not lock yourself out of a remote server.</p>
+<p>Official OpenSSH reference:
+<a href="https://ubuntu.com/server/docs/how-to/security/openssh-server/">https://ubuntu.com/server/docs/how-to/security/openssh-server/</a></p>
+<h2>8. Basic firewall</h2>
+<p>Before enabling UFW, allow SSH:</p>
+<pre><code class="language-bash">sudo ufw allow OpenSSH
+sudo ufw enable
+sudo ufw status verbose
+</code></pre>
+<p>For a dedicated home/LAN AI server, it is better to expose application ports only to trusted clients or the trusted LAN rather than to every network interface indiscriminately.</p>
+<p>LM Studio&#39;s default API port is 1234. <strong>Do not open it yet.</strong> Add the appropriate rule when LM Studio is installed and you know which clients should reach it.</p>
+<p>Official firewall reference:
+<a href="https://ubuntu.com/server/docs/how-to/security/firewalls/">https://ubuntu.com/server/docs/how-to/security/firewalls/</a></p>
+<h2>9. NVIDIA GPU driver</h2>
+<p>Skip this section if the server will use CPU inference or a non-NVIDIA accelerator.</p>
+<p>First update the system and reboot if necessary. Then let Ubuntu identify suitable NVIDIA compute drivers:</p>
+<pre><code class="language-bash">sudo ubuntu-drivers list --gpgpu
+</code></pre>
+<p>For a compute/server workload, Ubuntu documents automatic installation with:</p>
+<pre><code class="language-bash">sudo ubuntu-drivers install --gpgpu
+</code></pre>
+<p>Reboot after installation:</p>
+<pre><code class="language-bash">sudo reboot
+</code></pre>
+<p>Then validate the GPU:</p>
+<pre><code class="language-bash">nvidia-smi
+</code></pre>
+<p>A successful <code>nvidia-smi</code> should show the GPU, driver version, temperature, VRAM, and process table.</p>
+<h3>Secure Boot note</h3>
+<p>Secure Boot requires compatible signed kernel modules. Ubuntu&#39;s <code>ubuntu-drivers</code> tooling is the preferred installation path because it is designed to select Ubuntu-packaged drivers appropriately. If the NVIDIA module does not load, check Secure Boot state before repeatedly reinstalling drivers:</p>
+<pre><code class="language-bash">mokutil --sb-state
+</code></pre>
+<p>Do not disable Secure Boot merely as a routine first step. If your particular firmware/driver combination has signing or MOK-enrollment problems, resolve that deliberately and document the BIOS change.</p>
+<p>Official NVIDIA-on-Ubuntu reference:
+<a href="https://ubuntu.com/server/docs/how-to/graphics/install-nvidia-drivers/">https://ubuntu.com/server/docs/how-to/graphics/install-nvidia-drivers/</a></p>
+<h2>10. Final readiness check</h2>
+<p>Run:</p>
+<pre><code class="language-bash">hostnamectl
+ip -br address
+systemctl is-active ssh
+sudo ufw status
+free -h
+df -h /
+nvidia-smi    # NVIDIA systems only
+</code></pre>
+<p>At this point the machine should have:</p>
+<ul>
+<li>a supported Ubuntu LTS installation;</li>
+<li>current package updates;</li>
+<li>working LAN connectivity;</li>
+<li>working SSH access;</li>
+<li>a basic firewall;</li>
+<li>useful administration tools;</li>
+<li>a validated NVIDIA driver, if applicable.</li>
+</ul>
+<p>The server is now ready for the LM Studio / llmster installation.</p>
+<h2>11. What is intentionally not covered</h2>
+<p>This baseline does not configure NAS/Samba storage, Docker, databases, web servers, RAID, custom disk layouts, VPNs, Pi-hole/DNS, desktop environments, CUDA Toolkit, or application-specific software. Those belong to separate deployment guides.</p>
+<p>A standalone CUDA Toolkit is <strong>not required merely to run LM Studio with a supported NVIDIA GPU</strong>; use the runtime/driver stack LM Studio supports unless another application specifically requires the CUDA development toolkit.</p>
+<h2>12. Maintenance basics</h2>
+<p>Periodically apply normal updates:</p>
+<pre><code class="language-bash">sudo apt update
+sudo apt upgrade
+</code></pre>
+<p>Check whether a reboot is pending:</p>
+<pre><code class="language-bash">if [ -f /run/reboot-required ]; then
+  cat /run/reboot-required
+fi
+</code></pre>
+<p>Before a major Ubuntu release upgrade, read that release&#39;s notes and back up the server. Major release upgrades are different from ordinary package updates.</p>
+<hr>
+<h2>Official sources</h2>
+<ul>
+<li>Ubuntu Server documentation: <a href="https://ubuntu.com/server/docs/">https://ubuntu.com/server/docs/</a></li>
+<li>Ubuntu release cycle: <a href="https://ubuntu.com/about/release-cycle">https://ubuntu.com/about/release-cycle</a></li>
+<li>Ubuntu 24.04 LTS release notes: <a href="https://documentation.ubuntu.com/release-notes/24.04/">https://documentation.ubuntu.com/release-notes/24.04/</a></li>
+<li>Basic installation: <a href="https://ubuntu.com/server/docs/tutorial/basic-installation/">https://ubuntu.com/server/docs/tutorial/basic-installation/</a></li>
+<li>Package management: <a href="https://ubuntu.com/server/docs/how-to/software/package-management/">https://ubuntu.com/server/docs/how-to/software/package-management/</a></li>
+<li>OpenSSH: <a href="https://ubuntu.com/server/docs/how-to/security/openssh-server/">https://ubuntu.com/server/docs/how-to/security/openssh-server/</a></li>
+<li>UFW/firewall: <a href="https://ubuntu.com/server/docs/how-to/security/firewalls/">https://ubuntu.com/server/docs/how-to/security/firewalls/</a></li>
+<li>NVIDIA drivers: <a href="https://ubuntu.com/server/docs/how-to/graphics/install-nvidia-drivers/">https://ubuntu.com/server/docs/how-to/graphics/install-nvidia-drivers/</a></li>
+</ul>
+<hr>
+<h1>Part 2: LM Studio Headless Server and Model Management</h1>
+<p><strong>Installation, model choice, quantization, API service, and model switching</strong><br><strong>Target:</strong> Linux/Ubuntu headless server<br><strong>Document date:</strong> 12 September 2026</p>
+<h2>1. Purpose</h2>
+<p>This guide starts with a clean Ubuntu server that already has working networking, SSH, and - for NVIDIA acceleration - a validated GPU driver. It installs LM Studio&#39;s headless runtime, explains how to choose and download models, exposes the local API when desired, and provides an interactive Bash model switcher.</p>
+<p>LM Studio&#39;s server-native component is called <strong>llmster</strong>. The command-line program used to control it is <strong>lms</strong>. A graphical desktop is not required.</p>
+<p>Official headless documentation:
+<a href="https://lmstudio.ai/docs/developer/core/headless">https://lmstudio.ai/docs/developer/core/headless</a></p>
+<h2>2. Three names to understand</h2>
+<ul>
+<li><strong>LM Studio</strong> is the overall product and ecosystem.</li>
+<li><strong>llmster</strong> is the headless/server daemon. It runs the inference service without a GUI.</li>
+<li><strong>lms</strong> is the CLI used to download, load, unload, inspect, and serve models.</li>
+</ul>
+<p>On a dedicated Linux inference server, llmster + lms is normally the cleanest arrangement.</p>
+<h2>3. Install llmster / lms</h2>
+<p>Install as the normal user who will run the service, not as root:</p>
+<pre><code class="language-bash">curl -fsSL https://lmstudio.ai/install.sh | bash
+</code></pre>
+<p>Start the daemon:</p>
+<pre><code class="language-bash">lms daemon up
+</code></pre>
+<p>Verify the CLI:</p>
+<pre><code class="language-bash">lms --version
+lms --help
+</code></pre>
+<p>If the shell cannot find <code>lms</code>, start a new login shell or add LM Studio&#39;s binary directory to the current shell PATH:</p>
+<pre><code class="language-bash">export PATH=&quot;$HOME/.lmstudio/bin:$PATH&quot;
+</code></pre>
+<p>To make that explicit for Bash:</p>
+<pre><code class="language-bash">echo &#39;export PATH=&quot;$HOME/.lmstudio/bin:$PATH&quot;&#39; &gt;&gt; ~/.bashrc
+source ~/.bashrc
+</code></pre>
+<h2>4. Find and download models</h2>
+<p>Running <code>lms get</code> without a model shows recommendations:</p>
+<pre><code class="language-bash">lms get
+</code></pre>
+<p>Download a model by its catalog name:</p>
+<pre><code class="language-bash">lms get publisher/model-name
+</code></pre>
+<p>For example, the exact model is deliberately left to the reader rather than hard-coded into this guide.</p>
+<p>List downloaded models:</p>
+<pre><code class="language-bash">lms ls
+</code></pre>
+<p>Show downloaded variants/quantizations when available:</p>
+<pre><code class="language-bash">lms ls --variants
+</code></pre>
+<p>JSON output is useful for scripts:</p>
+<pre><code class="language-bash">lms ls --json | jq
+</code></pre>
+<p>LM Studio can download supported models from its catalog/Hugging Face ecosystem. The current CLI also supports specifying a quantization while downloading, for example:</p>
+<pre><code class="language-bash">lms get publisher/model-name@q4_k_m
+</code></pre>
+<p>Use the actual quantization names offered for that model; not every model is published in every format.</p>
+<p>Official model-download documentation:
+<a href="https://lmstudio.ai/docs/cli/local-models/get">https://lmstudio.ai/docs/cli/local-models/get</a></p>
+<h2>5. Model size versus quantization - a beginner&#39;s explanation</h2>
+<p>A model contains billions of learned numerical values called <strong>weights</strong>. Higher numerical precision stores those values more faithfully but consumes more disk space and RAM/VRAM. <strong>Quantization</strong> compresses the model by representing those values with fewer bits.</p>
+<p>A useful mental model is a high-quality audio recording: Q8 preserves more detail, Q6 compresses somewhat more, and Q4 compresses further. They are still versions of the same trained model; Q8 does not magically add new training or knowledge.</p>
+<p>Typical interpretation:</p>
+<table>
+<thead>
+<tr>
+<th>Quantization</th>
+<th>Memory use</th>
+<th>Fidelity</th>
+<th>Practical role</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Q4-class</td>
+<td>Lower</td>
+<td>Good</td>
+<td>Excellent starting point; often enough for chat/tool use</td>
+</tr>
+<tr>
+<td>Q5/Q6-class</td>
+<td>Medium</td>
+<td>Higher</td>
+<td>Strong balance of quality and memory</td>
+</tr>
+<tr>
+<td>Q8-class</td>
+<td>Higher</td>
+<td>Very high</td>
+<td>Use when the extra fidelity measurably helps</td>
+</tr>
+</tbody></table>
+<p>LM Studio&#39;s own guidance is to choose a 4-bit option or higher when the machine can support it.</p>
+<h3>The important rule</h3>
+<p><strong>Do not choose Q8 simply because 8 is bigger than 4.</strong> Choose the smallest quantization that performs your real workload reliably. Extra precision has value only if it improves the answers, reasoning, tool use, or stability enough to justify its larger permanent memory footprint.</p>
+<h2>6. Model size is not the same as model intelligence</h2>
+<p>Quantization and model size are different decisions.</p>
+<p>A larger, more capable model at moderate quantization can outperform a smaller model at Q8 on difficult reasoning. Conversely, a small Q4 model may be ideal for fast command interpretation.</p>
+<p>When selecting a model, consider:</p>
+<ol>
+<li><strong>Task:</strong> chat, coding, tool/function calling, vision, data analysis, embeddings, etc.</li>
+<li><strong>Model architecture/parameter count:</strong> larger models often have more capability but need more memory and may be slower.</li>
+<li><strong>Quantization:</strong> Q4/Q6/Q8 changes the fidelity/memory trade-off of that model.</li>
+<li><strong>Context length:</strong> larger context can consume additional memory.</li>
+<li><strong>GPU fit:</strong> keeping the model and working context in VRAM generally gives the best GPU inference experience.</li>
+<li><strong>Tool-use support:</strong> if an application requires native function/tool calling, choose a model trained and supported for it.</li>
+</ol>
+<p>The correct choice is workload-specific. Test real prompts rather than relying only on benchmark scores.</p>
+<h2>7. Estimate memory before loading</h2>
+<p>LM Studio can estimate resource use without loading the model:</p>
+<pre><code class="language-bash">lms load publisher/model-name \
+  --context-length 8192 \
+  --gpu max \
+  --estimate-only
+</code></pre>
+<p>This is an estimate, not a guarantee. Validate the actual loaded model with <code>lms ps</code>, <code>nvidia-smi</code>, and real inference.</p>
+<h2>8. Load and unload models</h2>
+<p>Load a downloaded model:</p>
+<pre><code class="language-bash">lms load publisher/model-name --context-length 8192 --gpu max
+</code></pre>
+<p><code>--gpu max</code> asks LM Studio to offload as much as possible to the GPU. If omitted, LM Studio can choose automatically.</p>
+<p>See what is loaded:</p>
+<pre><code class="language-bash">lms ps
+</code></pre>
+<p>Unload a model interactively or by key:</p>
+<pre><code class="language-bash">lms unload publisher/model-name
+</code></pre>
+<p>Unload everything:</p>
+<pre><code class="language-bash">lms unload --all
+</code></pre>
+<p>Official reference:
+<a href="https://lmstudio.ai/docs/cli/local-models/load">https://lmstudio.ai/docs/cli/local-models/load</a></p>
+<h2>9. Start the HTTP API</h2>
+<p>For access only from the server itself:</p>
+<pre><code class="language-bash">lms server start --bind 127.0.0.1 --port 1234
+</code></pre>
+<p>Verify:</p>
+<pre><code class="language-bash">curl -s http://127.0.0.1:1234/v1/models | jq
+</code></pre>
+<p>To listen on all IPv4 interfaces:</p>
+<pre><code class="language-bash">lms server start --bind 0.0.0.0 --port 1234
+</code></pre>
+<p><strong>Security:</strong> binding to <code>0.0.0.0</code> exposes the service to reachable networks. LM Studio&#39;s documentation recommends authentication when exposing beyond localhost. At minimum, restrict port 1234 with UFW to trusted LAN clients or a trusted subnet. Do not expose an unauthenticated inference API directly to the public Internet.</p>
+<p>Example for one trusted client:</p>
+<pre><code class="language-bash">sudo ufw allow from CLIENT_IP to any port 1234 proto tcp
+</code></pre>
+<p>Example for a trusted private subnet (replace it with your real subnet):</p>
+<pre><code class="language-bash">sudo ufw allow from 192.168.1.0/24 to any port 1234 proto tcp
+</code></pre>
+<p>Official server reference:
+<a href="https://lmstudio.ai/docs/cli/serve/server-start">https://lmstudio.ai/docs/cli/serve/server-start</a></p>
+<h2>10. Test an inference request</h2>
+<p>The OpenAI-compatible API can be tested with <code>curl</code>:</p>
+<pre><code class="language-bash">curl -s http://127.0.0.1:1234/v1/chat/completions \
+  -H &#39;Content-Type: application/json&#39; \
+  -d &#39;{
+    &quot;model&quot;: &quot;publisher/model-name&quot;,
+    &quot;messages&quot;: [
+      {&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;Reply with exactly: Local inference works.&quot;}
+    ],
+    &quot;temperature&quot;: 0
+  }&#39; | jq
+</code></pre>
+<p>Replace the model identifier with the identifier shown by <code>lms ps</code> or <code>/v1/models</code>.</p>
+<h2>11. Start LM Studio automatically at boot</h2>
+<p>LM Studio documents running llmster as a systemd startup task. Replace <code>YOUR_USER</code>, the model key, context length, and network binding with your own values.</p>
+<p>Create the service:</p>
+<pre><code class="language-bash">sudo nano /etc/systemd/system/lmstudio.service
+</code></pre>
+<p>Example:</p>
+<pre><code class="language-ini">[Unit]
+Description=LM Studio Headless Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=YOUR_USER
+Environment=&quot;HOME=/home/YOUR_USER&quot;
+
+ExecStartPre=/home/YOUR_USER/.lmstudio/bin/lms daemon up
+ExecStartPre=/home/YOUR_USER/.lmstudio/bin/lms load publisher/model-name --context-length 8192 --gpu max --yes
+ExecStart=/home/YOUR_USER/.lmstudio/bin/lms server start --bind 127.0.0.1 --port 1234
+ExecStop=/home/YOUR_USER/.lmstudio/bin/lms daemon down
+
+[Install]
+WantedBy=multi-user.target
+</code></pre>
+<p>Enable and start it:</p>
+<pre><code class="language-bash">sudo systemctl daemon-reload
+sudo systemctl enable --now lmstudio.service
+systemctl status lmstudio.service --no-pager
+</code></pre>
+<p>Then verify:</p>
+<pre><code class="language-bash">lms ps
+curl -s http://127.0.0.1:1234/v1/models | jq
+</code></pre>
+<h3>If rapid CLI startup produces <code>Text file busy</code></h3>
+<p>On some systems a second <code>lms</code> invocation immediately after <code>lms daemon up</code> may race with daemon startup. If you actually encounter that error, add a short delay between the two <code>ExecStartPre</code> lines:</p>
+<pre><code class="language-ini">ExecStartPre=/home/YOUR_USER/.lmstudio/bin/lms daemon up
+ExecStartPre=/bin/sleep 5
+ExecStartPre=/home/YOUR_USER/.lmstudio/bin/lms load ...
+</code></pre>
+<p>Do not add workarounds pre-emptively when the simpler service works.</p>
+<p>Official startup-task reference:
+<a href="https://lmstudio.ai/docs/developer/core/headless_llmster">https://lmstudio.ai/docs/developer/core/headless_llmster</a></p>
+<h2>12. Interactive model switcher</h2>
+<p>The companion script <code>lmstudio-model-switcher.sh</code> (full listing at the end of this page) provides a simple numbered menu of downloaded <strong>model keys</strong>. It:</p>
+<ol>
+<li>ensures llmster is running;</li>
+<li>reads downloaded models from <code>lms ls --json</code>;</li>
+<li>asks which model to use;</li>
+<li>unloads the currently loaded model(s);</li>
+<li>loads the selected model with a configurable context/GPU policy;</li>
+<li>leaves/starts the API service as needed;</li>
+<li>shows <code>lms ps</code> and checks <code>/v1/models</code>.</li>
+</ol>
+<p>Install it:</p>
+<pre><code class="language-bash">mkdir -p ~/bin
+cp lmstudio-model-switcher.sh ~/bin/
+chmod +x ~/bin/lmstudio-model-switcher.sh
+</code></pre>
+<p>Run it with its conservative defaults (8192-token context, GPU max, localhost API):</p>
+<pre><code class="language-bash">~/bin/lmstudio-model-switcher.sh
+</code></pre>
+<p>Override settings for one invocation:</p>
+<pre><code class="language-bash">LMS_CONTEXT_LENGTH=16384 \
+LMS_GPU=max \
+LMS_BIND=0.0.0.0 \
+LMS_PORT=1234 \
+~/bin/lmstudio-model-switcher.sh
+</code></pre>
+<h3>Important: model variants / quantizations</h3>
+<p>LM Studio distinguishes a <strong>logical model key</strong> from its downloaded quantization variants. Downloading <code>publisher/model@q4_k_m</code> chooses a quantization to store, while loading commonly uses the logical model key reported by <code>lms ls</code>.</p>
+<p>If you keep several quantizations of the same logical model, inspect them with:</p>
+<pre><code class="language-bash">lms ls --variants
+lms ls --json | jq
+</code></pre>
+<p>Variant-selection behavior has changed across LM Studio CLI releases, so check <code>lms get --help</code> / <code>lms load --help</code> on the installed version before automating quantization switching. The supplied script intentionally switches <strong>model keys</strong>, which is the stable and understandable operation for a general-purpose guide.</p>
+<h2>13. Changing the boot-time default model</h2>
+<p>The interactive switcher changes what is loaded <strong>now</strong>. If the systemd service explicitly loads a model at boot, a reboot will load the model written in <code>/etc/systemd/system/lmstudio.service</code> again.</p>
+<p>To make another model the permanent boot default:</p>
+<pre><code class="language-bash">sudo nano /etc/systemd/system/lmstudio.service
+</code></pre>
+<p>Change the <code>lms load ...</code> line, then:</p>
+<pre><code class="language-bash">sudo systemctl daemon-reload
+sudo systemctl restart lmstudio.service
+</code></pre>
+<p>A more advanced deployment can use JIT model loading instead of pinning one model at boot. LM Studio supports JIT loading and automatic eviction; this is useful when applications choose models dynamically.</p>
+<h2>14. Monitor the server</h2>
+<p>Loaded models:</p>
+<pre><code class="language-bash">lms ps
+</code></pre>
+<p>GPU snapshot:</p>
+<pre><code class="language-bash">nvidia-smi
+</code></pre>
+<p>Refresh every two seconds:</p>
+<pre><code class="language-bash">watch -n 2 nvidia-smi
+</code></pre>
+<p>CPU/RAM:</p>
+<pre><code class="language-bash">htop
+</code></pre>
+<p>Interactive GPU monitor:</p>
+<pre><code class="language-bash">nvtop
+</code></pre>
+<p>LM Studio logs can also be streamed from the CLI:</p>
+<pre><code class="language-bash">lms log stream
+</code></pre>
+<h2>15. A practical model-selection workflow</h2>
+<p>A sensible way to choose a model is:</p>
+<ol>
+<li>Define the real workload first.</li>
+<li>Identify models with the required capability (for example tool use, coding, vision, or reasoning).</li>
+<li>Download a Q4-class variant first when available.</li>
+<li>Use <code>--estimate-only</code> before loading if memory is tight.</li>
+<li>Test real prompts and tool calls.</li>
+<li>Move to Q5/Q6 only if Q4 loses meaningful reliability or quality.</li>
+<li>Move to Q8 only if the improvement is visible and worth the extra RAM/VRAM.</li>
+<li>If even Q8 of a small model is not capable enough, test a <strong>larger/better model at moderate quantization</strong> rather than assuming still more precision will solve the problem.</li>
+</ol>
+<p>This keeps model choice empirical rather than numerical: <strong>the best model is the smallest/fastest configuration that reliably meets the application&#39;s needs.</strong></p>
+<h2>16. Troubleshooting checklist</h2>
+<p>If LM Studio does not behave as expected, check in this order:</p>
+<pre><code class="language-bash">lms --version
+lms daemon up
+lms ls
+lms ps
+lms server status
+nvidia-smi
+free -h
+</code></pre>
+<p>For a model that may not fit, estimate first:</p>
+<pre><code class="language-bash">lms load publisher/model-name --context-length 8192 --gpu max --estimate-only
+</code></pre>
+<p>For a remote client that cannot connect, verify locally first:</p>
+<pre><code class="language-bash">curl -s http://127.0.0.1:1234/v1/models | jq
+</code></pre>
+<p>Then verify the server is listening on the intended address and port:</p>
+<pre><code class="language-bash">ss -ltnp | grep 1234
+sudo ufw status numbered
+</code></pre>
+<p>If local access works but remote access does not, investigate bind address, firewall rules, routing, and API authentication before changing the model.</p>
+<h2>17. What this guide intentionally leaves open</h2>
+<p>It does not prescribe one universal model. Hardware, workload, context length, model architecture, and required capabilities differ too much for that. It also does not require a separate CUDA Toolkit, Docker, a desktop GUI, or application-specific integrations.</p>
+<p>Once the server is stable, application-specific guides can define their own model, context, API endpoint, authentication, and benchmark requirements.</p>
+<hr>
+<h2>Official sources</h2>
+<ul>
+<li>LM Studio CLI: <a href="https://lmstudio.ai/docs/cli">https://lmstudio.ai/docs/cli</a></li>
+<li>Headless / llmster: <a href="https://lmstudio.ai/docs/developer/core/headless">https://lmstudio.ai/docs/developer/core/headless</a></li>
+<li>Linux startup task: <a href="https://lmstudio.ai/docs/developer/core/headless_llmster">https://lmstudio.ai/docs/developer/core/headless_llmster</a></li>
+<li>Download models (<code>lms get</code>): <a href="https://lmstudio.ai/docs/cli/local-models/get">https://lmstudio.ai/docs/cli/local-models/get</a></li>
+<li>Load/unload models (<code>lms load</code>): <a href="https://lmstudio.ai/docs/cli/local-models/load">https://lmstudio.ai/docs/cli/local-models/load</a></li>
+<li>Start API server: <a href="https://lmstudio.ai/docs/cli/serve/server-start">https://lmstudio.ai/docs/cli/serve/server-start</a></li>
+<li>Model download/quantization overview: <a href="https://lmstudio.ai/docs/app/basics/download-model">https://lmstudio.ai/docs/app/basics/download-model</a></li>
+<li>REST API quickstart: <a href="https://lmstudio.ai/docs/developer/rest/quickstart">https://lmstudio.ai/docs/developer/rest/quickstart</a></li>
+</ul>
+<hr>
+<h2>Appendix: <code>lmstudio-model-switcher.sh</code></h2>
+<p>Save this as <code>lmstudio-model-switcher.sh</code>, then install it as shown in Part 2 § 12.</p>
+<pre><code class="language-bash">#!/usr/bin/env bash
+set -euo pipefail
+
+# LM Studio interactive model switcher
+# Optional environment overrides:
+#   LMS_CONTEXT_LENGTH=16384 LMS_GPU=max LMS_BIND=0.0.0.0 LMS_PORT=1234 ./lmstudio-model-switcher.sh
+
+CONTEXT_LENGTH=&quot;${LMS_CONTEXT_LENGTH:-8192}&quot;
+GPU=&quot;${LMS_GPU:-max}&quot;
+BIND=&quot;${LMS_BIND:-127.0.0.1}&quot;
+PORT=&quot;${LMS_PORT:-1234}&quot;
+
+need() {
+  command -v &quot;$1&quot; &gt;/dev/null 2&gt;&amp;1 || {
+    echo &quot;Error: &#39;$1&#39; is required but was not found in PATH.&quot; &gt;&amp;2
+    exit 1
+  }
+}
+
+need lms
+need jq
+
+# Make sure the headless daemon is available.
+lms daemon up &gt;/dev/null
+
+mapfile -t MODELS &lt; &lt;(
+  lms ls --json | jq -r &#39;
+    if type == &quot;array&quot; then .[]
+    elif has(&quot;models&quot;) then .models[]
+    else empty end
+    | .modelKey // .model_key // empty
+  &#39; | awk &#39;NF&#39; | sort -u
+)
+
+if ((${#MODELS[@]} == 0)); then
+  echo &quot;No downloaded models were found.&quot;
+  echo &quot;Download one first, for example: lms get &lt;publisher/model&gt;&quot;
+  exit 1
+fi
+
+echo
+echo &quot;Downloaded LM Studio models&quot;
+echo &quot;---------------------------&quot;
+for i in &quot;${!MODELS[@]}&quot;; do
+  printf &#39;  %2d) %s\n&#39; &quot;$((i + 1))&quot; &quot;${MODELS[$i]}&quot;
+done
+echo &quot;   0) Cancel&quot;
+echo
+
+while true; do
+  read -r -p &quot;Choose a model [0-${#MODELS[@]}]: &quot; CHOICE
+  [[ &quot;$CHOICE&quot; =~ ^[0-9]+$ ]] || { echo &quot;Please enter a number.&quot;; continue; }
+  (( CHOICE == 0 )) &amp;&amp; exit 0
+  (( CHOICE &gt;= 1 &amp;&amp; CHOICE &lt;= ${#MODELS[@]} )) &amp;&amp; break
+  echo &quot;Choice out of range.&quot;
+done
+
+MODEL=&quot;${MODELS[$((CHOICE - 1))]}&quot;
+
+echo
+echo &quot;Selected: $MODEL&quot;
+echo &quot;Context : $CONTEXT_LENGTH&quot;
+echo &quot;GPU     : $GPU&quot;
+echo
+
+read -r -p &quot;Unload the current model and load this one? [y/N]: &quot; CONFIRM
+[[ &quot;$CONFIRM&quot; =~ ^[Yy]$ ]] || { echo &quot;Cancelled.&quot;; exit 0; }
+
+echo &quot;Unloading currently loaded models...&quot;
+lms unload --all || true
+
+echo &quot;Loading $MODEL...&quot;
+lms load &quot;$MODEL&quot; --context-length &quot;$CONTEXT_LENGTH&quot; --gpu &quot;$GPU&quot; --yes
+
+# Start the HTTP server only if it is not already running.
+if ! lms server status &gt;/dev/null 2&gt;&amp;1; then
+  echo &quot;Starting LM Studio server on $BIND:$PORT...&quot;
+  lms server start --bind &quot;$BIND&quot; --port &quot;$PORT&quot;
+fi
+
+echo
+echo &quot;Current LM Studio state:&quot;
+lms ps
+
+echo
+echo &quot;API model list:&quot;
+if command -v curl &gt;/dev/null 2&gt;&amp;1; then
+  curl -fsS &quot;http://127.0.0.1:${PORT}/v1/models&quot; | jq . || \
+    echo &quot;API check failed. If the server uses another port, set LMS_PORT accordingly.&quot;
+else
+  echo &quot;curl is not installed; skipping API check.&quot;
+fi
+</code></pre>
+
+        </div>
+    </main>
+</div>
+
+<script>
+(function(){
+    var h=document.getElementById('hamburger'),s=document.getElementById('sidebar'),o=document.getElementById('overlay');
+    function open(){s.classList.add('open');o.classList.add('active');h.setAttribute('aria-expanded','true');h.classList.add('is-open');}
+    function close(){s.classList.remove('open');o.classList.remove('active');h.setAttribute('aria-expanded','false');h.classList.remove('is-open');}
+    h.addEventListener('click',function(){s.classList.contains('open')?close():open();});
+    o.addEventListener('click',close);
+    document.querySelectorAll('.nav-link').forEach(function(a){a.addEventListener('click',function(){if(window.innerWidth<900)close();});});
+})();
+</script>
+</body>
+</html>

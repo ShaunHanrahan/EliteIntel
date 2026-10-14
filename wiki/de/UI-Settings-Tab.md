@@ -52,7 +52,8 @@ nicht.
 
 Einrichtungsanleitungen: [LM Studio unter Linux](Install-LM-Studio-Linux) ·
 [LM Studio unter Windows](Install-LM-Studio-Windows) ·
-[AMD-RX-Serie](AMD-RX-7800XT-LLM-Setup)
+[AMD-RX-Serie](AMD-RX-7800XT-LLM-Setup) ·
+[Headless-Ubuntu-Server](LM-Studio-Ubuntu-Server)
 
 **Cloud-Einrichtung**
 

@@ -25,6 +25,7 @@ cloud-llm-options: 🆓 Kostenloses Cloud-LLM
 Install-LM-Studio-Linux: LM Studio  Linux
 Install-LM-Studio-Windows: LM Studio  Windows
 AMD-RX-7800XT-LLM-Setup: AMD RX Series
+LM-Studio-Ubuntu-Server: Headless-Ubuntu-Server
 General-Operation: Allgemeiner Betrieb
 Custom-Commands: Eigene Befehle erstellen
 TradeRoutePlotting: Handel & Profit

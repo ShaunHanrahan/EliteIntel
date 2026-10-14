@@ -7,6 +7,7 @@
   * ### [🆓 Install LM Studio Linux](Install-LM-Studio-Linux)
   * ### [🆓 Install LM Studio Windows](Install-LM-Studio-Windows)
   * ### [🆓 LLMs on AMD-RX Series](AMD-RX-7800XT-LLM-Setup)
+  * ### [🆓 LM Studio on Ubuntu Server](LM-Studio-Ubuntu-Server)
   * ### [👤 General Operation](General-Operation)
   * ### [🛠️ Customize you AI](Customizing-your-AI)
   * ### [🌠 Discovery](Discovery-Assistance)

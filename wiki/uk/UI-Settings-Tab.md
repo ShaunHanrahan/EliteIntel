@@ -50,7 +50,8 @@ Intel попередить під час запуску; інші моделі �
 
 Посібники: [LM Studio в Linux](Install-LM-Studio-Linux) ·
 [LM Studio у Windows](Install-LM-Studio-Windows) ·
-[Серія AMD RX](AMD-RX-7800XT-LLM-Setup)
+[Серія AMD RX](AMD-RX-7800XT-LLM-Setup) ·
+[Сервер Ubuntu без GUI](LM-Studio-Ubuntu-Server)
 
 **Хмарне налаштування**
 

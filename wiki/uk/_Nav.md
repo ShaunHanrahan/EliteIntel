@@ -25,6 +25,7 @@ cloud-llm-options: 🆓 Безкоштовний хмарний LLM
 Install-LM-Studio-Linux: LM Studio  Linux
 Install-LM-Studio-Windows: LM Studio  Windows
 AMD-RX-7800XT-LLM-Setup: AMD RX Series
+LM-Studio-Ubuntu-Server: Сервер Ubuntu без GUI
 General-Operation: Загальне використання
 Custom-Commands: Власні команди
 TradeRoutePlotting: Торгівля та прибуток

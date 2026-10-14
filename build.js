@@ -220,6 +220,7 @@ const DEFAULT_NAV = {
     'Install-LM-Studio-Linux':         'LM Studio  Linux',
     'Install-LM-Studio-Windows':       'LM Studio  Windows',
     'AMD-RX-7800XT-LLM-Setup':         'AMD RX Series',
+    'LM-Studio-Ubuntu-Server':         'Headless Ubuntu Server',
     'General-Operation':               'General Operation',
     'Custom-Commands':                 'Make Your Own Commands',
     TradeRoutePlotting:                'Trade & Profit',
@@ -309,6 +310,7 @@ function buildSidebar(activePage, assetBase, nav, titleMap, localePages) {
             ${lnk('Install-LM-Studio-Linux',           'ai.png', ' nav-sub')}
             ${lnk('Install-LM-Studio-Windows',         'ai.png', ' nav-sub')}
             ${lnk('AMD-RX-7800XT-LLM-Setup',           'ai.png', ' nav-sub')}
+            ${lnk('LM-Studio-Ubuntu-Server',           'ai.png', ' nav-sub')}
 
             ${sec('section_howdoi')}
             ${lnk('General-Operation',                'manual.png')}

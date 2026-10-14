@@ -51,7 +51,8 @@ modelo local es otro; otros modelos pueden funcionar mal o no funcionar.
 
 Guías: [LM Studio en Linux](Install-LM-Studio-Linux) ·
 [LM Studio en Windows](Install-LM-Studio-Windows) ·
-[Serie AMD RX](AMD-RX-7800XT-LLM-Setup)
+[Serie AMD RX](AMD-RX-7800XT-LLM-Setup) ·
+[Servidor Ubuntu headless](LM-Studio-Ubuntu-Server)
 
 **Configuración en la nube**
 

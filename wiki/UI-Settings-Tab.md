@@ -51,7 +51,8 @@ local model is something else; other models may work poorly or not at all.
 
 Setup guides: [LM Studio on Linux](Install-LM-Studio-Linux) ·
 [LM Studio on Windows](Install-LM-Studio-Windows) ·
-[AMD RX series](AMD-RX-7800XT-LLM-Setup)
+[AMD RX series](AMD-RX-7800XT-LLM-Setup) ·
+[Headless Ubuntu server](LM-Studio-Ubuntu-Server)
 
 **Cloud Setup**
 

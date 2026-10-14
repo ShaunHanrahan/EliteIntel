@@ -50,7 +50,8 @@ Elite Intel предупредит при запуске; другие моде�
 
 Руководства: [LM Studio в Linux](Install-LM-Studio-Linux) ·
 [LM Studio в Windows](Install-LM-Studio-Windows) ·
-[Серия AMD RX](AMD-RX-7800XT-LLM-Setup)
+[Серия AMD RX](AMD-RX-7800XT-LLM-Setup) ·
+[Сервер Ubuntu без GUI](LM-Studio-Ubuntu-Server)
 
 **Облачная настройка**
 

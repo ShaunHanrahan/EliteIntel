@@ -110,6 +110,15 @@
     <xhtml:link rel="alternate" hreflang="ru" href="https://www.elite-intel.org/ru/Installation.html"/>
   </url>
   <url>
+    <loc>https://www.elite-intel.org/LM-Studio-Ubuntu-Server.html</loc>
+    <xhtml:link rel="alternate" hreflang="en" href="https://www.elite-intel.org/LM-Studio-Ubuntu-Server.html"/>
+    <xhtml:link rel="alternate" hreflang="fr" href="https://www.elite-intel.org/fr/LM-Studio-Ubuntu-Server.html"/>
+    <xhtml:link rel="alternate" hreflang="es" href="https://www.elite-intel.org/es/LM-Studio-Ubuntu-Server.html"/>
+    <xhtml:link rel="alternate" hreflang="de" href="https://www.elite-intel.org/de/LM-Studio-Ubuntu-Server.html"/>
+    <xhtml:link rel="alternate" hreflang="uk" href="https://www.elite-intel.org/uk/LM-Studio-Ubuntu-Server.html"/>
+    <xhtml:link rel="alternate" hreflang="ru" href="https://www.elite-intel.org/ru/LM-Studio-Ubuntu-Server.html"/>
+  </url>
+  <url>
     <loc>https://www.elite-intel.org/Navigation-Assistance.html</loc>
     <xhtml:link rel="alternate" hreflang="en" href="https://www.elite-intel.org/Navigation-Assistance.html"/>
     <xhtml:link rel="alternate" hreflang="fr" href="https://www.elite-intel.org/fr/Navigation-Assistance.html"/>
