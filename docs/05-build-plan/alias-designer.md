@@ -96,23 +96,24 @@ installations with each other before then. Once the master exists, each row offe
 | # | Slice | Needs | Status |
 |---|---|---|---|
 | A1 | **First setup** — turn what the installations hold into the master: per element, the four cases, a name conflict routed into the rename, a labelled backup and Edit History before writing | Core C1, C2 (both done) | **done 2026-10-07** |
+| A1b | **Activation** — the first opening of the BindForge tab: a never-pruned "before BindForge" backup of every installation's device files and every `.binds`/`StartPreset` in the bindings folder; the master filled with no prompt when the installations are identical (possibly empty), first setup opened when they differ; a stored "activated" fact (migration `12005`) replacing every "empty master means not set up" test — gear, APPLY, **SET UP**, `DeviceFilesCheck`; told once, spoken and logged. [Spec](../02-features/bindforge/alias-designer.md#activation--2026-10-13-alan) | A1 (done) | **next** — added 2026-10-13 |
 | A2 | **`.buttonMap` label merge** — one row per input that disagrees, nothing else | A1 (done) | **done 2026-10-08** |
 | A3 | **Divergence against the master** — replace installation-against-installation | A1 (done) | **done 2026-10-08** |
 | A3b | **The ways out, per row** — adopt (`DeviceFilesAdopt`), revert (`DeviceFilesPush.push(installId)`), and the label re-merge with the master as one side of `LabelMergeDialog`. Confirms first; backups before any game-file write | A3 (done) | **done 2026-10-08** |
 | A4 | **Installations markers** — `M`, *not added*, severity colour | A1 (done) | **done 2026-10-08** |
 | A5 | **Built-in Devices tab** — Frontier's list, read-only | — | **done 2026-10-08** |
 | A6 | **Onboarding: the rule** — the default-name rule and alias validation | Core C1 (done) | **done 2026-10-06** |
-| A6b | **Onboarding: the dialog and its writes** — name the controllers `needingName` returns, then write the entry and a generated `.buttonMap` straight away. A controller `.binds` names by hex waits for Apply, with a `.binds` rewrite | A6, A8 | **next** — unblocked 2026-10-13: the `.binds` device rewrite from [the foundation branch](README.md#the-foundation-branch--how-a-v12-feature-changes-a-file-v11-ships-krondor-2026-10-12) has merged up |
+| A6b | **Onboarding: the dialog and its writes** — name the controllers `needingName` returns, then write the entry and a generated `.buttonMap` straight away. A controller `.binds` names by hex waits for Apply, with a `.binds` rewrite | A6, A8, A1b | after A1b — sources approved 2026-10-13 (hand-off note); the `.binds` device rewrite from [the foundation branch](README.md#the-foundation-branch--how-a-v12-feature-changes-a-file-v11-ships-krondor-2026-10-12) has merged up |
 | A7 | **Automatic registration and hot-plug** — `DeviceBus` connect and disconnect | A6b | waiting |
 | A8 | **`.buttonMap` generation at Elite-Intel startup** — connected, named, none on disk | Core C1 (done) | **done 2026-10-06** |
 | A8b | **Which axes and hats a controller has** — read each axis's identity (X, Y, Z, Rx, Ry, Rz, Slider, Dial) from the controller's HID description, on Windows and Linux, and the number of hats it reports, in the shared `elite.intel.devices`, built on this branch (Alan, 2026-10-10). SDL gives only an axis count, two Virpil sticks put the twist on Z and RZ, and the Device Service reads no hats today. The Device Editor is built from what this reports: a tab only for a kind of input the controller has. **A8's generated `.buttonMap` gains hat labels** in the form `Hat 1 Up`, `Hat 1 Right`, `Hat 1 Down`, `Hat 1 Left` (the spec's order), beside its existing `Button N` and `X Axis` (Alan, 2026-10-10). [Spec](../02-features/bindforge/alias-designer.md#which-axes-and-hats-a-controller-has--2026-10-10-alan) | — | **done 2026-10-10** |
 | A9 | **Device Editor** — a dialog opened from a gear on every My Devices row: DEVICE (name, VID/PID, install strip), AXES, BUTTONS (groups of 32), HATS, each only where the controller has them; default labels; live highlighting; **SAVE** to the draft and BACK's Save / Discard / Keep editing; the footer's middle place (GAP 7), with CLEAR's button laid out for A10. [Spec](../02-features/bindforge/alias-designer.md#a-dialog-opened-from-the-row--2026-10-10-alan) | C2 (done), A8b (done) | **done 2026-10-11** |
 | A10 | **Actions** — DISCARD of the whole draft (if any), CLEAR, RESET LABELS, APPLY, reported per installation. *SAVE moved to A9 (2026-10-10).* Unlocks [Core C6](core.md#slices), the exit prompt, which needs an editor holding unsaved edits. **RESET LABELS must delete the `.buttonMap` in every installation**, or A8 never regenerates it | A9 (done) | **done 2026-10-11** |
-| A11 | **Rename** — every installation first, `.binds` last, all or nothing | A10 (done) | ready — unblocked 2026-10-13, the `.binds` rewrite has merged up; after A6b |
+| A11 | **Rename** — every installation first, `.binds` last, all or nothing | A10 (done) | ready — unblocked 2026-10-13, the `.binds` rewrite has merged up; after A1b and A6b |
 | A12 | **When hardware changes** — a missing device, the identity question, retarget, one missing device at a time | A11 | waiting |
 | A13 | **The missing-controller warning**, once per run | — | **done 2026-10-11** |
 
-**A6b is next**, then A11; A7 and A12 wait on them. The `.binds` rewrite merged up 2026-10-13. Core C6, the exit
+**A1b is next**, then A6b, then A11; A7 and A12 wait on them. The `.binds` rewrite merged up 2026-10-13. Core C6, the exit
 prompt A10 unblocked, was settled 2026-10-12 as a ruling with no code — the Device Editor's own prompt is it.
 
 **One `.binds` rewrite unblocks three slices:** A6b's hex case, A11's rename, and CLEAR on a device `.binds` names
@@ -126,6 +127,24 @@ game's `.binds` **last**; a hex reference rewritten **from the value `BindsDevic
 
 *Newest first. Two or three lines each: what was decided and where it is recorded, what was found, what the
 next slice needs.*
+
+- **2026-10-13 — A6b planned, then A1b split out ahead of it** (Alan answered five questions, one at a time; no
+  code). **Found:** first setup had become a button every user must press, and an empty master meant *not set up*,
+  so a new player and a player with only a custom `.binds` could never activate BindForge. Recorded in
+  [Activation](../02-features/bindforge/alias-designer.md#activation--2026-10-13-alan) and two notes in
+  overview.md: silent when the installations are identical; first setup opened straight away when they differ;
+  never-pruned "before BindForge" backup of all input data; told once, spoken. **A1b needs:** where the backup
+  lives (beside `DeviceFilesSnapshot`'s, in the default player backups folder), the identical test (likely
+  `FirstSetupPlan` with nothing to write), the trigger (first showing, as A13's `missingWarningWanted`).
+  **A6b's sources, approved:** `needingName` → `OnboardingDialog` (default name, `validate`, names taken = master +
+  draft + every installation + Frontier + names picked in the dialog); labels from `ButtonMapLabels.generate` with
+  `DeviceService` counts and description; **not hex-named** — written now to master *and* a started draft (one
+  transaction, or `promote()` drops it) and to every installation by a new `DeviceOnboarding` (one element inserted
+  at master-order position, Edit History, `AtomicFiles`; `.buttonMap` by `CreateOnlyFiles`); **hex-named** — held in
+  the draft, and `DeviceApply` rewrites after the push via `rewriteDeviceReferences` (working copies first, the
+  game's `.binds` last, then `recordGameFileBaseline`); hex counts by a new strict reader in
+  `BindsDeviceReferences`. **Still to ask in A6b:** what a partial Apply does to the hex rewrite (rename's
+  all-or-nothing, or not); what opens onboarding; whether Next writes per controller or at the end.
 
 - **2026-10-13 — the `.binds` rewrite merged up; A6b and A11 unblocked.** Krondor narrowed the hex match to VID
   then PID and asked for the game's file last; both accepted and recorded in

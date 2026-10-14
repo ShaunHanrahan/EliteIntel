@@ -190,6 +190,64 @@ install matches it. *"Adopt"* stays reserved for what happens later, when someon
 
 **It can be opened and abandoned.** Nothing is written until the user presses the button at the end.
 
+*How first setup is reached changed 2026-10-13 (Alan): it is no longer a step every user starts. BindForge
+**activates** itself the first time its tab is opened, and first setup opens only when the installations
+disagree — see [Activation](#activation--2026-10-13-alan).*
+
+### Activation — 2026-10-13 (Alan)
+
+**Found while planning A6b.** The 2026-09-06 ruling took the user's files with no prompt the first time BindForge
+was opened. The 2026-09-23 ruling replaced it for installations that **disagree**, but the case where they agree
+was never carried over, and A1 built first setup as a button every user had to press. With nothing of the user's
+to set up, the master stayed empty, and an empty master was read as *not set up*. So a new player (Frontier's
+files only) and a player with a custom `.binds` and stock device files could never get past **SET UP**: no APPLY,
+no Device Editor, no onboarding. The second is exactly the user whose `.binds` names their sticks by hex. The
+fix is activation:
+
+- **Activation is automatic the first time the BindForge tab is opened**, with no prompt, **when the installations
+  agree**. The master is filled from what they hold, which may be nothing.
+- **"Agree" means identical: filling the master would write no game file.** Any difference at all opens
+  [first setup](#first-setup--reconciling-the-installs--settled-2026-09-23) instead, even one with nothing to ask.
+  An entry only one installation holds is shown as decided and confirmed by the dialog's final button, so no game
+  file is written until the user asks ([offered, never forced](overview.md#offered-never-forced--settled-2026-09-23)).
+- **When they disagree, first setup opens straight away** on that first opening. Opening BindForge is the user
+  asking. The dialog can still be abandoned, it writes nothing until its last button, and until it finishes
+  BindForge is not activated and **SET UP** reopens it.
+- **No installation detected:** activate with an empty master. One found later is handled as
+  [an install that appears later](#an-install-that-appears-later).
+- **An installation whose folder is gone** is left out of "identical" and activation goes ahead, as first setup
+  already skips it. When it comes back, it is judged against the master like any other installation.
+- **A file that is there but cannot be read** stops silent activation, and first setup opens and names it. An
+  unread file could hold the one entry the master must not lose.
+- **Activation is its own stored fact**, not "the master has rows". A user who owns nothing is still activated.
+  Every test that read an empty master as *not set up* becomes *not activated*: the gear, APPLY, **SET UP**, and
+  [the startup check's](overview.md#for-the-device-files--settled-2026-10-05-alan) "an empty master means first
+  setup has not run". A master that already has rows counts as activated. One left empty by an earlier **SET UP**
+  that found nothing activates the next time the tab is opened.
+
+**Every user gets a "before BindForge" backup**, whichever path activation takes:
+
+- **It covers all of the user's input data:** every reachable installation's `DeviceMappings.xml` and
+  `DeviceButtonMaps\`, and every `.binds` and `StartPreset.#.start` in the bindings folder. On Linux that is every
+  bindings folder BindForge knows of, since each Proton installation has its own
+  ([input environment §7](../../00-overview/input-environment.md#7-linux-the-bindings-folder-is-not-shared)).
+- **It is taken before anything is written**: at silent activation, or when first setup opens. First setup still
+  takes its own labelled backup just before it writes, because the user may abandon the dialog and come back after
+  the files have changed.
+- **It is never pruned.** Edit History keeps a limited number of copies per file, so after enough Applies the
+  files as they were before BindForge would otherwise age out.
+- **It goes in the player backups folder**, as first setup's backup does, so it is listed under Player Backups.
+  The restore there handles `.binds` presets only; restoring device files is
+  [File Manager's](file-manager.md) work.
+
+**The user is told once, on first activation only**, that the backup was made: a spoken line (the AI says it)
+and a log line, as the [missing-controller warning](#a-missing-controller-is-worth-exactly-one-warning--settled-2026-09-24)
+does. Never again after that.
+
+**What this changes for onboarding:** it always runs after activation, so a controller `.binds` names by hex can be
+named and wait for Apply from the first visit. A6b's planned "not before first setup" rule for the hex case is
+withdrawn.
+
 ### What it reads
 
 Every install's `DeviceMappings.xml` and `.buttonMap` files, plus two references that decide how rows are
@@ -1398,10 +1456,12 @@ was blocked on testing.*
 
 ## First Run and Hot-Plug
 
-If no draft exists yet, BindForge auto-imports `DeviceMappings.xml` and all `.buttonMap` files from every
+~~If no draft exists yet, BindForge auto-imports `DeviceMappings.xml` and all `.buttonMap` files from every
 detected installation, with no prompt — a status message informs the user this is happening. If no
 installation is detected, the draft starts empty and any connected devices are added via
-[Automatic Device Registration](#automatic-device-registration) above.
+[Automatic Device Registration](#automatic-device-registration) above.~~ *Replaced 2026-10-13 (Alan) by
+[Activation](#activation--2026-10-13-alan): no prompt when the installations agree, first setup when they do not,
+and an empty master when none is detected.*
 
 ### A missing controller is worth exactly one warning — settled 2026-09-24
 

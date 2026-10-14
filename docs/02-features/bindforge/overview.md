@@ -102,6 +102,10 @@ So the default posture is **back up, detect, report — and write nothing to a g
   `.buttonMap` files disagree and offers the ways out — merge them, overwrite one install from another, or
   pick one as the master. The user chooses; BindForge does not.
 - **Until they choose, nothing is pushed.** No master is imposed, no install is edited.
+- *Refined 2026-10-13 (Alan):* opening BindForge's tab is the user coming to it. Where the installs are
+  identical, the master is filled from them with no question, since that writes no game file; where they differ,
+  first setup opens. Either way a "before BindForge" backup is taken first, and the user is told once. See
+  [Activation](alias-designer.md#activation--2026-10-13-alan).
 
 **Why not force it, when divergence is a latent outage?** Because the app already behaves this way and it
 works: Elite-Intel has warned about binding conflicts for months without requiring anyone to act, and a
@@ -259,6 +263,8 @@ write takes, and lands an [Edit History](file-manager.md#edit-history) entry.
    only labels on Frontier's own entries expects the stock file, so for it a stock file is not a wipe.*
 3. **An empty master means first setup has not run**, and the check compares nothing. Before then every custom
    entry would read as an edit, and [nothing is forced](#offered-never-forced--settled-2026-09-23).
+   *Changed 2026-10-13 (Alan): the test is **not activated**, not an empty master — a user who owns nothing is
+   activated with an empty master. See [Activation](alias-designer.md#activation--2026-10-13-alan).*
 4. **Adopt changes the master, never a game file.** The other installations then stop matching it, and the
    user's next Apply brings them in line. An entry the installation no longer has leaves the master as a
    [pending removal](alias-designer.md#actions-and-what-each-one-reaches); an entry it has that the master does
