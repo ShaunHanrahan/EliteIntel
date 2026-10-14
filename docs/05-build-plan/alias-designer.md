@@ -102,27 +102,35 @@ installations with each other before then. Once the master exists, each row offe
 | A4 | **Installations markers** — `M`, *not added*, severity colour | A1 (done) | **done 2026-10-08** |
 | A5 | **Built-in Devices tab** — Frontier's list, read-only | — | **done 2026-10-08** |
 | A6 | **Onboarding: the rule** — the default-name rule and alias validation | Core C1 (done) | **done 2026-10-06** |
-| A6b | **Onboarding: the dialog and its writes** — name the controllers `needingName` returns, then write the entry and a generated `.buttonMap` straight away. A controller `.binds` names by hex waits for Apply, with a `.binds` rewrite | A6, A8 | waiting — the hex case needs the `.binds` device rewrite from [the foundation branch](README.md#the-foundation-branch--how-a-v12-feature-changes-a-file-v11-ships-krondor-2026-10-12) |
+| A6b | **Onboarding: the dialog and its writes** — name the controllers `needingName` returns, then write the entry and a generated `.buttonMap` straight away. A controller `.binds` names by hex waits for Apply, with a `.binds` rewrite | A6, A8 | **next** — unblocked 2026-10-13: the `.binds` device rewrite from [the foundation branch](README.md#the-foundation-branch--how-a-v12-feature-changes-a-file-v11-ships-krondor-2026-10-12) has merged up |
 | A7 | **Automatic registration and hot-plug** — `DeviceBus` connect and disconnect | A6b | waiting |
 | A8 | **`.buttonMap` generation at Elite-Intel startup** — connected, named, none on disk | Core C1 (done) | **done 2026-10-06** |
 | A8b | **Which axes and hats a controller has** — read each axis's identity (X, Y, Z, Rx, Ry, Rz, Slider, Dial) from the controller's HID description, on Windows and Linux, and the number of hats it reports, in the shared `elite.intel.devices`, built on this branch (Alan, 2026-10-10). SDL gives only an axis count, two Virpil sticks put the twist on Z and RZ, and the Device Service reads no hats today. The Device Editor is built from what this reports: a tab only for a kind of input the controller has. **A8's generated `.buttonMap` gains hat labels** in the form `Hat 1 Up`, `Hat 1 Right`, `Hat 1 Down`, `Hat 1 Left` (the spec's order), beside its existing `Button N` and `X Axis` (Alan, 2026-10-10). [Spec](../02-features/bindforge/alias-designer.md#which-axes-and-hats-a-controller-has--2026-10-10-alan) | — | **done 2026-10-10** |
 | A9 | **Device Editor** — a dialog opened from a gear on every My Devices row: DEVICE (name, VID/PID, install strip), AXES, BUTTONS (groups of 32), HATS, each only where the controller has them; default labels; live highlighting; **SAVE** to the draft and BACK's Save / Discard / Keep editing; the footer's middle place (GAP 7), with CLEAR's button laid out for A10. [Spec](../02-features/bindforge/alias-designer.md#a-dialog-opened-from-the-row--2026-10-10-alan) | C2 (done), A8b (done) | **done 2026-10-11** |
 | A10 | **Actions** — DISCARD of the whole draft (if any), CLEAR, RESET LABELS, APPLY, reported per installation. *SAVE moved to A9 (2026-10-10).* Unlocks [Core C6](core.md#slices), the exit prompt, which needs an editor holding unsaved edits. **RESET LABELS must delete the `.buttonMap` in every installation**, or A8 never regenerates it | A9 (done) | **done 2026-10-11** |
-| A11 | **Rename** — every installation first, `.binds` last, all or nothing | A10 (done) | waiting — its `.binds` rewrite comes from [the foundation branch](README.md#the-foundation-branch--how-a-v12-feature-changes-a-file-v11-ships-krondor-2026-10-12) |
+| A11 | **Rename** — every installation first, `.binds` last, all or nothing | A10 (done) | ready — unblocked 2026-10-13, the `.binds` rewrite has merged up; after A6b |
 | A12 | **When hardware changes** — a missing device, the identity question, retarget, one missing device at a time | A11 | waiting |
 | A13 | **The missing-controller warning**, once per run | — | **done 2026-10-11** |
 
-**No slice here is next.** A6b and A11 wait on the `.binds` rewrite, and A7 and A12 wait on them. Core C6, the exit
+**A6b is next**, then A11; A7 and A12 wait on them. The `.binds` rewrite merged up 2026-10-13. Core C6, the exit
 prompt A10 unblocked, was settled 2026-10-12 as a ruling with no code — the Device Editor's own prompt is it.
 
 **One `.binds` rewrite unblocks three slices:** A6b's hex case, A11's rename, and CLEAR on a device `.binds` names
 (refused until then — [the rule](../02-features/bindforge/alias-designer.md#an-edit-binds-depends-on-updates-binds--2026-10-11-alan)).
-Whether Alias Designer writes it or hands it to the Bind Editor is undecided (Alan, 2026-10-11).
+*Settled 2026-10-12:* Alias Designer writes it inside its own Apply. The API is
+`BindingsWriter.rewriteDeviceReferences(List<Path>, DeviceReferenceRewrite, Path)`: drafts and masters first, the
+game's `.binds` **last**; a hex reference rewritten **from the value `BindsDeviceReferences` found**; then
+`recordGameFileBaseline` for each rewritten draft. [The rules](../02-features/bindforge/alias-designer.md#an-edit-binds-depends-on-updates-binds--2026-10-11-alan).
 
 ## Hand-off notes
 
 *Newest first. Two or three lines each: what was decided and where it is recorded, what was found, what the
 next slice needs.*
+
+- **2026-10-13 — the `.binds` rewrite merged up; A6b and A11 unblocked.** Krondor narrowed the hex match to VID
+  then PID and asked for the game's file last; both accepted and recorded in
+  [the spec](../02-features/bindforge/alias-designer.md#an-edit-binds-depends-on-updates-binds--2026-10-11-alan).
+  **A6b needs:** the API and its three caller rules above.
 
 - **2026-10-11 — A13 and second A10 review fixes** (`code-integrity-review.md`, Alan: all six). Recorded under *After
   review* in [built — A13](../02-features/bindforge/alias-designer.md#built--2026-10-11-alan-a13) and *Second review*

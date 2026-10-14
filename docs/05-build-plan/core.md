@@ -88,12 +88,13 @@ Growing it touches `bindforge.io` — see C4.
 | C1 | **Device-file write** — merge the master's elements into each installation's `DeviceMappings.xml` and `.buttonMap`; keep unique prior content; atomic replace; prune; per installation, reported | **done 2026-10-04** |
 | C2 | **Device draft** — where unapplied device edits live; SAVE writes the draft, APPLY promotes it | **done 2026-10-04** |
 | C3 | **Startup check for device files** — each installation against the master: unchanged, wiped (matches the stock reference), or edited; adopt or revert | **done 2026-10-05** |
-| C4 | **`.binds` and `StartPreset`** — whole-file master, Edit History on apply, the version-bump merge | waiting — its file-level part goes on the foundation branch, scoped first ([README](README.md#the-foundation-branch--how-a-v12-feature-changes-a-file-v11-ships-krondor-2026-10-12)) |
+| C4 | **`.binds` and `StartPreset`** — whole-file master, Edit History on apply, the version-bump merge | ready — scoped 2026-10-12 ([the split](../02-features/bindforge/overview.md#where-the-binds-and-startpreset-master-lives--settled-2026-10-12-alan-foundation-f3)); its one V1.1 change, `BindingsApplyService.applyFrom`, merged up 2026-10-13. The rest is new V1.2 classes |
 | C5 | **Change detection for the install folders** | **done 2026-10-11** |
 | C6 | **Unsaved work on exit** — Save or Discard, never Apply | **done 2026-10-12** — a ruling, no code |
 | C7 | **First-time startup** | after Preset Editor can read all four `StartPreset` lines |
 
-**No Core slice is next.** C4 waits on the foundation branch, C7 on Preset Editor.
+**C4 is unblocked** (2026-10-13), but Alias Designer does not need it — a master is rewritten only once one
+exists — so it is built when Preset Editor or File Manager needs it. C7 waits on Preset Editor.
 
 ### C1 in detail — designed 2026-10-03, built 2026-10-04
 

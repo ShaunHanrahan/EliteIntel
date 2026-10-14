@@ -1226,15 +1226,24 @@ Alias Designer writes `.binds` itself or hands the change to the Bind Editor as 
   (`BindingsWorkingCopyRepository.recordGameFileBaseline`) — likewise the `.binds` master once it exists. The
   substitution is mechanical and the same on every copy, so it cannot lose an edit; refusing the rename instead
   would make the user apply or discard unrelated binding edits to rename a stick. So the rewrite takes a list of
-  files — game `.binds`, drafts, masters — and is **all or nothing across all of them**.
-- **Matching ignores case, and a hex reference matches in either order** (VID+PID or PID+VID), as
+  files — drafts, masters, and the game's `.binds` — and is **all or nothing across all of them**.
+- **The game's `.binds` goes last in that list** (Krondor, 2026-10-13). Writing it makes the bindings monitor
+  reload, and the reload copies the game's file over a working copy holding no draft; a working copy still to
+  come would then read as changed, and the whole rewrite would be put back as `STALE_FILE`.
+- **Matching ignores case. A hex reference is rewritten from the value found** (Krondor, 2026-10-13, accepted
+  by Alan). `BindsDeviceReferences` still *reads* hex in either order, as
   [format §4.2](domain-knowledge/EliteDangerous-BindsFileFormat.md#42-vidpid-derived-hex-identifiers) asks of a
-  reader — the same comparison `BindsDeviceReferences` uses, so CLEAR's refusal count and the rewrite agree.
+  reader, and reports the exact value it found; the rewrite is built from that value
+  (`new DeviceReferenceRewrite(Set.of(found), name)`), so CLEAR's refusal count and the rewrite still agree.
+  `DeviceReferenceRewrite.hardwareIdToName(vid, pid, name)` matches **VID then PID only**, the order the game
+  writes: a rewrite writes, and matching the reverse could rename a second device whose VID and PID are this
+  one's swapped. `DeviceMappings.xml` is unaffected — its `<VID>` and `<PID>` are read by tag, in any order.
 - **CLEAR writes hex** — VID then PID, upper case, as the game does. It is the one place BindForge writes a hex
   reference ([format §4.2](domain-knowledge/EliteDangerous-BindsFileFormat.md#42-vidpid-derived-hex-identifiers)).
 - Every `Device="…"` is rewritten — on `<Primary>`, `<Secondary>`, `<Binding>` and `<Modifier>` alike — and every
   `.binds` in the folder, not only the active preset, since the game validates them all. Built as
-  `BindingsWriter`'s device rewrite on the [foundation branch](../../05-build-plan/foundation.md).
+  `BindingsWriter`'s device rewrite on the [foundation branch](../../05-build-plan/foundation.md); merged into
+  `V1.1-Release` and up to `V1.2-BindForge` 2026-10-13.
 
 What it reaches today:
 
