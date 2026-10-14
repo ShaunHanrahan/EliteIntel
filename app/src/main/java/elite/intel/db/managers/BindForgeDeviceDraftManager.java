@@ -161,6 +161,59 @@ public class BindForgeDeviceDraftManager {
     }
 
     /**
+     * Onboarding's names, in one transaction (Alan, 2026-10-14, A6b).
+     * <p>
+     * <strong>Named now</strong> - a controller no binding names by hardware id - goes into the master, since its
+     * entry is written to every installation straight away and an installation entry the master lacks is a
+     * divergence. <strong>And into a started draft</strong>, as a copy of the master row: Apply promotes the draft,
+     * so a name left out of it would leave the master again and be stored as a pending removal.
+     * <p>
+     * <strong>Named at Apply</strong> - a controller {@code .binds} names by hardware id - goes into the draft only,
+     * starting it, because naming it moves bindings, which only Apply does.
+     *
+     * @param now     controllers named now, with their generated labels. Ids are ignored
+     * @param atApply controllers that wait for Apply, with their generated labels. Ids are ignored
+     * @return {@code false}, writing nothing, when BindForge is not activated or a name is already in the master or
+     *         the draft - the caller read a list that has changed since
+     */
+    public boolean onboard(List<StoredDevice> now, List<StoredDevice> atApply) {
+        return inTransaction(daos -> {
+            BindForgeDeviceMasterDao master = daos.master();
+            BindForgeDeviceDraftDao draft = daos.draft();
+            if (!daos.activation().isActivated()) return false;
+            for (StoredDevice device : concat(now, atApply)) {
+                if (master.findByName(device.deviceName()) != null || draft.findByName(device.deviceName()) != null) {
+                    return false;
+                }
+            }
+            boolean draftStarted = draft.exists();
+            for (StoredDevice device : now) {
+                master.insert(device.deviceName(), device.vid(), device.pid(), true);
+                DeviceRow row = master.findByName(device.deviceName());
+                device.labels().forEach((token, label) -> master.putLabel(row.id(), token, label));
+                master.clearPendingRemoval(device.deviceName());
+                if (draftStarted) copyIntoDraft(draft, row);
+            }
+            if (!atApply.isEmpty()) {
+                // WHY: after the master rows above, so a draft started here copies them in with the rest.
+                startIfNone(daos);
+                for (StoredDevice device : atApply) {
+                    draft.insert(null, device.deviceName(), device.vid(), device.pid(), true, null);
+                    long draftId = draft.findByName(device.deviceName()).id();
+                    device.labels().forEach((token, label) -> draft.putLabel(draftId, token, label));
+                }
+            }
+            return true;
+        });
+    }
+
+    private static List<StoredDevice> concat(List<StoredDevice> first, List<StoredDevice> second) {
+        List<StoredDevice> all = new ArrayList<>(first);
+        all.addAll(second);
+        return all;
+    }
+
+    /**
      * Puts one master device back into the draft as the master holds it, undoing every saved edit to it -
      * including its removal. A master device that no longer exists is simply left out of the draft.
      * <p>

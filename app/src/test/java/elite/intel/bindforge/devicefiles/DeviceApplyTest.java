@@ -4,6 +4,7 @@ import elite.intel.bindforge.devicefiles.DeviceFilesPush.MasterDevice;
 import elite.intel.bindforge.devicefiles.DeviceFilesPush.Outcome;
 import elite.intel.bindforge.devicefiles.DeviceFilesPush.Report;
 import elite.intel.bindforge.devicefiles.DeviceFilesPush.Target;
+import elite.intel.bindforge.io.DeviceRewriteResult;
 import elite.intel.db.dao.BindForgeDeviceMasterDao.DeviceRow;
 import elite.intel.db.managers.BindForgeDeviceDraftManager;
 import elite.intel.db.managers.BindForgeDeviceMasterManager;
@@ -16,6 +17,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -223,6 +225,146 @@ class DeviceApplyTest {
                 () -> { reads.add("read"); return Set.of(); }, FrontierStockDevices.getInstance(), master).apply();
 
         assertTrue(reads.isEmpty());
+    }
+
+    /**
+     * Onboarding's hex case lands here: once an installation holds the entry, the bindings naming the device by its
+     * hardware id move to its name - built from the value found (A6b, 2026-10-14).
+     */
+    @Test
+    void bindingsNamingAMasterDeviceByHardwareIdMoveToItsName() throws IOException {
+        master.record("LVWAP", "3344", "83F4", true);
+        FakeRewrite rewrite = new FakeRewrite(Map.of("83f43344", 5, "334403F5", 2));
+
+        DeviceApply.Result result = applyWith(List.of(steamInstallation()), rewrite);
+
+        assertEquals(List.of("LVWAP <- [83f43344]"), rewrite.calls, "the value found, in the order found");
+        assertEquals(List.of(new DeviceApply.Move("LVWAP", 5, DeviceApply.MoveOutcome.MOVED,
+                DeviceRewriteResult.Status.REWRITTEN)), result.moves());
+    }
+
+    /** The user's Apply comes first: one installation missing does not hold the move back (Alan, 2026-10-14). */
+    @Test
+    void aMissingInstallationDoesNotHoldTheMoveBack() throws IOException {
+        master.record("LVWAP", "3344", "83F4", true);
+        FakeRewrite rewrite = new FakeRewrite(Map.of("334483F4", 5));
+
+        DeviceApply.Result result = applyWith(List.of(steamInstallation(), unplugged()), rewrite);
+
+        assertEquals(DeviceApply.MoveOutcome.MOVED, result.moves().getFirst().outcome());
+    }
+
+    /** With no installation holding the entry nothing was applied for the bindings to follow - they wait. */
+    @Test
+    void noInstallationTookTheEntrySoTheBindingsWait() {
+        master.record("LVWAP", "3344", "83F4", true);
+        FakeRewrite rewrite = new FakeRewrite(Map.of("334483F4", 5));
+
+        DeviceApply.Result result = applyWith(List.of(unplugged()), rewrite);
+
+        assertTrue(rewrite.calls.isEmpty());
+        assertEquals(DeviceApply.MoveOutcome.NOT_APPLIED, result.moves().getFirst().outcome());
+    }
+
+    /** One of Frontier's names is never a target: its element is Frontier's definition, not the user's. */
+    @Test
+    void aFrontierNameIsNeverATarget() throws IOException {
+        master.record("T-Rudder", "044F", "B679", true);
+        FakeRewrite rewrite = new FakeRewrite(Map.of("044FB679", 3));
+
+        DeviceApply.Result result = applyWith(List.of(steamInstallation()), rewrite);
+
+        assertTrue(rewrite.calls.isEmpty());
+        assertTrue(result.moves().isEmpty());
+    }
+
+    @Test
+    void bindingsThatCannotBeReadMoveNothingAndSaySo() throws IOException {
+        master.record("LVWAP", "3344", "83F4", true);
+        FakeRewrite rewrite = new FakeRewrite(null);
+
+        DeviceApply.Result result = applyWith(List.of(steamInstallation()), rewrite);
+
+        assertTrue(result.movesUnread());
+        assertTrue(rewrite.calls.isEmpty());
+    }
+
+    /**
+     * One rewrite per device, back to back (Alan, 2026-10-14): a second one that meets the bindings monitor
+     * mid-reload stops on its own, is reported, and leaves the first moved - the next Apply moves it.
+     */
+    @Test
+    void twoDevicesMoveOneRewriteEachAndAFailureStopsOnlyItsOwn() throws IOException {
+        master.record("LVWAP", "3344", "83F4", true);
+        master.record("RVWAP", "3344", "83F5", true);
+        FakeRewrite rewrite = new FakeRewrite(Map.of("334483F4", 5, "334483F5", 7));
+        rewrite.answers.put("RVWAP", DeviceRewriteResult.Status.STALE_FILE);
+
+        DeviceApply.Result result = applyWith(List.of(steamInstallation()), rewrite);
+
+        assertEquals(List.of("LVWAP <- [334483F4]", "RVWAP <- [334483F5]"), rewrite.calls);
+        assertEquals(List.of(
+                new DeviceApply.Move("LVWAP", 5, DeviceApply.MoveOutcome.MOVED, DeviceRewriteResult.Status.REWRITTEN),
+                new DeviceApply.Move("RVWAP", 7, DeviceApply.MoveOutcome.FAILED, DeviceRewriteResult.Status.STALE_FILE)),
+                result.moves());
+    }
+
+    /** Two master devices on one VID/PID: the first in the master's order takes the bindings, the other nothing. */
+    @Test
+    void aSharedHardwareIdGoesToTheFirstInMasterOrder() throws IOException {
+        master.record("LVWAP", "3344", "83F4", true);
+        master.record("AlphaStick", "3344", "83F4", true);
+        FakeRewrite rewrite = new FakeRewrite(Map.of("334483F4", 5));
+
+        DeviceApply.Result result = applyWith(List.of(steamInstallation()), rewrite);
+
+        assertEquals(List.of("AlphaStick <- [334483F4]"), rewrite.calls);
+        assertEquals(1, result.moves().size());
+    }
+
+    /** The game saved .binds between the count and the rewrite: nothing was there to move, and it says so. */
+    @Test
+    void aMoveThatFindsNothingIsNotReportedAsMoved() throws IOException {
+        master.record("LVWAP", "3344", "83F4", true);
+        FakeRewrite rewrite = new FakeRewrite(Map.of("334483F4", 5));
+        rewrite.answers.put("LVWAP", DeviceRewriteResult.Status.NO_REFERENCES);
+
+        DeviceApply.Result result = applyWith(List.of(steamInstallation()), rewrite);
+
+        assertEquals(DeviceApply.MoveOutcome.NOT_FOUND, result.moves().getFirst().outcome());
+    }
+
+    private DeviceApply.Result applyWith(List<Target> targets, DeviceApply.HardwareIdRewrite rewrite) {
+        return new DeviceApply(draft::promote, pusher(targets)::push, Set::of, FrontierStockDevices.getInstance(),
+                master, rewrite).apply();
+    }
+
+    /** Hardware-id counts as given, and the rewrites asked for - each succeeding unless told otherwise. */
+    private static final class FakeRewrite implements DeviceApply.HardwareIdRewrite {
+        private final Map<String, Integer> counts;
+        final Map<String, DeviceRewriteResult.Status> answers = new HashMap<>();
+        final List<String> calls = new ArrayList<>();
+
+        /** @param counts {@code null} to fail the read */
+        FakeRewrite(Map<String, Integer> counts) {
+            this.counts = counts;
+        }
+
+        @Override
+        public Map<String, Integer> hardwareIdCounts() throws IOException {
+            if (counts == null) throw new IOException("bindings folder not there");
+            return counts;
+        }
+
+        @Override
+        public DeviceApply.Rewritten rewrite(String name, Set<String> found) {
+            calls.add(name + " <- " + found.stream().sorted().toList());
+            DeviceRewriteResult.Status status = answers.getOrDefault(name, DeviceRewriteResult.Status.REWRITTEN);
+            int moved = status == DeviceRewriteResult.Status.REWRITTEN
+                    ? found.stream().mapToInt(counts::get).sum()
+                    : 0;
+            return new DeviceApply.Rewritten(status, moved);
+        }
     }
 
     private void lvwapAppliedTo(Target steam) {

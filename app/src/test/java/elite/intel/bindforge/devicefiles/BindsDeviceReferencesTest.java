@@ -142,6 +142,40 @@ class BindsDeviceReferencesTest {
         assertTrue(BindsDeviceReferences.referencedEntryNames(bindings.resolve("moved")).isEmpty());
     }
 
+    /**
+     * Hardware ids are counted on their own, keyed by the value exactly as written, so a rewrite can be built from
+     * what was found (A6b, 2026-10-14).
+     */
+    @Test
+    void hardwareIdsAreCountedAsWritten() throws IOException {
+        binds("Custom.4.2.binds", """
+                <Root>
+                  <A><Primary Device="334483F4" Key="Joy_1" /><Secondary Device="334483F4" Key="Joy_2" /></A>
+                  <B><Binding Device="334483f4" Key="Joy_XAxis" /></B>
+                  <C><Primary Device="T-Rudder" Key="Joy_2" /></C>
+                </Root>
+                """);
+
+        assertEquals(Map.of("334483F4", 2, "334483f4", 1), BindsDeviceReferences.hardwareIdCounts(bindings));
+        assertEquals(Map.of("T-Rudder", 1), BindsDeviceReferences.referenceCounts(bindings),
+                "entry names are unaffected");
+    }
+
+    @Test
+    void hardwareIdCountsRefuseAMissingFolder() {
+        assertThrows(IOException.class, () -> BindsDeviceReferences.hardwareIdCounts(bindings.resolve("gone")));
+    }
+
+    /** Read in either order and either case, as format §4.2 asks of a reader - and only this device's. */
+    @Test
+    void hardwareIdsForADeviceMatchEitherOrderAndCase() {
+        Map<String, Integer> counts = Map.of("334483F4", 2, "83f43344", 1, "334403F5", 7);
+
+        assertEquals(Map.of("334483F4", 2, "83f43344", 1),
+                BindsDeviceReferences.hardwareIdsFor("3344", "83F4", counts));
+        assertTrue(BindsDeviceReferences.hardwareIdsFor("1234", "0001", counts).isEmpty());
+    }
+
     private void binds(String name, String content) throws IOException {
         Files.writeString(bindings.resolve(name), content);
     }

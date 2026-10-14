@@ -475,6 +475,73 @@ class BindForgeDeviceDraftManagerTest {
         assertTrue(draft.promote().isEmpty(), "nothing is removed");
     }
 
+    /** Onboarding names a controller no binding names by hex straight away: into the master (A6b, 2026-10-14). */
+    @Test
+    void onboardingNamedNowGoesIntoTheMaster() {
+        activated();
+
+        assertTrue(draft.onboard(List.of(stick("VirpilControls20220720", "3344", "0194")), List.of()));
+
+        DeviceRow row = master.findByName("VirpilControls20220720");
+        assertNotNull(row);
+        assertTrue(row.aliasConfirmed(), "the user was shown the name");
+        assertEquals(labels("Joy_1", "Button 1"), master.labelsOf(row.id()));
+        assertFalse(draft.isStarted(), "no draft is started for a name applied straight away");
+    }
+
+    /** A started draft gets the name too, or Apply's promote would drop it and store it as a pending removal. */
+    @Test
+    void onboardingNamedNowGoesIntoAStartedDraftAsWell() {
+        activated();
+        draft.start();
+
+        assertTrue(draft.onboard(List.of(stick("VirpilControls20220720", "3344", "0194")), List.of()));
+
+        DraftRow copy = draft.findByName("VirpilControls20220720");
+        assertNotNull(copy);
+        assertEquals(master.findByName("VirpilControls20220720").id(), copy.masterId());
+        assertTrue(draft.promote().isEmpty(), "nothing leaves the master on Apply");
+        assertNotNull(master.findByName("VirpilControls20220720"));
+        assertTrue(master.pendingRemovals().isEmpty());
+    }
+
+    /** A controller .binds names by hex waits for Apply: the draft only, starting it from the master. */
+    @Test
+    void onboardingNamedAtApplyGoesIntoTheDraftOnly() {
+        activated();
+
+        assertTrue(draft.onboard(List.of(), List.of(stick("LeftStick", "3344", "83F3"))));
+
+        assertNull(master.findByName("LeftStick"), "not applied yet");
+        assertEquals(List.of("LVWAP", "LeftStick", "RVWAP"), names(draft.findAll()), "a whole copy of the master");
+        assertEquals(labels("Joy_1", "Button 1"), draft.labelsOf(draft.findByName("LeftStick").id()));
+        draft.promote();
+        assertNotNull(master.findByName("LeftStick"), "Apply makes it the master's");
+    }
+
+    @Test
+    void onboardingWritesNothingBeforeActivation() {
+        assertFalse(draft.onboard(List.of(stick("STICK2", "1234", "0001")), List.of(stick("STICK3", "1234", "0002"))));
+
+        assertNull(master.findByName("STICK2"));
+        assertFalse(draft.isStarted());
+    }
+
+    /** A name taken since the dialog read the list writes nothing at all - not even the names that were free. */
+    @Test
+    void onboardingWritesNothingWhenANameWasTakenMeanwhile() {
+        activated();
+
+        assertFalse(draft.onboard(List.of(stick("STICK2", "1234", "0001"), stick("RVWAP", "1234", "0002")),
+                List.of()));
+
+        assertNull(master.findByName("STICK2"));
+    }
+
+    private static StoredDevice stick(String name, String vid, String pid) {
+        return new StoredDevice(null, name, vid, pid, true, null, labels("Joy_1", "Button 1"));
+    }
+
     @Test
     void storedReadsTheMasterAndTheDraftTogether() {
         assertNull(draft.stored().draft(), "no draft is started");

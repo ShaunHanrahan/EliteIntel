@@ -4,6 +4,7 @@ import com.google.common.eventbus.Subscribe;
 import elite.intel.bindforge.devices.DeviceEditorInputs;
 import elite.intel.bindforge.devices.DeviceEditorMiddle;
 import elite.intel.bindforge.devices.DeviceEditorLights;
+import elite.intel.bindforge.devices.DeviceNames;
 import elite.intel.bindforge.devices.InstallationMarkers;
 import elite.intel.bindforge.devices.MyDevice;
 import elite.intel.db.managers.BindForgeDeviceDraftManager;
@@ -100,6 +101,7 @@ final class DeviceEditorDialog extends JDialog {
 
     private final Opening opening;
     private final Runnable onSaved;
+    private final Runnable onName;
     private final Map<String, String> starting;
     private final Map<String, HudTextField> boxes = new LinkedHashMap<>();
     private final DeviceEditorLights lights;
@@ -110,12 +112,17 @@ final class DeviceEditorDialog extends JDialog {
     /** A write to the draft is under way - SAVE, CLEAR, RESET LABELS or an undo - so nothing else may start. */
     private boolean busy;
 
-    /** @param onSaved run on the EDT after a save, so the screen reads everything again */
-    DeviceEditorDialog(Component parent, Opening opening, Runnable onSaved) {
+    /**
+     * @param onSaved run on the EDT after a save, so the screen reads everything again
+     * @param onName  run on the EDT after the dialog closes, when the user asks to name an unnamed controller - which
+     *                opens onboarding for it (Alan, 2026-10-14, A6b)
+     */
+    DeviceEditorDialog(Component parent, Opening opening, Runnable onSaved, Runnable onName) {
         super(SwingUtilities.getWindowAncestor(parent), ModalityType.APPLICATION_MODAL);
         setUndecorated(true);
         this.opening = opening;
         this.onSaved = onSaved;
+        this.onName = onName;
         this.starting = opening.inputs().startingLabels(opening.saved());
         this.lights = new DeviceEditorLights(opening.description() == null
                 ? DeviceDescription.axesUnknown(0)
@@ -136,6 +143,14 @@ final class DeviceEditorDialog extends JDialog {
 
     private boolean named() {
         return opening.deviceName() != null;
+    }
+
+    /**
+     * NAME, for a controller onboarding would ask about - {@link DeviceNames#needingName}, the one rule - and not
+     * already named in the draft for Apply.
+     */
+    private boolean offersName() {
+        return !named() && !DeviceNames.needingName(List.of(opening.device())).isEmpty();
     }
 
     /** Labels can be edited once the device has a name - and not while it is cleared or reset, waiting for APPLY. */
@@ -224,6 +239,16 @@ final class DeviceEditorDialog extends JDialog {
         } else if (rule.why() == DeviceEditorMiddle.Why.NAMED_IN_BINDS
                 || rule.why() == DeviceEditorMiddle.Why.BINDS_UNREAD) {
             row = line(panel, row, whyText(rule), HudPalette.HUD_COLOR_ROLE_WARNING);
+        }
+        if (offersName()) {
+            JButton name = makeButton(getText("bindings.aliasDesigner.editor.button.name"));
+            name.addActionListener(e -> {
+                dispose();
+                onName.run();
+            });
+            GridBagConstraints c = cell(0, row++);
+            c.gridwidth = 3;
+            panel.add(name, c);
         }
         row = field(panel, row, "bindings.aliasDesigner.editor.field.vid", device.vid());
         row = field(panel, row, "bindings.aliasDesigner.editor.field.pid", device.pid());

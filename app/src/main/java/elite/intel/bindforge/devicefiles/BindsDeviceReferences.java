@@ -77,6 +77,40 @@ public final class BindsDeviceReferences {
      * @throws IOException when the folder is missing or no {@code .binds} in it could be read
      */
     public static Map<String, Integer> referenceCounts(Path bindingsFolder) throws IOException {
+        return readStrictly(bindingsFolder).counts();
+    }
+
+    /**
+     * How many bindings name each device by its hardware id - eight hex characters, the game's fallback for a device
+     * with no entry - across every {@code .binds} in {@code bindingsFolder}, keyed by the value exactly as found
+     * (Alan, 2026-10-14, A6b). Onboarding counts these to say how many bindings a name will move, and Apply rewrites
+     * them <em>from the value found</em> (Krondor, 2026-10-13), so a reference written in either case or order is
+     * moved as it is written.
+     * <p>
+     * Strict, as {@link #referenceCounts(Path)} is: it decides a write.
+     *
+     * @throws IOException when the folder is missing or no {@code .binds} in it could be read
+     */
+    public static Map<String, Integer> hardwareIdCounts(Path bindingsFolder) throws IOException {
+        return readStrictly(bindingsFolder).hardwareIds();
+    }
+
+    /**
+     * The hardware ids among {@code counts} that name this VID and PID, with their counts. Read in either order - VID
+     * then PID, as the game writes, or the reverse a hand-edited file may hold (format §4.2) - and ignoring case.
+     */
+    public static Map<String, Integer> hardwareIdsFor(String vid, String pid, Map<String, Integer> counts) {
+        String forward = (vid + pid).toUpperCase(Locale.ROOT);
+        String reversed = (pid + vid).toUpperCase(Locale.ROOT);
+        Map<String, Integer> found = new LinkedHashMap<>();
+        counts.forEach((id, count) -> {
+            String upper = id.toUpperCase(Locale.ROOT);
+            if (upper.equals(forward) || upper.equals(reversed)) found.put(id, count);
+        });
+        return found;
+    }
+
+    private static Reading readStrictly(Path bindingsFolder) throws IOException {
         if (!Files.isDirectory(bindingsFolder)) {
             throw new NoSuchFileException(bindingsFolder.toString(), null, "the bindings folder is not there");
         }
@@ -85,16 +119,17 @@ public final class BindsDeviceReferences {
             throw new IOException("none of the " + reading.files() + " .binds files in " + bindingsFolder
                     + " could be read");
         }
-        return reading.counts();
+        return reading;
     }
 
     private static Reading read(Path bindingsFolder) throws IOException {
         Map<String, Integer> counts = new LinkedHashMap<>();
+        Map<String, Integer> hardwareIds = new LinkedHashMap<>();
         List<Path> files = bindsFilesIn(bindingsFolder);
         int parsed = 0;
         for (Path file : files) {
             try {
-                collectInto(file, counts);
+                collectInto(file, counts, hardwareIds);
                 parsed++;
             } catch (SAXException | ParserConfigurationException | IOException e) {
                 // WHY: skipped, not fatal. See above - one unreadable file in the folder is an ordinary
@@ -103,13 +138,13 @@ public final class BindsDeviceReferences {
                 log.warn("Skipped {} while reading which devices the bindings name: {}", file, e.getMessage());
             }
         }
-        return new Reading(Map.copyOf(counts), files.size(), parsed);
+        return new Reading(Map.copyOf(counts), Map.copyOf(hardwareIds), files.size(), parsed);
     }
 
-    private record Reading(Map<String, Integer> counts, int files, int parsed) {
+    private record Reading(Map<String, Integer> counts, Map<String, Integer> hardwareIds, int files, int parsed) {
     }
 
-    private static void collectInto(Path bindsFile, Map<String, Integer> counts)
+    private static void collectInto(Path bindsFile, Map<String, Integer> counts, Map<String, Integer> hardwareIds)
             throws IOException, SAXException, ParserConfigurationException {
 
         NodeList all = newDocumentBuilder().parse(bindsFile.toFile()).getElementsByTagName("*");
@@ -117,7 +152,11 @@ public final class BindsDeviceReferences {
             Element element = (Element) all.item(i);
             if (!element.hasAttribute(DEVICE_ATTRIBUTE)) continue;
             String device = element.getAttribute(DEVICE_ATTRIBUTE).trim();
-            if (isAnEntryName(device)) counts.merge(device, 1, Integer::sum);
+            if (isRawHardwareId(device)) {
+                hardwareIds.merge(device, 1, Integer::sum);
+            } else if (isAnEntryName(device)) {
+                counts.merge(device, 1, Integer::sum);
+            }
         }
     }
 

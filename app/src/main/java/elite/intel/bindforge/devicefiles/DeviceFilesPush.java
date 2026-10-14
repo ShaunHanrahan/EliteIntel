@@ -17,12 +17,9 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -134,9 +131,7 @@ public final class DeviceFilesPush {
     private final Supplier<List<Target>> targets;
     private final Supplier<List<MasterDevice>> master;
     private final FrontierStockDevices stock;
-    private final TimestampedBackups backups;
-    private final Path historyRoot;
-    private final IntSupplier retention;
+    private final EditHistory history;
     private final Consumer<Target> afterWrite;
 
     /**
@@ -162,9 +157,7 @@ public final class DeviceFilesPush {
         this.targets = targets;
         this.master = master;
         this.stock = stock;
-        this.backups = backups;
-        this.historyRoot = historyRoot;
-        this.retention = retention;
+        this.history = new EditHistory(backups, historyRoot, retention);
         this.afterWrite = afterWrite;
     }
 
@@ -182,7 +175,7 @@ public final class DeviceFilesPush {
      */
     public Report push(Set<String> removals) {
         List<MasterDevice> devices = master.get();
-        int keep = retention.getAsInt();
+        int keep = history.retention();
         Set<String> keptThisPush = new HashSet<>();
         List<InstallationResult> results = new ArrayList<>();
         for (Target target : targets.get()) {
@@ -206,7 +199,7 @@ public final class DeviceFilesPush {
         List<InstallationResult> results = new ArrayList<>();
         for (Target target : targets.get()) {
             if (target.installId() != installId) continue;
-            InstallationResult result = pushTo(target, devices, Set.of(), retention.getAsInt(), new HashSet<>());
+            InstallationResult result = pushTo(target, devices, Set.of(), history.retention(), new HashSet<>());
             log.info("Device files for {} ({}), reverted to the master: {}{}", target.storefront(),
                     target.controlSchemes(), result.outcome(), result.reason() == null ? "" : " - " + result.reason());
             results.add(result);
@@ -331,14 +324,7 @@ public final class DeviceFilesPush {
 
     private void keepHistory(Target target, List<FileWrite> writes, int keep, Set<String> kept) throws IOException {
         for (FileWrite write : writes) {
-            if (write.previous() == null) continue;
-            if (!kept.add(sha256(write.previous()))) continue;
-            Path folder = historyRoot.resolve(String.valueOf(target.installId()));
-            if (write.path().getFileName().toString().endsWith(GameInstallation.BUTTON_MAP_SUFFIX)) {
-                folder = folder.resolve(GameInstallation.DEVICE_BUTTON_MAPS);
-            }
-            backups.create(write.path(), folder);
-            backups.prune(folder, write.path().getFileName().toString(), keep);
+            history.keep(target.installId(), write.path(), write.previous(), keep, kept);
         }
     }
 
@@ -403,14 +389,6 @@ public final class DeviceFilesPush {
                         + FrontierStockDevices.RESOURCE);
             }
             return xml.readAllBytes();
-        }
-    }
-
-    private static String sha256(byte[] content) {
-        try {
-            return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(content));
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 is required of every Java platform", e);
         }
     }
 

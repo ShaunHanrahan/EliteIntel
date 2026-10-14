@@ -4,6 +4,7 @@ import com.google.common.eventbus.Subscribe;
 import elite.intel.bindforge.devicefiles.Activation;
 import elite.intel.bindforge.devicefiles.BeforeBindForgeBackup;
 import elite.intel.bindforge.devicefiles.BindsDeviceReferences;
+import elite.intel.bindforge.devicefiles.ButtonMapLabels;
 import elite.intel.bindforge.devicefiles.DeviceApply;
 import elite.intel.bindforge.devicefiles.DeviceDivergence;
 import elite.intel.bindforge.devicefiles.DeviceDivergenceScanner;
@@ -13,6 +14,7 @@ import elite.intel.bindforge.devicefiles.DeviceFilesAdopt;
 import elite.intel.bindforge.devicefiles.DeviceFilesCheck;
 import elite.intel.bindforge.devicefiles.DeviceFilesPush;
 import elite.intel.bindforge.devicefiles.DeviceMappingsParser;
+import elite.intel.bindforge.devicefiles.DeviceOnboarding;
 import elite.intel.bindforge.devicefiles.DivergenceWaysOut;
 import elite.intel.bindforge.devicefiles.DivergenceWaysOut.WayOut;
 import elite.intel.bindforge.devicefiles.DraftChanges;
@@ -29,9 +31,11 @@ import elite.intel.bindforge.devices.InstallationMarkers;
 import elite.intel.bindforge.devices.MissingControllerWarning;
 import elite.intel.bindforge.devices.MyDevice;
 import elite.intel.bindforge.devices.MyDeviceList;
+import elite.intel.bindforge.devices.Onboarding;
 import elite.intel.bindforge.install.GameInstallation;
 import elite.intel.bindforge.install.InstallationRegistry;
 import elite.intel.bindforge.install.WindowsGameInstallationProvider;
+import elite.intel.bindforge.io.DeviceRewriteResult;
 import elite.intel.db.dao.BindForgeInstallationsDao.InstallationRow;
 import elite.intel.db.dao.BindForgeDeviceDraftDao.DraftRow;
 import elite.intel.db.dao.BindForgeDeviceMasterDao.DeviceRow;
@@ -123,6 +127,11 @@ import static elite.intel.ui.theme.HudPalette.HUD_TABLE_ROW_HEIGHT;
  * <p>
  * <strong>The first time it is shown in a run, it says which named controllers are missing</strong> - those the
  * bindings name, spoken and logged, once (Alan, 2026-10-11, A13; {@link MissingControllerWarning}).
+ * <p>
+ * <strong>Onboarding opens once per run, right after activation</strong>, when an attached controller has no name
+ * - and from the gear, for one controller (Alan, 2026-10-14, A6b; {@link OnboardingDialog}). A controller no binding
+ * names by hardware id is written to every installation when the user finishes; one {@code .binds} names by hex is
+ * held in the draft for APPLY, which moves those bindings to the name.
  */
 public class AliasDesignerPanel extends JPanel {
 
@@ -198,6 +207,11 @@ public class AliasDesignerPanel extends JPanel {
     private boolean activationRunning;
     private List<String> currentChanges = List.of();
     private boolean screenActionRunning;
+    /**
+     * Set when activation is tried, and taken by the first refresh after it that finds BindForge activated and the
+     * hardware listed: onboarding opens once per run, for the controllers attached then (Alan, 2026-10-14, A6b).
+     */
+    private final AtomicBoolean onboardingWanted = new AtomicBoolean();
 
     public AliasDesignerPanel() {
         this(new InstallationRegistry(
@@ -209,11 +223,12 @@ public class AliasDesignerPanel extends JPanel {
         buildUi();
         // WHY: the first time the user opens this screen in a run, not at startup (Alan, 2026-10-11, A13). initData()
         // first runs as the application starts, before the Device Service has looked at any hardware, so this asks
-        // for a refresh of its own and the warning judges that one.
+        // for a refresh of its own and the warning judges that one. Onboarding's offer, still waiting, asks the same.
         addHierarchyListener(event -> {
             if ((event.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) == 0 || !isShowing()) return;
-            if (!MissingControllerWarning.getInstance().pending()) return;
-            missingWarningWanted.set(true);
+            boolean warning = MissingControllerWarning.getInstance().pending();
+            if (!warning && !onboardingWanted.get()) return;
+            if (warning) missingWarningWanted.set(true);
             initData();
         });
         UiBus.register(this);
@@ -367,6 +382,7 @@ public class AliasDesignerPanel extends JPanel {
             List<String> changes = List.of();
             // WHY: null until read, so a refresh that failed before the hardware leaves the last answer on screen.
             Boolean running = null;
+            boolean listed = false;
             try {
                 isActivated = BindForgeActivationManager.getInstance().isActivated();
                 changes = DraftChanges.stored();
@@ -379,6 +395,7 @@ public class AliasDesignerPanel extends JPanel {
                 Map<String, List<DeviceEntry>> entries = entriesByInstall(rows);
                 Attached attached = readAttached();
                 running = attached.running();
+                listed = attached.listed();
                 myDevices = readMyDevices(attached.devices(), entries);
                 builtIn = BuiltInDeviceList.build(FrontierStockDevices.getInstance(), attached.devices());
                 // WHY: only against a master. Before first setup M, not added and the divergence colour mean
@@ -403,6 +420,7 @@ public class AliasDesignerPanel extends JPanel {
             Boolean loadedActivated = isActivated;
             List<String> loadedChanges = changes;
             Boolean loadedRunning = running;
+            boolean loadedListed = listed;
             SwingUtilities.invokeLater(() -> {
                 if (loadedRunning != null) deviceServiceRunning = loadedRunning;
                 installLabels = loadedLabels;
@@ -415,6 +433,12 @@ public class AliasDesignerPanel extends JPanel {
                 showBuiltIn(loadedBuiltIn);
                 currentReport = loadedDivergence.report();
                 showFindings(loadedDivergence.findings());
+                // WHY: only once the hardware is listed, and only while the user is looking. Before the listing every
+                // controller reads absent, so nobody would need a name and this run's one offer would be spent on
+                // nothing; a refresh the user did not start would put the dialog over another screen.
+                if (activated && loadedListed && isShowing() && onboardingWanted.compareAndSet(true, false)) {
+                    openOnboarding(null);
+                }
                 // WHY: something asked for a refresh while this one ran - the screen shown, a device file changed, an
                 // action finished - and this one may have read what it changed too early.
                 if (refreshes.finish()) initData();
@@ -712,6 +736,141 @@ public class AliasDesignerPanel extends JPanel {
             text.append('\n').append(getText("bindings.aliasDesigner.apply.heldBack",
                     String.join(", ", result.heldBack())));
         }
+        if (result.movesUnread()) {
+            text.append('\n').append(getText("bindings.aliasDesigner.apply.movesUnread"));
+        }
+        for (DeviceApply.Move move : result.moves()) {
+            text.append('\n').append(switch (move.outcome()) {
+                case MOVED -> getText("bindings.aliasDesigner.apply.moved", move.bindings(), move.name());
+                case NOT_APPLIED -> getText("bindings.aliasDesigner.apply.moveNotApplied", move.name());
+                case NOT_FOUND -> getText("bindings.aliasDesigner.apply.moveNotFound", move.name());
+                case FAILED -> getText("bindings.aliasDesigner.apply.moveFailed", move.name(),
+                        moveReason(move.status()));
+            });
+        }
+        return text.toString();
+    }
+
+    /** Why a move stopped, in the user's words - the status itself is in the log. */
+    private static String moveReason(DeviceRewriteResult.Status status) {
+        return switch (status) {
+            case STALE_FILE -> getText("bindings.aliasDesigner.apply.moveReason.stale");
+            case READ_FAILED, UNSUPPORTED_XML -> getText("bindings.aliasDesigner.apply.moveReason.unread");
+            case BACKUP_FAILED -> getText("bindings.aliasDesigner.apply.moveReason.backup");
+            case WRITE_FAILED, REWRITTEN, NO_REFERENCES -> getText("bindings.aliasDesigner.apply.moveReason.write");
+        };
+    }
+
+    /**
+     * Onboarding: reads who needs a name off the EDT, opens the dialog, and writes what the user chose when they
+     * finish (Alan, 2026-10-14, A6b).
+     *
+     * @param only the controller to name, from the gear - or {@code null} for every controller that needs one, which
+     *             says nothing when nobody does
+     */
+    private void openOnboarding(MyDevice only) {
+        String title = getText("bindings.aliasDesigner.onboarding.title");
+        offEdt(title, () -> readOnboarding(only), reading -> {
+            if (reading.problem() != null) {
+                HudConfirmDialog.info(this, title, reading.problem(),
+                        getText("bindings.aliasDesigner.firstSetup.close"));
+                return;
+            }
+            if (reading.pages().isEmpty()) {
+                if (only != null) {
+                    HudConfirmDialog.info(this, title, getText("bindings.aliasDesigner.onboarding.nobody"),
+                            getText("bindings.aliasDesigner.firstSetup.close"));
+                }
+                return;
+            }
+            new OnboardingDialog(this, reading.pages(), reading.taken(),
+                    names -> runAndReport(title, () -> onboardText(nameAll(reading.pages(), names)))).showDialog();
+        });
+    }
+
+    /**
+     * Who onboarding asks, what each is offered, and every name already taken - the master's, the draft's, every
+     * installation's entries and Frontier's. A {@code .binds} that cannot be read stops it: without it, a controller
+     * the bindings name by hardware id would be named straight away, leaving those bindings on an id that may no
+     * longer resolve.
+     */
+    private OnboardingReading readOnboarding(MyDevice only) {
+        if (!BindForgeActivationManager.getInstance().isActivated()) {
+            return new OnboardingReading(List.of(), List.of(), getText("bindings.aliasDesigner.onboarding.notActivated"));
+        }
+        Map<String, Integer> hardwareIds;
+        try {
+            hardwareIds = BindsDeviceReferences.hardwareIdCounts(PlayerSession.getInstance().getBindingsDir());
+        } catch (IOException e) {
+            log.warn("Onboarding did not open: the bindings could not be read", e);
+            return new OnboardingReading(List.of(), List.of(),
+                    getText("bindings.aliasDesigner.onboarding.bindsUnread", messageOf(e)));
+        }
+        List<InstallationRow> rows = registry.currentWithStartupScan();
+        Map<String, List<DeviceEntry>> entries = entriesByInstall(rows);
+        List<MyDevice> devices = readMyDevices(readAttached().devices(), entries);
+
+        Set<String> taken = new LinkedHashSet<>(FrontierStockDevices.getInstance().names());
+        BindForgeDeviceMasterManager.getInstance().findAll().forEach(row -> taken.add(row.deviceName()));
+        List<DraftRow> draft = BindForgeDeviceDraftManager.getInstance().findAll();
+        draft.forEach(row -> taken.add(row.deviceName()));
+        entries.values().forEach(list -> list.forEach(entry -> taken.add(entry.name())));
+        List<HardwareId> heldByDraft = draft.stream().map(row -> new HardwareId(row.vid(), row.pid())).toList();
+
+        List<MyDevice> asked = only == null
+                ? devices
+                : devices.stream().filter(device -> device.hardware().equals(only.hardware())).toList();
+        List<Onboarding.Page> pages = Onboarding.pages(asked, heldByDraft, taken, hardwareIds,
+                AliasDesignerPanel::generatedLabels);
+        return new OnboardingReading(pages, List.copyOf(taken), null);
+    }
+
+    /** @param problem what stopped onboarding, already worded, or {@code null} */
+    private record OnboardingReading(List<Onboarding.Page> pages, List<String> taken, String problem) {
+    }
+
+    /** The labels a controller gets when named - what startup generation would give it, read from it now. */
+    private static Map<String, String> generatedLabels(MyDevice device) {
+        Device live = attachedController(device.hardware());
+        if (live == null) return Map.of();
+        DeviceDescription description =
+                DeviceService.getInstance().description(live.id()).orElse(DeviceDescription.axesUnknown(0));
+        return ButtonMapLabels.generate(live.buttonCount(), live.axisCount(), description);
+    }
+
+    private static DeviceOnboarding.Result nameAll(List<Onboarding.Page> pages, List<String> names) throws IOException {
+        List<DeviceOnboarding.Naming> namings = new ArrayList<>();
+        for (int i = 0; i < pages.size(); i++) {
+            Onboarding.Page page = pages.get(i);
+            namings.add(new DeviceOnboarding.Naming(names.get(i), page.device().vid(), page.device().pid(),
+                    page.labels(), page.bindings()));
+        }
+        return DeviceOnboarding.stored().name(namings);
+    }
+
+    private String onboardText(DeviceOnboarding.Result result) {
+        if (!result.recorded()) return getText("bindings.aliasDesigner.onboarding.result.notRecorded");
+        StringBuilder text = new StringBuilder();
+        // WHY: said even with no installation to write - "updated 0 of 0" - unless every name waits for Apply.
+        if (!result.installations().isEmpty() || result.atApply().isEmpty()) {
+            text.append(getText("bindings.aliasDesigner.wayOut.revert.result", result.matchingCount(),
+                    result.installations().size()));
+            for (DeviceOnboarding.InstallationResult installation : result.installations()) {
+                String install = namesOf(List.of(installation.target().installId()));
+                if (installation.reason() != null) {
+                    text.append('\n').append(getText("bindings.aliasDesigner.firstSetup.result.installation", install,
+                            installation.reason()));
+                }
+                for (String kept : installation.keptButtonMaps()) {
+                    text.append('\n').append(getText("bindings.aliasDesigner.onboarding.result.keptButtonMap",
+                            install, kept));
+                }
+            }
+        }
+        for (DeviceOnboarding.Naming naming : result.atApply()) {
+            if (!text.isEmpty()) text.append('\n');
+            text.append(getText("bindings.aliasDesigner.onboarding.result.atApply", naming.name(), naming.bindings()));
+        }
         return text.toString();
     }
 
@@ -802,6 +961,7 @@ public class AliasDesignerPanel extends JPanel {
      */
     public void activateOnFirstShowing() {
         if (!activationTried.compareAndSet(false, true)) return;
+        onboardingWanted.set(true);
         activationRunning = true;
         refreshSetUp();
         new Thread(() -> {
@@ -1087,7 +1247,7 @@ public class AliasDesignerPanel extends JPanel {
                             getText("bindings.aliasDesigner.firstSetup.close"));
                     return;
                 }
-                new DeviceEditorDialog(this, loaded, this::initData).showDialog();
+                new DeviceEditorDialog(this, loaded, this::initData, () -> openOnboarding(device)).showDialog();
             });
         }, "BindForge-DeviceEditorRead").start();
     }
@@ -1103,7 +1263,7 @@ public class AliasDesignerPanel extends JPanel {
         String name = device.alias() != null
                 ? device.alias()
                 : device.builtIn() ? stock.covering(device.vid(), device.pid()).map(DeviceEntry::name).orElse(null)
-                : null;
+                : nameWaitingForApply(device);
         Map<String, String> saved = name == null ? Map.of() : storedLabels(name);
 
         Device live = device.attached() ? attachedController(device.hardware()) : null;
@@ -1139,6 +1299,17 @@ public class AliasDesignerPanel extends JPanel {
         return DeviceEditorMiddle.of(name, builtIn,
                 BindForgeDeviceMasterManager.getInstance().findByName(name) != null,
                 started, started && draft.findByName(name) != null, bindings);
+    }
+
+    /**
+     * The name the draft holds for a controller named in onboarding and waiting for APPLY - so its gear opens it under
+     * that name rather than offering to name it again (Alan, 2026-10-14, A6b). {@code null} when the draft has none.
+     */
+    private static String nameWaitingForApply(MyDevice device) {
+        for (DraftRow row : BindForgeDeviceDraftManager.getInstance().findAll()) {
+            if (new HardwareId(row.vid(), row.pid()).equals(device.hardware())) return row.deviceName();
+        }
+        return null;
     }
 
     private static Map<String, String> storedLabels(String name) {

@@ -97,6 +97,64 @@ public final class DeviceMappingsMerge {
     }
 
     /**
+     * Adds new elements to the file and changes nothing else - onboarding's write (Alan, 2026-10-14, A6b).
+     * <p>
+     * Unlike {@link #merge}, an element already in the file is not brought into line or moved: onboarding names a
+     * controller, and bringing some other device's {@code <PID>} back to the master's would be a revert nobody asked
+     * for. Each new element goes where the push would put it - among the user's elements that lead the file, at its
+     * place in {@code masterOrder} - so a file that matched the master before still matches it after. An element
+     * whose tag is already in the file is left alone, and is not counted as added.
+     *
+     * @param existing    the installation's current file, or Frontier's stock file when it has none
+     * @param entries     the elements to add
+     * @param masterOrder every name in the master, new ones included, in the order the push leads the file with
+     * @throws IOException if {@code existing} is not a {@code DeviceMappings.xml}, or a name cannot be an element tag
+     */
+    public static Result insert(byte[] existing, List<UserEntry> entries, List<String> masterOrder)
+            throws IOException {
+        Document document = DeviceFileXml.parse(existing);
+        Element root = document.getDocumentElement();
+        if (root == null || !ROOT.equals(root.getTagName())) {
+            throw new IOException("Not a DeviceMappings.xml: its root element is <"
+                    + (root == null ? "" : root.getTagName()) + ">, not <" + ROOT + ">");
+        }
+
+        boolean changed = false;
+        for (UserEntry entry : entries) {
+            if (firstChildNamed(root, entry.name()) != null) continue;
+            int place = masterOrder.indexOf(entry.name());
+            if (place < 0) {
+                throw new IllegalArgumentException(entry.name() + " is not in the master order it is placed by");
+            }
+            Element element = newEntry(document, entry);
+            Node before = insertionPoint(root, masterOrder, place);
+            root.insertBefore(element, before);
+            changed = true;
+        }
+        return changed ? new Result(DeviceFileXml.write(document), true) : new Result(existing, false);
+    }
+
+    /**
+     * Where an element at {@code place} in the master order goes: just after the last of the leading user elements
+     * that comes before it, or at the very top when none does. The leading run is the root's first elements while
+     * they are names the master holds - the run the push and the check both read.
+     *
+     * @return the node to insert before, or {@code null} to append
+     */
+    private static Node insertionPoint(Element root, List<String> masterOrder, int place) {
+        Node after = null;
+        NodeList children = root.getChildNodes();
+        for (int i = 0; i < children.getLength(); i++) {
+            Node child = children.item(i);
+            if (child.getNodeType() != Node.ELEMENT_NODE) continue;
+            int index = masterOrder.indexOf(child.getNodeName());
+            if (index < 0) break;
+            if (index < place) after = child;
+        }
+        return after == null ? root.getFirstChild() : after.getNextSibling();
+    }
+
+    /**
      * Takes the named elements out of the file - CLEAR, applied (Alan, 2026-10-11, A10). Every element with one of
      * those tags goes, a second copy further down included: the name has left the user's set, so no copy of it is
      * the master's to keep.

@@ -914,6 +914,73 @@ Apply. See [testing item 13](../../00-overview/testing-required.md).
 Onboarding says so rather than leaving a surprise: *"131 bindings will move to LVWAP when you apply."* That is the
 [before-the-fact offer](#detecting-it-and-getting-ahead-of-it), folded into naming.
 
+#### Settled before building it — 2026-10-14 (Alan, A6b)
+
+- **Onboarding runs only once BindForge is [activated](#activation--2026-10-13-alan).** There is no "before first
+  setup" case, so a controller `.binds` names by hex is offered from the first visit and waits for Apply.
+- **Two ways in.** Automatically, once per run, on the first showing of the BindForge tab right after activation,
+  when any attached controller needs a name — those attached at that moment; one plugged in later is
+  [hot-plug's](#first-run-and-hot-plug). And from the gear: an unnamed device's editor offers **NAME**, which opens
+  onboarding for that one controller.
+- **Everything is written at the end.** Skip and Next only move between pages; **FINISH** writes every name in one
+  pass and reports per installation, listing each controller that waits for Apply and how many bindings will move.
+  BACK, the close glyph or Esc leave having written nothing, without asking — only typed names are lost — and the
+  controllers stay unnamed until the next run or the gear.
+- **A partial Apply does not hold the `.binds` rewrite back.** The installations that took the entry have it, and
+  `.binds` moves to the name; one that missed it is named in the report and
+  [caught up when it comes back](#actions-and-what-each-one-reaches). Only when **no** installation took the entry is
+  `.binds` left on the hex — nothing was applied for it to follow — and the controller is reported as not named
+  yet, for the next Apply. *The [rename](#binds-goes-last-and-only-if-every-installation-succeeded) keeps its own
+  all-or-nothing rule for now; whether it follows this one is A11's question.*
+
+#### Built — 2026-10-14 (Alan, A6b)
+
+Built as `bindforge.devices.Onboarding` (the pages, pure), `ui.screen.bindings.OnboardingDialog`,
+`bindforge.devicefiles.DeviceOnboarding` (the writes), `BindForgeDeviceDraftManager.onboard` (one transaction),
+`DeviceMappingsMerge.insert`, `BindsDeviceReferences.hardwareIdCounts` and `hardwareIdsFor`, and Apply's move in
+`DeviceApply` through `BindsHardwareIdRewrite`. Edit History for the device files is now one class, `EditHistory`,
+shared by the push and onboarding.
+
+- **Apply moves bindings for any master device of the user's that `.binds` still names by hardware id**, not only
+  one onboarding named. The test is derived — a master device whose VID and PID appear as hex in `.binds` — so a
+  controller named for Apply needs no record of its own, a move that could not run is retried by the next Apply,
+  and a hand-added entry whose bindings were never moved is put right the same way. Once an entry exists `.binds`
+  is expected to name it ([format §4.0](domain-knowledge/EliteDangerous-BindsFileFormat.md#40-the-rule-confirmed-2026-09-08)).
+  One of Frontier's names is never a target. Two master devices on one VID/PID: the first in the master's order
+  takes the bindings, as it leads every file and is the one the game resolves.
+- **The insert changes nothing but the new element.** Unlike the push it does not bring another element's VID/PID
+  into line or move it — that would be a revert the user did not ask for. The new element takes its place in the
+  master's order among the user's elements leading the file, so a file that matched the master still does.
+- **A `.buttonMap` already under the name is kept**, as startup generation keeps one, and the report says so; the
+  divergence list shows the difference.
+- **A `.binds` that cannot be read stops onboarding** before it opens: without it, a controller the bindings name by
+  hex would be named straight away and its bindings left on the id.
+- **The automatic offer waits for the hardware to be listed**, as the missing-controller warning does — before then
+  every controller reads absent, and the run's one offer would be spent on nobody.
+- **NAME is offered for a controller onboarding would ask about**: attached, not Frontier's, and named in no
+  installation. One an installation names is given its name by adopting that entry.
+- **A controller named for Apply opens under its draft name** from the gear, rather than offering NAME again, and is
+  not asked about again until Apply makes it the master's.
+- **Labels are what startup generation gives the controller**, read from it at the moment it is named.
+
+*After review (2026-10-14, `code-integrity-review.md`; Alan: eleven fixed, two left):*
+
+- **One rewrite per device, back to back** (Alan, option 1 of three). Each ends on the game's `.binds`, which the
+  bindings monitor reloads, so a second device's rewrite in the same Apply can meet a working copy mid-reload and
+  stop as a changed file. That device is reported, its bindings stay on the hardware id, and the next Apply moves
+  them. One pass for several devices would need a rewrite with several targets in `bindforge.io`, a foundation-branch
+  change; one device per Apply was the third option.
+- **A move that found nothing says so.** When the game saved `.binds` between the count and the rewrite, the report
+  says no binding named the controller any more, not that its bindings moved; a move reports the bindings it moved
+  in the game's own files.
+- **A move that stopped gives its reason in words**; the status is in the log.
+- **The automatic offer also waits for the user to be on the screen**, and coming back to it asks again — a refresh
+  the user did not start no longer opens the dialog over another screen.
+- **Two unnamed controllers on one VID/PID:** only the first page promises the bindings; the second is named
+  straight away.
+- **NAME uses onboarding's own rule** (`DeviceNames.needingName`), and one onboarding keeps one Edit History copy per
+  content across identical installations, as the push does.
+
 ### At Elite-Intel startup: a `.buttonMap` for every connected, named controller
 
 A controller that **already has a name** but no `.buttonMap` gets a generated one when Elite-Intel starts, with no
@@ -1279,6 +1346,16 @@ screen.
 drift this model exists to remove, so a push that half-lands must be visible
 ([what standardisation owes, #2](overview.md#every-install-gets-the-same-files--settled-2026-09-23)). After a
 partial apply the install strip shows it: the installation that missed the write stops matching the master.
+
+**The user's Apply comes first; an installation that missed it is caught up later — 2026-10-14 (Alan).** A
+missing, locked or unavailable installation is rare, and it never holds back what the user applied: every
+installation that can be written is, the report names the one that could not and why, and nothing is rolled back
+to wait for it. **When that installation is found again** — at Elite-Intel startup, or whenever the check next
+reaches it — BindForge asks: *"Found the Epic installation that was missing. Write your recent control
+configuration changes to it?"* Yes is the same push as **Revert**. This is a slice of its own (A14), not built
+with onboarding; until it is, the divergence list's **Revert** on that installation's row does the same.
+*Alan: "when a user edits and applies, those should be the priority, and the rare, weird and highly unlikely
+things get a message to the user."*
 
 **What Apply does per installation — settled 2026-10-04 (Alan), built in `bindforge.devicefiles.DeviceFilesPush`:**
 

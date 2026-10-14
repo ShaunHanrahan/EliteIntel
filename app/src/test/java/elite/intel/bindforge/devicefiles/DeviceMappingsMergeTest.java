@@ -186,6 +186,50 @@ class DeviceMappingsMergeTest {
                 () -> DeviceMappingsMerge.remove(bytes("<Bindings><RVWAP/></Bindings>"), List.of("RVWAP")));
     }
 
+    /** Onboarding's insert: with no user element leading the file, the new one goes at the very top (A6b). */
+    @Test
+    void anInsertedElementLeadsAFileWithNoUserElements() throws IOException {
+        Result result = DeviceMappingsMerge.insert(bytes(SPECIMEN), List.of(RVWAP), List.of("RVWAP"));
+
+        assertTrue(result.changed());
+        assertEquals(List.of("RVWAP", "GamePad", "SaitekX52", "T-Rudder"), names(result));
+        assertTrue(text(result).contains("<!-- XB1 Controller -->"));
+    }
+
+    /**
+     * An insert goes where the push would put it - in master order among the user's leading elements - and leaves
+     * every other element as it is, a user element whose PID differs from the master's included: bringing it into
+     * line would be a revert nobody asked for.
+     */
+    @Test
+    void anInsertTakesItsPlaceInMasterOrderAndChangesNothingElse() throws IOException {
+        String file = """
+                <?xml version="1.0" encoding="UTF-8" ?>
+                <Root>
+                \t<AAA><PID>0001</PID><VID>1234</VID></AAA>
+                \t<CCC><PID>9999</PID><VID>1234</VID></CCC>
+                \t<T-Rudder><PID>B679</PID><VID>044F</VID></T-Rudder>
+                </Root>
+                """;
+
+        Result result = DeviceMappingsMerge.insert(bytes(file), List.of(new UserEntry("BBB", "1234", "0002")),
+                List.of("AAA", "BBB", "CCC"));
+
+        assertEquals(List.of("AAA", "BBB", "CCC", "T-Rudder"), names(result));
+        assertEquals("9999", entry(result, "CCC").primary().pid(), "another device's PID is not brought into line");
+    }
+
+    @Test
+    void anElementAlreadyThereIsNotInsertedAgain() throws IOException {
+        byte[] file = bytes(SPECIMEN);
+
+        Result result = DeviceMappingsMerge.insert(file, List.of(new UserEntry("T-Rudder", "1234", "0002")),
+                List.of("T-Rudder"));
+
+        assertFalse(result.changed());
+        assertArrayEquals(file, result.content(), "untouched, not re-laid-out");
+    }
+
     private static byte[] stockFile() throws IOException {
         try (InputStream xml = DeviceMappingsMergeTest.class.getResourceAsStream(FrontierStockDevices.RESOURCE)) {
             return Objects.requireNonNull(xml, FrontierStockDevices.RESOURCE + " is missing").readAllBytes();
