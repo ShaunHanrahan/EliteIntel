@@ -22,8 +22,9 @@ import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Activation, the first opening of the BindForge tab (Alan, 2026-10-13): a "before BindForge" backup once, then the
- * master filled with no prompt when the installations are identical, and first setup when they are not.
+ * Activation, the first opening of the BindForge tab (Alan, 2026-10-13): the "before BindForge" backup, then the
+ * master filled with no prompt when the installations are identical, and first setup when they are not. Taking the
+ * backup once is {@link BeforeBindForgeBackupTest}'s.
  */
 class ActivationTest {
 
@@ -34,9 +35,13 @@ class ActivationTest {
 
     private final List<String> order = new ArrayList<>();
     private boolean activated;
-    private String backupTaken;
     private boolean backupWorks = true;
     private boolean pushWouldWrite;
+    private FirstSetup.Establish establish = (devices, removals) -> {
+        order.add("establish " + devices.stream().map(StoredDevice::deviceName).toList());
+        activated = true;
+        return true;
+    };
 
     @Test
     void anActivatedBindForgeIsLeftAlone() throws IOException {
@@ -45,26 +50,15 @@ class ActivationTest {
         Activation.Result result = activation(List.of(reachable(1)), sameEverywhere()).run();
 
         assertEquals(Activation.Outcome.ALREADY_ACTIVATED, result.outcome());
-        assertTrue(order.isEmpty(), "no backup, no read, nothing said");
+        assertTrue(order.isEmpty(), "no backup, no read");
     }
 
     @Test
-    void identicalInstallationsAreBackedUpToldAndActivatedWithNoPrompt() throws IOException {
+    void identicalInstallationsAreBackedUpAndActivatedWithNoPrompt() throws IOException {
         Activation.Result result = activation(List.of(reachable(1), reachable(2)), sameEverywhere()).run();
 
         assertEquals(Activation.Outcome.ACTIVATED, result.outcome());
-        assertEquals(List.of("backup", "announce", "establish [LVWAP]"), order);
-    }
-
-    /** The backup is taken once ever: first setup can be abandoned and opened again on a later run. */
-    @Test
-    void aBackupAlreadyTakenIsNotTakenOrAnnouncedAgain() throws IOException {
-        backupTaken = temp.resolve("earlier").toString();
-
-        Activation.Result result = activation(List.of(reachable(1)), sameEverywhere()).run();
-
-        assertEquals(Activation.Outcome.ACTIVATED, result.outcome());
-        assertEquals(List.of("establish [LVWAP]"), order);
+        assertEquals(List.of("backup", "establish [LVWAP]"), order);
     }
 
     @Test
@@ -75,7 +69,7 @@ class ActivationTest {
 
         assertEquals(Activation.Outcome.BACKUP_FAILED, result.outcome());
         assertTrue(result.reason().contains("disk full"));
-        assertEquals(List.of("backup"), order, "nothing said, nothing activated");
+        assertEquals(List.of("backup"), order, "nothing read, nothing activated");
     }
 
     /** Any difference opens first setup - even one with nothing to ask, such as a file only the push would add. */
@@ -88,7 +82,8 @@ class ActivationTest {
         assertEquals(Activation.Outcome.FIRST_SETUP, result.outcome());
         assertNotNull(result.reading());
         assertNotNull(result.setup());
-        assertEquals(List.of("backup", "announce"), order, "first setup writes nothing until its last button");
+        assertNull(result.reason(), "nothing went wrong, so first setup has nothing to name");
+        assertEquals(List.of("backup"), order, "first setup writes nothing until its last button");
     }
 
     @Test
@@ -112,7 +107,48 @@ class ActivationTest {
         assertEquals(Activation.Outcome.FIRST_SETUP, result.outcome());
         assertNull(result.reading());
         assertTrue(result.reason().contains("STEAM"), "the reason names the installation");
-        assertEquals(List.of("backup", "announce"), order);
+        assertEquals(List.of("backup"), order);
+    }
+
+    /** A file the push's plan cannot read is named too, so first setup does not open on a reading that looks whole. */
+    @Test
+    void aFileThePushCannotReadOpensFirstSetupNamingIt() throws IOException {
+        Target steam = reachable(1);
+        Activation activation = new Activation(() -> activated, this::backup,
+                () -> firstSetup(List.of(steam), sameEverywhere()),
+                (target, master) -> {
+                    throw new IOException(target.storefront() + ": LVWAP.buttonMap is locked");
+                }, establish);
+
+        Activation.Result result = activation.run();
+
+        assertEquals(Activation.Outcome.FIRST_SETUP, result.outcome());
+        assertNotNull(result.reading());
+        assertTrue(result.reason().contains("LVWAP.buttonMap is locked"));
+        assertFalse(order.contains("establish [LVWAP]"));
+    }
+
+    @Test
+    void aMasterThatCannotBeSavedIsAFailureAndActivatesNothing() throws IOException {
+        establish = (devices, removals) -> {
+            throw new IllegalStateException("database locked");
+        };
+
+        Activation.Result result = activation(List.of(reachable(1)), sameEverywhere()).run();
+
+        assertEquals(Activation.Outcome.FAILED, result.outcome());
+        assertTrue(result.reason().contains("database locked"));
+        assertFalse(activated);
+    }
+
+    /** Activated meanwhile - by first setup finishing first, say. Nothing is overwritten. */
+    @Test
+    void aMasterFilledMeanwhileIsAlreadyActivated() throws IOException {
+        establish = (devices, removals) -> false;
+
+        Activation.Result result = activation(List.of(reachable(1)), sameEverywhere()).run();
+
+        assertEquals(Activation.Outcome.ALREADY_ACTIVATED, result.outcome());
     }
 
     @Test
@@ -120,18 +156,18 @@ class ActivationTest {
         Activation.Result result = activation(List.of(), sameEverywhere()).run();
 
         assertEquals(Activation.Outcome.ACTIVATED, result.outcome());
-        assertEquals(List.of("backup", "announce", "establish []"), order);
+        assertEquals(List.of("backup", "establish []"), order);
     }
 
     @Test
     void anInstallationWhoseFolderIsGoneIsLeftOutOfIdentical() {
         pushWouldWrite = true;
         Target gone = new Target(2, "EPIC", temp.resolve("unplugged"), false);
-        Activation activation = new Activation(() -> activated, () -> List.of(gone), backup(), folder -> { },
+        Activation activation = new Activation(() -> activated, this::backup,
                 () -> firstSetup(List.of(gone), sameEverywhere()), (target, master) -> {
                     order.add("planned " + target.storefront());
                     return pushWouldWrite;
-                }, establish());
+                }, establish);
 
         assertEquals(Activation.Outcome.ACTIVATED, activation.run().outcome());
         assertFalse(order.contains("planned EPIC"));
@@ -146,39 +182,19 @@ class ActivationTest {
         Activation.PushPlanner push = (target, master) ->
                 !DeviceFilesPush.plan(target, master, FrontierStockDevices.getInstance()).writes().isEmpty();
 
-        assertTrue(Activation.identical(reading(List.of(steam, epic)), push));
-        assertFalse(Activation.identical(reading(List.of(steam, bare)), push),
+        assertTrue(Activation.fillWithoutWriting(reading(List.of(steam, epic)), push).isPresent());
+        assertTrue(Activation.fillWithoutWriting(reading(List.of(steam, bare)), push).isEmpty(),
                 "the push would seed the missing file from Frontier's");
     }
 
     private Activation activation(List<Target> targets, FirstSetup.Reader reader) {
-        return new Activation(() -> activated, () -> targets, backup(), folder -> order.add("announce"),
-                () -> firstSetup(targets, reader), (target, master) -> pushWouldWrite, establish());
+        return new Activation(() -> activated, this::backup, () -> firstSetup(targets, reader),
+                (target, master) -> pushWouldWrite, establish);
     }
 
-    private Activation.BeforeBackup backup() {
-        return new Activation.BeforeBackup() {
-            @Override
-            public String taken() {
-                return backupTaken;
-            }
-
-            @Override
-            public Path take(List<Target> targets) throws IOException {
-                order.add("backup");
-                if (!backupWorks) throw new IOException("disk full");
-                backupTaken = temp.resolve("before").toString();
-                return Path.of(backupTaken);
-            }
-        };
-    }
-
-    private FirstSetup.Establish establish() {
-        return (devices, removals) -> {
-            order.add("establish " + devices.stream().map(StoredDevice::deviceName).toList());
-            activated = true;
-            return true;
-        };
+    private void backup() throws IOException {
+        order.add("backup");
+        if (!backupWorks) throw new IOException("disk full");
     }
 
     private static FirstSetup firstSetup(List<Target> targets, FirstSetup.Reader reader) {

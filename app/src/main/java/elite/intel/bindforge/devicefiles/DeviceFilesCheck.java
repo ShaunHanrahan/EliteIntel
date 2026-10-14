@@ -126,15 +126,15 @@ public final class DeviceFilesCheck {
     }
 
     /**
-     * @param setUp       whether BindForge is activated, so there is a master to compare against - possibly an empty
-     *                    one. Before activation nothing is compared: every custom entry would read as an edit, and
-     *                    nothing is forced on a user who has not asked (Alan, 2026-10-05). <em>Activated, not "the
-     *                    master has rows"</em> (Alan, 2026-10-13, A1b): a user who owns nothing is activated with an
-     *                    empty master
+     * @param activated   whether BindForge is activated, so there is a master to compare against - possibly an
+     *                    empty one. Before activation nothing is compared: every custom entry would read as an edit,
+     *                    and nothing is forced on a user who has not asked (Alan, 2026-10-05). <em>Activated, not
+     *                    "the master has rows"</em> (Alan, 2026-10-13, A1b): a user who owns nothing is activated with
+     *                    an empty master
      * @param masterNames every device name in the master the installations were compared against
      * @param userNames   those of them Frontier does not ship - what a reset to Frontier's file loses
      */
-    public record Report(boolean setUp, Set<String> masterNames, Set<String> userNames,
+    public record Report(boolean activated, Set<String> masterNames, Set<String> userNames,
                          List<InstallationCheck> installations) {
         public Report {
             masterNames = Set.copyOf(masterNames);

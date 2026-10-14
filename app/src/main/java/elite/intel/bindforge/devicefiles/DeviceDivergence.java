@@ -154,13 +154,13 @@ public final class DeviceDivergence {
      * @param orphansByInstall each installation's {@code .buttonMap} files that match no entry, keyed as
      *                         {@link #installKey} keys them
      * @param referencedNames  the entry names the bindings actually use
-     * @throws IllegalArgumentException if the report found no master - an empty list would read as "everything
-     *                                  matches"
+     * @throws IllegalArgumentException if the report was made before activation - an empty list would read as
+     *                                  "everything matches"
      */
     public static List<Finding> againstMaster(DeviceFilesCheck.Report report, Map<String, List<Path>> orphansByInstall,
                                               Set<String> referencedNames) {
-        if (!report.setUp()) {
-            throw new IllegalArgumentException("no master to compare against - first setup has not run");
+        if (!report.activated()) {
+            throw new IllegalArgumentException("no master to compare against - BindForge is not activated");
         }
         Map<Row, Set<String>> rows = new LinkedHashMap<>();
         Map<String, Set<String>> missingByInstall = new LinkedHashMap<>();

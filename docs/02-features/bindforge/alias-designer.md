@@ -218,7 +218,9 @@ fix is activation:
 - **An installation whose folder is gone** is left out of "identical" and activation goes ahead, as first setup
   already skips it. When it comes back, it is judged against the master like any other installation.
 - **A file that is there but cannot be read** stops silent activation, and first setup opens and names it. An
-  unread file could hold the one entry the master must not lose.
+  unread file could hold the one entry the master must not lose. *As built (2026-10-13): when first setup's own read
+  fails there is no list to show, so the user gets first setup's "could not read your files" message naming the
+  file; when only the identical test fails to read one, first setup opens with the file named at the top.*
 - **Activation is its own stored fact**, not "the master has rows". A user who owns nothing is still activated.
   Every test that read an empty master as *not set up* becomes *not activated*: the gear, APPLY, **SET UP**, and
   [the startup check's](overview.md#for-the-device-files--settled-2026-10-05-alan) "an empty master means first
@@ -240,9 +242,10 @@ fix is activation:
   The restore there handles `.binds` presets only; restoring device files is
   [File Manager's](file-manager.md) work.
 
-**The user is told once, on first activation only**, that the backup was made: a spoken line (the AI says it)
-and a log line, as the [missing-controller warning](#a-missing-controller-is-worth-exactly-one-warning--settled-2026-09-24)
-does. Never again after that.
+**The user is told once, when the backup is made** — on the first attempt to activate, which may open first setup
+rather than finish: a spoken line (the AI says it) and a log line, as the [missing-controller warning](#a-missing-controller-is-worth-exactly-one-warning--settled-2026-09-24)
+does. Never again after that. *Was "on first activation only"; reconciled with the build after review
+(2026-10-13): the fact told is the backup, and the backup is taken once.*
 
 **What this changes for onboarding:** it always runs after activation, so a controller `.binds` names by hex can be
 named and wait for Apply from the first visit. A6b's planned "not before first setup" rule for the hex case is
@@ -274,9 +277,24 @@ table (migration `12005`, `BindForgeActivationManager`).
 - **Told when the backup is taken** — that is the one time — spoken (`speech.bindforgeBackedUp`) and logged with
   the folder.
 - **Every "empty master means not set up" test reads the fact now:** the gear, APPLY and **SET UP** on the screen,
-  and `DeviceFilesCheck` (whose `Report.setUp()` now means activated).
+  and `DeviceFilesCheck` (`Report.activated()`).
 - **Nothing prunes player backups yet.** When File Manager adds retention, the folder recorded in `backup_folder`
   must be exempt.
+
+*After review — 2026-10-13 (`code-integrity-review.md`, Alan: all thirteen):*
+
+- **SET UP takes the "before BindForge" backup too** (`BeforeBindForgeBackup.ensureTaken`, shared with activation,
+  one at a time). Otherwise a user whose first attempt could not take it, and who then pressed SET UP, would be
+  activated without it — and every later run would skip the step.
+- **SET UP waits while activation runs**, so the two cannot open first setup twice.
+- **A failed activation is said in the application log**, with its reason, as the backup's success is.
+- **An activated user pays for no detection:** the fact is checked before the rescan. Detection itself runs one at
+  a time (`InstallationRegistry.rescan()`), which closes the known collision between two scans.
+- **A refresh that fails keeps the last answer** rather than reading as *not activated*.
+- **The only way to activate is `establish`**, in the master's transaction; the manager has no `activate()`.
+- **The resolution judged identical is the one saved** (`Activation.fillWithoutWriting` returns it).
+- **A backup copied but not recorded is left in place** — a complete restore point; the next attempt takes and
+  records another.
 
 ### What it reads
 

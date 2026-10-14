@@ -60,7 +60,7 @@ class DeviceFilesCheckTest {
 
         Report report = check(List.of(steam), List.of(RVWAP));
 
-        assertFalse(report.setUp());
+        assertFalse(report.activated());
         assertTrue(report.installations().isEmpty());
         assertTrue(checker(List.of(steam), List.of(RVWAP)).check(1).isEmpty());
     }
@@ -72,7 +72,7 @@ class DeviceFilesCheckTest {
 
         Report report = check(List.of(steam), List.of());
 
-        assertTrue(report.setUp());
+        assertTrue(report.activated());
         assertEquals(State.UNCHANGED, only(report).state());
     }
 

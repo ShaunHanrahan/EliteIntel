@@ -137,13 +137,13 @@ class DeviceDivergenceTest {
                     Set.of("RVWAP")).isEmpty());
         }
 
-        /** Without a master, an empty list would read as "everything matches" - so it is refused. */
+        /** Before activation, an empty list would read as "everything matches" - so it is refused. */
         @Test
-        void aReportWithNoMasterIsRefused() {
-            Report notSetUp = new Report(false, Set.of(), Set.of(), List.of());
+        void aReportMadeBeforeActivationIsRefused() {
+            Report notActivated = new Report(false, Set.of(), Set.of(), List.of());
 
             assertThrows(IllegalArgumentException.class,
-                    () -> DeviceDivergence.againstMaster(notSetUp, Map.of(), Set.of()));
+                    () -> DeviceDivergence.againstMaster(notActivated, Map.of(), Set.of()));
         }
 
         /** The measured case, against the master: a named device one installation lacks breaks the preset. */

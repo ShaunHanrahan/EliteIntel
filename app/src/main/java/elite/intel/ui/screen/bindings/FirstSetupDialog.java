@@ -46,6 +46,7 @@ final class FirstSetupDialog extends JDialog {
 
     private final FirstSetup setup;
     private final FirstSetup.Reading reading;
+    private final String problem;
     private final Map<String, String> installNames;
     private final Runnable afterApply;
     private final List<Row> rows;
@@ -57,15 +58,18 @@ final class FirstSetupDialog extends JDialog {
     private JButton continueButton;
 
     /**
+     * @param problem      a file activation could not read, already worded - shown first, so the dialog does not look
+     *                     complete when it is not (review, 2026-10-13); {@code null} when nothing went wrong
      * @param installNames what each installation is called, keyed by its id as text
      * @param afterApply   run on the EDT once something was written, to refresh the screen behind
      */
-    FirstSetupDialog(Component parent, FirstSetup setup, FirstSetup.Reading reading,
+    FirstSetupDialog(Component parent, FirstSetup setup, FirstSetup.Reading reading, String problem,
                      Map<String, String> installNames, Runnable afterApply) {
         super(SwingUtilities.getWindowAncestor(parent), ModalityType.APPLICATION_MODAL);
         setUndecorated(true);
         this.setup = setup;
         this.reading = reading;
+        this.problem = problem;
         this.installNames = installNames;
         this.afterApply = afterApply;
         this.rows = reading.plan().rows();
@@ -82,6 +86,9 @@ final class FirstSetupDialog extends JDialog {
         // WHY: said first, because it is what makes the rest safe to touch.
         top.add(HudBanner.multiline(getText("bindings.aliasDesigner.firstSetup.backupBefore"),
                 StatusBadge.State.INFO));
+        if (problem != null) {
+            top.add(HudBanner.multiline(problem, StatusBadge.State.OFFLINE));
+        }
         if (!reading.unreachable().isEmpty()) {
             top.add(HudBanner.multiline(getText("bindings.aliasDesigner.firstSetup.unreachable",
                     reading.unreachable().stream().map(this::nameOf).collect(Collectors.joining(", "))),

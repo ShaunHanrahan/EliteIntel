@@ -29,7 +29,7 @@ data; most of what the spec describes is still ahead.
 | Startup `.buttonMap` (A8) | `bindforge.devicefiles.ButtonMapGeneration` (per installation, create-only), `ButtonMapLabels` (the generated labels: buttons, the axes the controller has — all eight when unknown — and four per hat); `bindforge.devices.ButtonMapStartup` runs it on every connect, started as `BUTTON_MAP_STARTUP` in `AppController` |
 | Device Editor (A9) | `ui.screen.bindings.DeviceEditorDialog`, opened by the gear column on My Devices in `AliasDesignerPanel` (`GearCell`, copied from `CommanderTabPanel`); `bindforge.devices.DeviceEditorInputs` (boxes, defaults, what SAVE writes) and `DeviceEditorLights` (highlighting), both pure; `BindForgeDeviceDraftManager.saveLabels`; `FrontierStockDevices.gameDrawsIt`; `devices.events.DeviceHatEvent`, polled in `DeviceService`; the footer's middle place and unsaved hint in `HudModalSpec` |
 | Actions (A10) | `bindforge.devices.DeviceEditorMiddle` (CLEAR / RESET LABELS / their undo, and when refused — pure), wired in `DeviceEditorDialog`; `BindForgeDeviceDraftManager.removeByName`, `restoreFromMaster`, `stored`; APPLY and DISCARD in `AliasDesignerPanel`'s footer, calling `DeviceApply` (removals held back while `.binds` names them; cleared once every installation took them); `DeviceFilesPush.push(Set)` and `DeviceMappingsMerge.remove`; `FrontierStockButtonMaps.shippedContent`; `BindsDeviceReferences.referenceCounts`; `bindforge.devicefiles.DraftChanges` (does the draft change anything — pure) |
-| Activation (A1b) | `bindforge.devicefiles.Activation` (backup once, then identical → master filled with no prompt, otherwise first setup; `identical` is the push's own test); `DeviceFilesSnapshot.take(label, targets, bindingsFolders)`; migration `12005__bindforge_activation.sql`, `BindForgeActivationDao`, `BindForgeActivationManager`; `establish` activates in its transaction; `AliasDesignerPanel.activateOnFirstShowing()`, called by `BindingsTabPanel`'s first showing; `speech.bindforgeBackedUp` in the nine bundles |
+| Activation (A1b) | `bindforge.devicefiles.Activation` (backup once, then identical → master filled with no prompt, otherwise first setup; `identical` is the push's own test); `DeviceFilesSnapshot.take(label, targets, bindingsFolders)`; migration `12005__bindforge_activation.sql`, `BindForgeActivationDao`, `BindForgeActivationManager`; `establish` activates in its transaction; `BeforeBindForgeBackup` (taken once, by activation or SET UP); `AliasDesignerPanel.activateOnFirstShowing()`, called by `BindingsTabPanel`'s first showing; `speech.bindforgeBackedUp` in the nine bundles |
 | Missing-controller warning (A13) | `bindforge.devices.MissingControllers` (who is named, pure), `MissingControllerWarning` (once per process, spoken and logged); triggered by `AliasDesignerPanel`'s first showing, which starts its own refresh (`missingWarningWanted`); `speech.missingController(s)` in the nine `gui*.properties` |
 | Which axes and hats (A8b) | `elite.intel.devices.model.DeviceDescription` (axes by game slot, `axesWithoutSlot`, SDL's numbering via `axisAt`, hat count) and `GameAxis`; `devices.hid.DeviceDescriber` reads it at connect — `WindowsHidUsages` (`hid.dll`), `LinuxHidUsages` + `HidReportDescriptor` (`/sys`), `AxisSlots` (pure rules); `DeviceService.description(deviceId)` |
 | Divergence list (A3) | `DeviceDivergence.againstMaster` (pure; each installation against the master, from `DeviceFilesCheck`), `DeviceDivergenceScanner.scanAgainstMaster` (adds orphans and `.binds`), `BindsDeviceReferences`, `ButtonMapAudit`. Before first setup, `DeviceDivergence.rank` still compares installations with each other |
@@ -129,13 +129,19 @@ game's `.binds` **last**; a hex reference rewritten **from the value `BindsDevic
 *Newest first. Two or three lines each: what was decided and where it is recorded, what was found, what the
 next slice needs.*
 
+- **2026-10-13 — A1b review fixes** (`code-integrity-review.md`, Alan: all thirteen). Recorded under *After
+  review* in [Activation, built](../02-features/bindforge/alias-designer.md#built--2026-10-13-alan-a1b): the backup
+  is `BeforeBindForgeBackup`, taken by SET UP as well; SET UP waits for activation; failures reach the app log;
+  `isActivated()` before the rescan, and `rescan()` serialized (the scan collision below is closed);
+  `Report.setUp` is now `activated`; no `activate()` outside `establish`. The spec's "told on first activation" and
+  "first setup names it" bullets reconciled with the build.
+
 - **2026-10-13 — A1b built** (Alan: the outer BIND FORGE tab). Recorded in [Activation, built](../02-features/bindforge/alias-designer.md#built--2026-10-13-alan-a1b):
   tried once per run; "identical" is `DeviceFilesPush.plan` writing nothing (a missing `DeviceMappings.xml` opens
   first setup, whose Continue now stays offered with nothing to ask); activated written in `establish`'s
   transaction; backup once, folder in `bindforge_activation.backup_folder`, told then. **Found:** activation must
   re-detect installations (`rescan()`), or a fresh database activates empty. **Owed:** File Manager's retention must
-  exempt `backup_folder`; two concurrent detections can collide on an installation row's insert (activation then
-  fails and retries next run). The Swing trigger is untested by the suite. **A6b needs:** onboarding runs after
+  exempt `backup_folder`; The Swing trigger is untested by the suite. **A6b needs:** onboarding runs after
   activation — test `BindForgeActivationManager.isActivated()`, never an empty master.
 
 - **2026-10-13 — A6b planned, then A1b split out ahead of it** (Alan answered five questions, one at a time; no

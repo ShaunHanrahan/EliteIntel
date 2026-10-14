@@ -62,7 +62,7 @@ public final class DeviceDivergenceScanner {
     /**
      * Once the master exists: each installation against it, ranked.
      *
-     * @param report {@link DeviceFilesCheck#check()}, which must have found a master - {@link Report#setUp()}
+     * @param report {@link DeviceFilesCheck#check()}, made once BindForge is activated - {@link Report#activated()}
      * @return the findings, worst first, keyed by {@link DeviceDivergence#installKey}, or empty when every
      *         installation matches the master
      */

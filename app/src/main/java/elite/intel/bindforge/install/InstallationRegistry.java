@@ -25,6 +25,7 @@ public class InstallationRegistry {
      * an instance field the moment they share a registry.
      */
     private static final AtomicBoolean DETECTED_THIS_RUN = new AtomicBoolean();
+    private static final Object DETECTING = new Object();
 
     private final GameInstallationProvider provider;
     private final BindForgeInstallationsManager installations;
@@ -38,23 +39,28 @@ public class InstallationRegistry {
         this.installations = installations;
     }
 
+    /** Test seam: lets a test start from "detection has not run yet" rather than inheriting a sibling's run. */
+    static void forgetStartupScan() {
+        DETECTED_THIS_RUN.set(false);
+    }
+
     /**
      * Runs detection and folds the result into the stored list: anything new is added, and every row is
      * marked present or missing according to whether its folder is there.
      *
      * @return the list as it now stands, including rows detection did not produce
      */
-    /** Test seam: lets a test start from "detection has not run yet" rather than inheriting a sibling's run. */
-    static void forgetStartupScan() {
-        DETECTED_THIS_RUN.set(false);
-    }
-
     public List<InstallationRow> rescan() {
-        for (GameInstallation detected : provider.findInstallations()) {
-            installations.record(detected.storefront().name(), detected.root(), false);
+        // WHY: one detection at a time, across every registry - the Alias Designer and Install Locations screens each
+        // hold one. Recording a folder is check-then-insert, so two detections at once can both find it absent, and
+        // the second insert then breaks the path's UNIQUE constraint (review, 2026-10-13).
+        synchronized (DETECTING) {
+            for (GameInstallation detected : provider.findInstallations()) {
+                installations.record(detected.storefront().name(), detected.root(), false);
+            }
+            refreshMissingFlags();
+            return installations.findAll();
         }
-        refreshMissingFlags();
-        return installations.findAll();
     }
 
     /**

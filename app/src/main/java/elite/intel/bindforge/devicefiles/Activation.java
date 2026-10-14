@@ -1,34 +1,24 @@
 package elite.intel.bindforge.devicefiles;
 
-import elite.intel.ai.mouth.subscribers.events.MissionCriticalAnnouncementEvent;
-import elite.intel.ai.mouth.subscribers.events.VocalisationRequestEvent;
 import elite.intel.bindforge.devicefiles.DeviceFilesPush.MasterDevice;
 import elite.intel.bindforge.devicefiles.DeviceFilesPush.Target;
 import elite.intel.db.managers.BindForgeActivationManager;
 import elite.intel.db.managers.BindForgeDeviceDraftManager;
-import elite.intel.eventbus.GameEventBus;
-import elite.intel.eventbus.UiBus;
-import elite.intel.session.PlayerSession;
-import elite.intel.ui.event.AppLogEvent;
-import elite.intel.util.StringUtls;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.BooleanSupplier;
-import java.util.function.Consumer;
-import java.util.function.Supplier;
 
 /**
  * Activation: the first opening of the BindForge tab (alias-designer.md, <em>Activation</em>, Alan, 2026-10-13).
  * <p>
  * <ul>
- *     <li><strong>A "before BindForge" backup first</strong>, whichever way activation goes: every reachable
- *     installation's device files and every {@code .binds} and {@code StartPreset} in the bindings folder. Taken
- *     once ever, recorded, never pruned - and the user is told once, spoken and logged.</li>
+ *     <li><strong>A "before BindForge" backup first</strong>, whichever way activation goes -
+ *     {@link BeforeBindForgeBackup}, which SET UP takes too.</li>
  *     <li><strong>Identical installations activate with no prompt</strong>, the master filled from what they hold,
  *     which may be nothing. "Identical" means filling the master would write no game file.</li>
  *     <li><strong>Anything else opens first setup</strong> - a difference, even one with nothing to ask, or a file
@@ -41,14 +31,13 @@ import java.util.function.Supplier;
 public final class Activation {
 
     private static final Logger log = LogManager.getLogger(Activation.class);
-    static final String SNAPSHOT_LABEL = "before-bindforge";
 
     public enum Outcome {
         /** BindForge was already activated. Nothing was done. */
         ALREADY_ACTIVATED,
         /** The installations were identical: the master is filled from them and BindForge is activated. */
         ACTIVATED,
-        /** The installations differ, or one could not be read: first setup is the user's to finish. */
+        /** The installations differ, or a file could not be read: first setup is the user's to finish. */
         FIRST_SETUP,
         /** The "before BindForge" backup could not be taken. Nothing else was done; the next run tries again. */
         BACKUP_FAILED,
@@ -57,10 +46,12 @@ public final class Activation {
     }
 
     /**
-     * @param setup       for {@link Outcome#FIRST_SETUP}: what to open first setup with
-     * @param reading     for {@link Outcome#FIRST_SETUP}: what the installations hold, or {@code null} when they
-     *                    could not be read - {@code reason} then names which
-     * @param reason      what went wrong, or why first setup has no reading; {@code null} otherwise
+     * @param setup   for {@link Outcome#FIRST_SETUP}: what to open first setup with, or {@code null} when the
+     *                installations could not be read
+     * @param reading for {@link Outcome#FIRST_SETUP}: what the installations hold, or {@code null} when they could not
+     *                be read
+     * @param reason  what went wrong - for {@link Outcome#FIRST_SETUP}, the file that could not be read, which first
+     *                setup names; {@code null} when nothing did
      */
     public record Result(Outcome outcome, FirstSetup setup, FirstSetup.Reading reading, String reason) {
         static Result of(Outcome outcome) {
@@ -68,13 +59,10 @@ public final class Activation {
         }
     }
 
-    /** The one backup, its folder recorded so it is taken once. */
-    interface BeforeBackup {
-        /** @return the folder already taken, or {@code null} */
-        String taken();
-
-        /** Takes it and records it. */
-        Path take(List<Target> targets) throws IOException;
+    /** Takes the "before BindForge" backup unless it was taken before - {@link BeforeBindForgeBackup#ensureTaken()}. */
+    @FunctionalInterface
+    interface Backup {
+        void ensureTaken() throws IOException;
     }
 
     /** Opens first setup's reading of the stored installations - {@link FirstSetup#stored()}. */
@@ -90,46 +78,27 @@ public final class Activation {
     }
 
     private final BooleanSupplier activated;
-    private final Supplier<List<Target>> targets;
-    private final BeforeBackup backup;
-    private final Consumer<Path> announce;
+    private final Backup backup;
     private final FirstSetupSource firstSetup;
     private final PushPlanner planner;
     private final FirstSetup.Establish establish;
 
     /** The stored installations, master and activation. */
     public static Activation stored() {
-        BindForgeActivationManager store = BindForgeActivationManager.getInstance();
         FrontierStockDevices stock = FrontierStockDevices.getInstance();
+        BeforeBindForgeBackup backup = BeforeBindForgeBackup.stored();
         return new Activation(
-                store::isActivated,
-                DeviceFilesPush::storedInstallations,
-                new BeforeBackup() {
-                    @Override
-                    public String taken() {
-                        return store.backupFolder();
-                    }
-
-                    @Override
-                    public Path take(List<Target> targets) throws IOException {
-                        Path folder = new DeviceFilesSnapshot().take(SNAPSHOT_LABEL, targets,
-                                List.of(PlayerSession.getInstance().getBindingsDir()));
-                        store.recordBackupFolder(folder.toString());
-                        return folder;
-                    }
-                },
-                Activation::announce,
+                BindForgeActivationManager.getInstance()::isActivated,
+                backup::ensureTaken,
                 FirstSetup::stored,
                 (target, master) -> !DeviceFilesPush.plan(target, master, stock).writes().isEmpty(),
                 BindForgeDeviceDraftManager.getInstance()::establish);
     }
 
-    Activation(BooleanSupplier activated, Supplier<List<Target>> targets, BeforeBackup backup, Consumer<Path> announce,
-               FirstSetupSource firstSetup, PushPlanner planner, FirstSetup.Establish establish) {
+    Activation(BooleanSupplier activated, Backup backup, FirstSetupSource firstSetup, PushPlanner planner,
+               FirstSetup.Establish establish) {
         this.activated = activated;
-        this.targets = targets;
         this.backup = backup;
-        this.announce = announce;
         this.firstSetup = firstSetup;
         this.planner = planner;
         this.establish = establish;
@@ -139,17 +108,15 @@ public final class Activation {
     public Result run() {
         if (activated.getAsBoolean()) return Result.of(Outcome.ALREADY_ACTIVATED);
 
-        // WHY: before anything is written, and once ever. First setup can be abandoned and reopened on a later run,
-        // by when the files may have changed - so the first copy is the one that means "before BindForge".
-        if (backup.taken() == null) {
-            Path folder;
-            try {
-                folder = backup.take(targets.get());
-            } catch (IOException | RuntimeException e) {
-                log.warn("BindForge was not activated: the backup before BindForge could not be taken", e);
-                return new Result(Outcome.BACKUP_FAILED, null, null, FirstSetup.messageOf(e));
-            }
-            announce.accept(folder);
+        // WHY: before anything is written. Taken once ever - first setup can be abandoned and reopened on a later run,
+        // by when the files may have changed, so the first copy is the one that means "before BindForge".
+        try {
+            backup.ensureTaken();
+        } catch (IOException | RuntimeException e) {
+            // WHY: broad, because recording the backup is a database write, and JDBI's failures are unchecked.
+            // Whatever the cause, nothing may be activated without the backup; the next run tries again.
+            log.warn("BindForge was not activated: the backup before BindForge could not be taken", e);
+            return new Result(Outcome.BACKUP_FAILED, null, null, FirstSetup.messageOf(e));
         }
 
         FirstSetup setup;
@@ -159,32 +126,38 @@ public final class Activation {
             reading = setup.read();
         } catch (IOException e) {
             // WHY: an unread file could hold the one entry the master must not lose, so it stops silent activation,
-            // and first setup opens to name it.
+            // and the reason names it.
             log.info("BindForge activation opens first setup: {}", e.getMessage());
             return new Result(Outcome.FIRST_SETUP, null, null, FirstSetup.messageOf(e));
         } catch (RuntimeException e) {
+            // WHY: the stored installations are read from the database, whose failures are unchecked. Not activated,
+            // so SET UP stays offered.
             log.warn("BindForge activation could not read the installations", e);
             return new Result(Outcome.FAILED, null, null, FirstSetup.messageOf(e));
         }
 
-        boolean same;
+        Optional<FirstSetupPlan.Resolution> fill;
         try {
-            same = identical(reading, planner);
+            fill = fillWithoutWriting(reading, planner);
         } catch (IOException e) {
-            log.info("BindForge activation opens first setup: {}", e.getMessage());
-            return new Result(Outcome.FIRST_SETUP, setup, reading, null);
+            // WHY: the same rule as a failed read - the file is named, so first setup does not open on a reading that
+            // looks complete (review, 2026-10-13).
+            log.info("BindForge activation opens first setup, a file could not be read: {}", e.getMessage());
+            return new Result(Outcome.FIRST_SETUP, setup, reading, FirstSetup.messageOf(e));
         }
-        if (!same) {
+        if (fill.isEmpty()) {
             log.info("The installations' device files differ, so BindForge activation opens first setup");
             return new Result(Outcome.FIRST_SETUP, setup, reading, null);
         }
 
-        FirstSetupPlan.Resolution resolution = reading.plan().resolve(Map.of());
+        FirstSetupPlan.Resolution resolution = fill.get();
         try {
             if (!establish.intoEmptyMaster(resolution.devices(), resolution.pendingRemovals())) {
                 return Result.of(Outcome.ALREADY_ACTIVATED);
             }
         } catch (RuntimeException e) {
+            // WHY: one transaction, whose failures are unchecked - it leaves nothing activated and nothing filled, so
+            // the next run can simply try again.
             log.error("BindForge was not activated: the master could not be saved", e);
             return new Result(Outcome.FAILED, null, null, FirstSetup.messageOf(e));
         }
@@ -194,36 +167,32 @@ public final class Activation {
     }
 
     /**
-     * Whether filling the master from what the installations hold would write no game file - so it can be filled
-     * with no prompt. Nothing to ask and nothing shadowed, and the push idle in every reachable installation. No
-     * reachable installation at all is identical: activation goes ahead with an empty master, and one found later is
-     * judged against it.
+     * The master to fill with no prompt, when filling it from what the installations hold would write no game file.
+     * Nothing to ask and nothing shadowed, and the push idle in every reachable installation. No reachable
+     * installation at all qualifies: activation goes ahead with an empty master, and one found later is judged
+     * against it.
+     * <p>
+     * Returns the resolution it tested, so what is saved is exactly what was judged identical (review, 2026-10-13).
      *
+     * @return the master to fill, or empty when the installations are not identical
      * @throws IOException if an installation's files cannot be read for the push's plan
      */
-    static boolean identical(FirstSetup.Reading reading, PushPlanner planner) throws IOException {
+    static Optional<FirstSetupPlan.Resolution> fillWithoutWriting(FirstSetup.Reading reading, PushPlanner planner)
+            throws IOException {
         FirstSetupPlan plan = reading.plan();
         for (FirstSetupPlan.Row row : plan.rows()) {
             // WHY: a shadowed name becomes a pending removal - something first setup would leave to clean up, so
             // the installations are not what the master would make them.
-            if (row.isQuestion() || row.kind() == FirstSetupPlan.Kind.SHADOWED) return false;
+            if (row.isQuestion() || row.kind() == FirstSetupPlan.Kind.SHADOWED) return Optional.empty();
         }
-        List<MasterDevice> master = plan.resolve(Map.of()).devices().stream()
+        FirstSetupPlan.Resolution resolution = plan.resolve(Map.of());
+        List<MasterDevice> master = resolution.devices().stream()
                 .map(device -> new MasterDevice(device.deviceName(), device.vid(), device.pid(), device.labels()))
                 .toList();
         for (Target target : reading.targets()) {
             if (!target.isReachable()) continue;
-            if (planner.wouldWrite(target, master)) return false;
+            if (planner.wouldWrite(target, master)) return Optional.empty();
         }
-        return true;
-    }
-
-    /** Told once, on the backup being taken: one spoken line, and a log line naming where it is. */
-    private static void announce(Path folder) {
-        GameEventBus.publish(new VocalisationRequestEvent(StringUtls.localizedSpeech("speech.bindforgeBackedUp"),
-                MissionCriticalAnnouncementEvent.class, false));
-        UiBus.publish(new AppLogEvent("BindForge backed up your input configuration files before changing anything: "
-                + folder));
-        log.info("Backup before BindForge taken at {}", folder);
+        return Optional.of(resolution);
     }
 }

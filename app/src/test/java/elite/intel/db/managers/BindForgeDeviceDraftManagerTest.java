@@ -423,7 +423,7 @@ class BindForgeDeviceDraftManagerTest {
     @Test
     void establishingRefusesOnceActivatedEvenWithAnEmptyMaster() {
         master.findAll().forEach(row -> master.remove(row.id()));
-        BindForgeActivationManager.getInstance().activate();
+        activated();
 
         assertFalse(draft.establish(List.of(new StoredDevice(null, "STICK2", "1234", "0001", true, null, Map.of())),
                 List.of()));
@@ -502,6 +502,13 @@ class BindForgeDeviceDraftManagerTest {
     static void notActivated() {
         try (Handle handle = Database.init()) {
             handle.execute("UPDATE bindforge_activation SET activated_at = NULL, backup_folder = NULL WHERE id = 1");
+        }
+    }
+
+    /** Activated by SQL: the manager has no way to activate outside {@code establish}, by design. */
+    static void activated() {
+        try (Handle handle = Database.init()) {
+            handle.execute("UPDATE bindforge_activation SET activated_at = CURRENT_TIMESTAMP WHERE id = 1");
         }
     }
 }

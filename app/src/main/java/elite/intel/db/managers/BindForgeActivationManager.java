@@ -8,9 +8,8 @@ import elite.intel.db.util.Database;
  * <em>Activation</em>, 2026-10-13).
  * <p>
  * <strong>Activated is its own fact, not "the master has rows".</strong> A user who owns nothing is activated with
- * an empty master. Activating together with filling the master is
- * {@link BindForgeDeviceDraftManager#establish}, in one transaction; {@link #activate()} is for a caller with no
- * master to fill.
+ * an empty master. <strong>The one way to activate is {@link BindForgeDeviceDraftManager#establish}</strong>, in the
+ * transaction that fills the master - so there is deliberately no {@code activate()} here (review, 2026-10-13).
  */
 public class BindForgeActivationManager {
 
@@ -33,13 +32,6 @@ public class BindForgeActivationManager {
 
     public boolean isActivated() {
         return Database.withDao(BindForgeActivationDao.class, BindForgeActivationDao::isActivated);
-    }
-
-    public void activate() {
-        Database.withDao(BindForgeActivationDao.class, dao -> {
-            dao.activate();
-            return Void.TYPE;
-        });
     }
 
     /** The "before BindForge" backup's folder, or {@code null} when it has not been taken. */

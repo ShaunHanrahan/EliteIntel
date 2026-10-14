@@ -2,6 +2,7 @@ package elite.intel.ui.screen.bindings;
 
 import com.google.common.eventbus.Subscribe;
 import elite.intel.bindforge.devicefiles.Activation;
+import elite.intel.bindforge.devicefiles.BeforeBindForgeBackup;
 import elite.intel.bindforge.devicefiles.BindsDeviceReferences;
 import elite.intel.bindforge.devicefiles.DeviceApply;
 import elite.intel.bindforge.devicefiles.DeviceDivergence;
@@ -44,6 +45,7 @@ import elite.intel.devices.model.DeviceIdentity;
 import elite.intel.eventbus.UiBus;
 import elite.intel.session.PlayerSession;
 import elite.intel.ui.dialog.HudConfirmDialog;
+import elite.intel.ui.event.AppLogEvent;
 import elite.intel.ui.event.DeviceFilesChangedEvent;
 import elite.intel.ui.theme.AppTheme;
 import elite.intel.ui.theme.HudGlyphs;
@@ -189,6 +191,11 @@ public class AliasDesignerPanel extends JPanel {
     private boolean activated;
     /** Activation is tried once per run - abandoned first setup is then SET UP's, and the next run's to offer again. */
     private final AtomicBoolean activationTried = new AtomicBoolean();
+    /**
+     * Whether activation is running. SET UP waits for it, or the two could open first setup twice (review,
+     * 2026-10-13). Written and read on the EDT only.
+     */
+    private boolean activationRunning;
     private List<String> currentChanges = List.of();
     private boolean screenActionRunning;
 
@@ -354,7 +361,9 @@ public class AliasDesignerPanel extends JPanel {
             List<MyDevice> myDevices = List.of();
             List<BuiltInDevice> builtIn = List.of();
             Markers markers = Markers.NONE;
-            boolean isActivated = false;
+            // WHY: null until read, so a refresh that failed leaves the last answer on screen - an activated user is
+            // not sent back to SET UP by one failed query (review, 2026-10-13).
+            Boolean isActivated = null;
             List<String> changes = List.of();
             // WHY: null until read, so a refresh that failed before the hardware leaves the last answer on screen.
             Boolean running = null;
@@ -391,16 +400,16 @@ public class AliasDesignerPanel extends JPanel {
             List<MyDevice> loadedMyDevices = myDevices;
             List<BuiltInDevice> loadedBuiltIn = builtIn;
             Markers loadedMarkers = markers;
-            boolean loadedActivated = isActivated;
+            Boolean loadedActivated = isActivated;
             List<String> loadedChanges = changes;
             Boolean loadedRunning = running;
             SwingUtilities.invokeLater(() -> {
                 if (loadedRunning != null) deviceServiceRunning = loadedRunning;
                 installLabels = loadedLabels;
                 installPaths = loadedPaths;
-                activated = loadedActivated;
+                if (loadedActivated != null) activated = loadedActivated;
                 currentChanges = loadedChanges;
-                setUpButton.setEnabled(!activated);
+                refreshSetUp();
                 refreshScreenActions();
                 showMyDevices(loadedMyDevices, loadedMarkers);
                 showBuiltIn(loadedBuiltIn);
@@ -423,7 +432,7 @@ public class AliasDesignerPanel extends JPanel {
         // WHY: decided by the check's own reading of the master, not a separate one, so the rows and the master
         // they are judged against are always the same master.
         DeviceFilesCheck.Report report = new DeviceFilesCheck().check();
-        return report.setUp()
+        return report.activated()
                 ? new Divergence(report, DeviceDivergenceScanner.scanAgainstMaster(report, bindings))
                 : new Divergence(null, DeviceDivergenceScanner.scan(controlSchemesByInstall(rows), bindings));
     }
@@ -726,76 +735,135 @@ public class AliasDesignerPanel extends JPanel {
      * confirms the summary inside it.
      */
     private void openFirstSetup() {
+        // WHY: activation may open first setup itself any moment now - one dialog, not two (review, 2026-10-13).
+        if (activationRunning) return;
         setUpButton.setEnabled(false);
         Map<String, String> names = installLabels;
         new Thread(() -> {
             FirstSetup setup = null;
             FirstSetup.Reading reading = null;
-            String failure = null;
+            String problem = null;
             try {
-                setup = FirstSetup.stored();
-                reading = setup.read();
+                // WHY: SET UP is a way into activation too, so it takes the "before BindForge" backup if activation
+                // could not - otherwise finishing first setup would activate without it, for good (review, 2026-10-13).
+                BeforeBindForgeBackup.stored().ensureTaken();
             } catch (IOException | RuntimeException e) {
                 // WHY: broad on purpose - a thread boundary, and the user pressed a button and must be told.
-                log.warn("First setup could not read the installations", e);
-                failure = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+                log.warn("First setup did not open: the backup before BindForge could not be taken", e);
+                problem = getText("bindings.aliasDesigner.firstSetup.result.backupFailed", messageOf(e));
+            }
+            if (problem == null) {
+                try {
+                    setup = FirstSetup.stored();
+                    reading = setup.read();
+                } catch (IOException | RuntimeException e) {
+                    // WHY: broad on purpose - a thread boundary, and the user pressed a button and must be told.
+                    log.warn("First setup could not read the installations", e);
+                    problem = getText("bindings.aliasDesigner.firstSetup.readFailed", messageOf(e));
+                }
             }
             FirstSetup loadedSetup = setup;
             FirstSetup.Reading loadedReading = reading;
-            String loadedFailure = failure;
+            String loadedProblem = problem;
             SwingUtilities.invokeLater(() -> {
-                setUpButton.setEnabled(!activated);
-                showFirstSetup(loadedSetup, loadedReading, loadedFailure, names);
+                refreshSetUp();
+                showFirstSetup(loadedSetup, loadedReading, loadedProblem, names);
             });
         }, "BindForge-FirstSetupRead").start();
     }
 
-    /** First setup's dialog for a reading - or, where the installations could not be read, why. On the EDT. */
-    private void showFirstSetup(FirstSetup setup, FirstSetup.Reading reading, String failure,
+    /**
+     * First setup's dialog for a reading, naming the problem when there is one - or, with no reading, the problem
+     * alone. On the EDT.
+     *
+     * @param problem the text to show the user, already worded; {@code null} when nothing went wrong
+     */
+    private void showFirstSetup(FirstSetup setup, FirstSetup.Reading reading, String problem,
                                 Map<String, String> names) {
         // WHY: decided on the reading, not the message. An exception can carry no message, and keyed on that, a
         // failed read would open the dialog with nothing to show.
         if (setup == null || reading == null) {
-            HudConfirmDialog.info(this, getText("bindings.aliasDesigner.firstSetup.title"),
-                    getText("bindings.aliasDesigner.firstSetup.readFailed", failure),
+            HudConfirmDialog.info(this, getText("bindings.aliasDesigner.firstSetup.title"), problem,
                     getText("bindings.aliasDesigner.firstSetup.close"));
             return;
         }
-        new FirstSetupDialog(this, setup, reading, names, this::initData).showDialog();
+        new FirstSetupDialog(this, setup, reading, problem, names, this::initData).showDialog();
+    }
+
+    /** SET UP until BindForge is activated - and not while activation runs, which may open first setup itself. */
+    private void refreshSetUp() {
+        setUpButton.setEnabled(!activated && !activationRunning);
     }
 
     /**
      * Activation, the first time the BindForge tab is shown in a run (Alan, 2026-10-13, A1b): a "before BindForge"
      * backup, then the master filled with no prompt when the installations are identical, or first setup opened when
-     * they are not. Called by the tab; does nothing once tried in this run or once activated.
+     * they are not. Called by the tab, on the EDT; does nothing once tried in this run.
      */
     public void activateOnFirstShowing() {
         if (!activationTried.compareAndSet(false, true)) return;
+        activationRunning = true;
+        refreshSetUp();
         new Thread(() -> {
-            Activation.Result result;
+            Activation.Result result = null;
             Map<String, String> names = Map.of();
             try {
-                // WHY: a detection of its own, not currentWithStartupScan(). Activation reads the stored list, and on a
-                // fresh database nothing is stored until detection has run; the startup scan may still be running on
-                // the refresh thread, and the call that loses that race returns the list as it was - so the user
-                // would activate with an empty master. Once per run, so the cost is one more detection.
-                List<InstallationRow> rows = registry.rescan();
-                names = labelsFor(rows);
-                result = Activation.stored().run();
+                // WHY: asked first, so every run after activation - nearly all of them - pays for no detection and
+                // starts none to race the refresh's (review, 2026-10-13).
+                if (!BindForgeActivationManager.getInstance().isActivated()) {
+                    // WHY: a detection of its own, not currentWithStartupScan(). Activation reads the stored list, and
+                    // on a fresh database nothing is stored until detection has run; the startup scan may still be
+                    // running on the refresh thread, and the call that loses that race returns the list as it was -
+                    // so the user would activate with an empty master. rescan() waits for a detection in progress.
+                    List<InstallationRow> rows = registry.rescan();
+                    names = labelsFor(rows);
+                    result = Activation.stored().run();
+                    reportActivationFailure(result.outcome(), result.reason());
+                }
             } catch (RuntimeException e) {
                 // WHY: broad on purpose - a thread boundary. Not activated, so SET UP stays offered.
                 log.warn("BindForge could not be activated", e);
-                result = null;
+                reportActivationFailure(Activation.Outcome.FAILED, messageOf(e));
             }
             Activation.Result loadedResult = result;
             Map<String, String> loadedNames = names;
             SwingUtilities.invokeLater(() -> {
+                activationRunning = false;
+                refreshSetUp();
                 if (loadedResult != null && loadedResult.outcome() == Activation.Outcome.FIRST_SETUP) {
-                    showFirstSetup(loadedResult.setup(), loadedResult.reading(), loadedResult.reason(), loadedNames);
+                    showFirstSetup(loadedResult.setup(), loadedResult.reading(), problemOf(loadedResult), loadedNames);
                 }
                 initData();
             });
         }, "BindForge-Activation").start();
+    }
+
+    /** What first setup should name, for activation that opens it: a file it could not read, if any. */
+    private static String problemOf(Activation.Result result) {
+        if (result.reason() == null) return null;
+        return result.reading() == null
+                ? getText("bindings.aliasDesigner.firstSetup.readFailed", result.reason())
+                : getText("bindings.aliasDesigner.firstSetup.unreadableFile", result.reason());
+    }
+
+    /**
+     * A failed activation is said in the application log, as a successful one's backup is - otherwise the user sees
+     * SET UP and nothing saying why (review, 2026-10-13).
+     */
+    private static void reportActivationFailure(Activation.Outcome outcome, String reason) {
+        String what = switch (outcome) {
+            case BACKUP_FAILED -> "the backup before BindForge could not be taken";
+            case FAILED -> "it could not be set up";
+            default -> null;
+        };
+        if (what == null) return;
+        UiBus.publish(new AppLogEvent("BindForge was not activated: " + what + " - " + reason
+                + ". SET UP on Alias Designer tries again."));
+    }
+
+    /** An exception's message, or its kind when it carries none - never the word "null" on screen. */
+    private static String messageOf(Exception e) {
+        return e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
     }
 
     /**
