@@ -904,6 +904,12 @@ Roll Left              —           —           NOT BOUND
 Toggle HUD             —           —           ON PURPOSE
 ```
 
+**Built 2026-10-15 as AI ACCESS, in plain words for users who read nothing else.** The header is *AI
+access*. The states read *Vega can't use* (CAN'T PRESS) and *Vega needs a
+key* (NOT BOUND), both in the warning colour, with hover text saying which slot to use and that the controller binding stays.
+**A control Vega can press reads *Vega uses this*, dimmed, rather than
+blank**, so the column explains itself before anything goes wrong. The controls judged are the built-in commands' and every binding a custom command taps. ON PURPOSE is not built yet.
+
 | State | Meaning |
 |---|---|
 | *(blank)* | **The common case.** Either Elite-Intel can drive the control, or it never needs to. |

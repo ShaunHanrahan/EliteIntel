@@ -41,7 +41,7 @@ public class AssignKeyboardBindingDialog extends JDialog {
     private static final Logger log = LogManager.getLogger(AssignKeyboardBindingDialog.class);
 
     private final KeyboardKeyAvailabilityService availabilityService;
-    private final BindingSlotDisplayFormatter slotFormatter = new BindingSlotDisplayFormatter();
+    private final BindingSlotDisplayFormatter slotFormatter = BindingSlotDisplayFormatter.withSavedLabels();
     private final Path bindingsFile;
     private final String bindingId;
     private final BindingSlotType slotType;

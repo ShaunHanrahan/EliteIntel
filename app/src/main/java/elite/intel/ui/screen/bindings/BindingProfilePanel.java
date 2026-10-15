@@ -1,11 +1,14 @@
 package elite.intel.ui.screen.bindings;
 
 import com.google.common.eventbus.Subscribe;
+import elite.intel.ai.brain.actions.handlers.commands.custom.CustomCommandDefinition;
+import elite.intel.ai.brain.actions.handlers.commands.custom.CustomCommandRegistry;
 import elite.intel.bindforge.io.*;
 import elite.intel.bindforge.model.BindingDisplayNames;
 import elite.intel.bindforge.model.BindingModifier;
 import elite.intel.bindforge.model.BindingSection;
 import elite.intel.bindforge.model.BindingSlotType;
+import elite.intel.bindforge.rules.AiAccess;
 import elite.intel.bindforge.rules.BindingConflictScanner;
 import elite.intel.bindforge.rules.KeyboardKeyAvailabilityService;
 import elite.intel.bindforge.rules.MissingBindingAutoAssigner;
@@ -27,6 +30,7 @@ import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import java.awt.*;
+import java.awt.event.HierarchyEvent;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -62,7 +66,10 @@ public class BindingProfilePanel extends JPanel {
     private final SystemSession systemSession = SystemSession.getInstance();
     private final KeyboardKeyAvailabilityService availabilityService = new KeyboardKeyAvailabilityService();
     private final BindingsWriter bindingsWriter = new BindingsWriter();
-    private final BindingSlotDisplayFormatter slotFormatter = new BindingSlotDisplayFormatter();
+    /**
+     * Reads controller inputs by the names saved in the Device Editor - re-read whenever the grid is shown.
+     */
+    private BindingSlotDisplayFormatter slotFormatter = new BindingSlotDisplayFormatter();
     private final BindingsSelectionController selectionController;
     private final BindingsGroupTableFactory tableFactory;
     private final BindingsWorkingCopyRepository workingCopyRepo = new BindingsWorkingCopyRepository();
@@ -125,6 +132,14 @@ public class BindingProfilePanel extends JPanel {
                 id -> recommendationsByBinding.containsKey(id),
                 this::buildRowCalloutContent);
         buildUi();
+        // WHY: what the grid shows also comes from outside the binds file - button names saved in the Device
+        // Editor, and which controls custom commands tap - and nothing announces a change to either. Coming
+        // back to this tab is when the commander looks, so that is when it is read again.
+        addHierarchyListener(event -> {
+            if ((event.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) == 0 || !isShowing()) return;
+            reloadDeviceLabels();
+            renderBindingTables();
+        });
         saveResultPresenter = new BindingSaveResultPresenter(this);
         applyResultPresenter = new BindingApplyResultPresenter(this);
         UiBus.register(this);
@@ -319,6 +334,7 @@ public class BindingProfilePanel extends JPanel {
             recommendationsByBinding = computeRecommendations(parsedSlots);
 
             currentSlots = slots;
+            reloadDeviceLabels();
             activeBindingsFile = workingCopyPath.toFile();
             activeBindingsLastModified = Files.getLastModifiedTime(workingCopyPath);
             activeBindingsFileSize = Files.size(workingCopyPath);
@@ -350,6 +366,13 @@ public class BindingProfilePanel extends JPanel {
             fixAllButton.setEnabled(false);
         }
         updateSyncStatus();
+    }
+
+    /**
+     * Reads the Device Editor's button names again.
+     */
+    private void reloadDeviceLabels() {
+        slotFormatter = BindingSlotDisplayFormatter.withSavedLabels();
     }
 
     private void updateSyncStatus() {
@@ -793,21 +816,59 @@ public class BindingProfilePanel extends JPanel {
     private Map<BindingSection, List<Object[]>> groupedBindings(
             List<String> bindingIds,
             Map<String, KeyBindingsParser.ReadOnlyBindingSlots> slots,
-            BindingsGroupTableFactory.RowAction rowAction
+            BindingsGroupTableFactory.RowAction rowAction,
+            AiAccess aiAccess
     ) {
         Map<BindingSection, List<Object[]>> grouped = groupedRows();
         for (String bindingId : inGameOrder(bindingIds)) {
             KeyBindingsParser.ReadOnlyBindingSlots bindingSlots = slots.get(bindingId);
-            String primary = slotFormatter.formatSlot(bindingSlots == null ? null : bindingSlots.primary());
-            String secondary = slotFormatter.formatSlot(bindingSlots == null ? null : bindingSlots.secondary());
+            SlotCell primary = slotCell(bindingSlots == null ? null : bindingSlots.primary());
+            SlotCell secondary = slotCell(bindingSlots == null ? null : bindingSlots.secondary());
+            AiAccessCell ai = aiAccessCell(aiAccess.stateOf(bindingId, bindingSlots), bindingSlots);
             Object[] row = switch (rowAction) {
-                case AUTO_FIX -> new Object[]{bindingId, primary, secondary, getText("bindings.column.autofix.action")};
-                case CLEAR -> new Object[]{bindingId, primary, secondary, getText("bindings.column.clear.action")};
-                case NONE -> new Object[]{bindingId, primary, secondary};
+                case AUTO_FIX ->
+                        new Object[]{bindingId, primary, secondary, ai, getText("bindings.column.autofix.action")};
+                case CLEAR -> new Object[]{bindingId, primary, secondary, ai, getText("bindings.column.clear.action")};
+                case NONE -> new Object[]{bindingId, primary, secondary, ai};
             };
             grouped.get(BindingDisplayNames.lookup(bindingId).section()).add(row);
         }
         return grouped;
+    }
+
+    private SlotCell slotCell(KeyBindingsParser.ReadOnlyBindingSlot slot) {
+        return new SlotCell(slotFormatter.formatSlot(slot), slotFormatter.rawTokens(slot));
+    }
+
+    /**
+     * The AI ACCESS cell for one row. The hover text says what to do in plain words, because the commander
+     * reading it will not have read anything else: which slot to use, and that the controller binding stays.
+     */
+    private static AiAccessCell aiAccessCell(AiAccess.State state, KeyBindingsParser.ReadOnlyBindingSlots slots) {
+        return switch (state) {
+            case NOT_USED -> new AiAccessCell(state, "", null);
+            case READY -> new AiAccessCell(state,
+                    getText("bindings.aiAccess.ready"), getText("bindings.aiAccess.ready.tooltip"));
+            case CANT_PRESS -> new AiAccessCell(state,
+                    getText("bindings.aiAccess.cantPress"),
+                    getText(AiAccess.bothSlotsTaken(slots)
+                            ? "bindings.aiAccess.cantPress.bothSlots.tooltip"
+                            : "bindings.aiAccess.cantPress.tooltip"));
+            case NOT_BOUND -> new AiAccessCell(state,
+                    getText("bindings.aiAccess.notBound"), getText("bindings.aiAccess.notBound.tooltip"));
+        };
+    }
+
+    /**
+     * The controls VEGA presses: its built-in commands' controls, and every binding a custom command taps -
+     * a custom command on a stick-only control fails just the same, so the commander is warned about it too.
+     */
+    private static AiAccess currentAiAccess() {
+        Set<String> vegaControls = new HashSet<>(BindingsMonitor.appDrivenControls());
+        for (CustomCommandDefinition command : CustomCommandRegistry.getInstance().getCustomCommands()) {
+            vegaControls.addAll(command.distinctBindingIds());
+        }
+        return new AiAccess(vegaControls);
     }
 
     /**
@@ -908,24 +969,27 @@ public class BindingProfilePanel extends JPanel {
         BindingPartition partition = partitionByKeyboardBinding(currentSlots);
         List<String> usedBindings = partition.used();
         List<String> missingBindings = partition.missing();
+        AiAccess aiAccess = currentAiAccess();
 
         renderGroupedTables(
                 usedBindingsPanel,
-                groupedBindings(filterRows(usedBindings), currentSlots, BindingsGroupTableFactory.RowAction.CLEAR),
+                groupedBindings(filterRows(usedBindings), currentSlots, BindingsGroupTableFactory.RowAction.CLEAR, aiAccess),
                 BindingsGroupTableFactory.RowAction.CLEAR,
                 getText("bindings.column.action"),
                 getText("bindings.column.primary"),
                 getText("bindings.column.secondary"),
+                getText("bindings.column.aiAccess"),
                 getText("bindings.column.clear"));
         tabs.setTitleAt(0, getText("bindings.usedBindings", usedBindings.size()));
 
         renderGroupedTables(
                 missingBindingsPanel,
-                groupedBindings(filterRows(missingBindings), currentSlots, BindingsGroupTableFactory.RowAction.AUTO_FIX),
+                groupedBindings(filterRows(missingBindings), currentSlots, BindingsGroupTableFactory.RowAction.AUTO_FIX, aiAccess),
                 BindingsGroupTableFactory.RowAction.AUTO_FIX,
                 getText("bindings.column.action"),
                 getText("bindings.column.primary"),
                 getText("bindings.column.secondary"),
+                getText("bindings.column.aiAccess"),
                 getText("bindings.column.autofix"));
         tabs.setTitleAt(1, getText("bindings.missingBindings", missingBindings.size()));
         fixAllButton.setEnabled(!missingBindings.isEmpty());
@@ -993,6 +1057,9 @@ public class BindingProfilePanel extends JPanel {
      * been typed. Literal, case-insensitive substring matching - what is typed is what is looked
      * for - and the tag is in the haystack so a commander who arrived here from a forum post
      * naming {@code ExplorationSAANextGenus} can still find the row.
+     * <p>
+     * A controller binding is in the haystack too, by the button name the commander gave it in the
+     * Device Editor: "what did I put on 1st Hat Up?" is answered by typing that name.
      */
     private List<String> filterBySearch(List<String> bindingIds) {
         if (bindingSearchField == null) {
@@ -1003,8 +1070,19 @@ public class BindingProfilePanel extends JPanel {
             return bindingIds;
         }
         return bindingIds.stream()
-                .filter(id -> BindingDisplayNames.searchText(id, sectionLabelFor(id)).contains(query))
+                .filter(id -> searchText(id).contains(query))
                 .toList();
+    }
+
+    private String searchText(String bindingId) {
+        String text = BindingDisplayNames.searchText(bindingId, sectionLabelFor(bindingId));
+        KeyBindingsParser.ReadOnlyBindingSlots slots = currentSlots.get(bindingId);
+        if (slots == null) {
+            return text;
+        }
+        return text
+                + " " + slotFormatter.controllerSearchText(slots.primary()).toLowerCase()
+                + " " + slotFormatter.controllerSearchText(slots.secondary()).toLowerCase();
     }
 
     private static String sectionLabelFor(String bindingId) {

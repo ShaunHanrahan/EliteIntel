@@ -210,7 +210,7 @@ final class AliasDesignerReader {
                 : device.alias() != null ? device.alias()
                 : device.builtIn() ? stock.covering(device.vid(), device.pid()).map(DeviceEntry::name).orElse(null)
                 : null;
-        Map<String, String> saved = name == null ? Map.of() : storedLabels(name);
+        Map<String, String> saved = name == null ? Map.of() : SavedDeviceLabels.of(name);
 
         Device live = device.attached() ? attachedController(device.hardware()) : null;
         DeviceDescription description = live == null
@@ -301,17 +301,6 @@ final class AliasDesignerReader {
         boolean renamePending = masterRow != null && masterRow.previousName() != null
                 && !masterRow.previousName().equals(masterRow.deviceName());
         return renamePending ? middle.whileRenamePending() : middle;
-    }
-
-    private static Map<String, String> storedLabels(String name) {
-        BindForgeDeviceDraftManager draft = BindForgeDeviceDraftManager.getInstance();
-        if (draft.isStarted()) {
-            DraftRow row = draft.findByName(name);
-            if (row != null) return draft.labelsOf(row.id());
-        }
-        BindForgeDeviceMasterManager master = BindForgeDeviceMasterManager.getInstance();
-        DeviceRow row = master.findByName(name);
-        return row == null ? Map.of() : master.labelsOf(row.id());
     }
 
     /**
