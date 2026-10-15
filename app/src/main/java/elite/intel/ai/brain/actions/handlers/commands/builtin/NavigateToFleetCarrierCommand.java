@@ -42,9 +42,10 @@ public final class NavigateToFleetCarrierCommand implements IntelCommand {
     @Override
     public String execute(JsonObject params, String responseText) {
         PlayerSession playerSession = PlayerSession.getInstance();
-        return destination(playerSession.getLastKnownCarrierLocation(), playerSession.getHomeSystem())
-                .map(system -> new RoutePlotter().plotRoute(system))
-                .orElseGet(() -> StringUtls.localizedResponse("handler.navigate.noHomeSystem"));
+        Optional<String> destination = destination(playerSession.getLastKnownCarrierLocation(), playerSession.getHomeSystem());
+        // Not Optional.map: plotRoute returns null when it plotted, which map would turn into "no destination".
+        if (destination.isEmpty()) return StringUtls.localizedResponse("handler.navigate.noHomeSystem");
+        return new RoutePlotter().plotRoute(destination.get());
     }
 
     /**
