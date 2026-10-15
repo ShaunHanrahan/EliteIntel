@@ -2,6 +2,7 @@ package elite.intel.bindforge.devicefiles;
 
 import elite.intel.bindforge.devicefiles.DeviceFilesPush.Outcome;
 import elite.intel.bindforge.devicefiles.DeviceFilesPush.Report;
+import elite.intel.bindforge.io.DeviceReferenceRewrite;
 import elite.intel.bindforge.io.DeviceRewriteResult;
 import elite.intel.db.dao.BindForgeDeviceMasterDao.DeviceRow;
 import elite.intel.db.managers.BindForgeDeviceDraftManager;
@@ -46,11 +47,12 @@ import java.util.stream.Collectors;
  * <p>
  * With no draft, Apply still pushes the master. That is the retry after a partial Apply.
  * <p>
- * <strong>Bindings that name a master device by hardware id move to its name</strong> once the push has put the
- * entry in at least one installation (Alan, 2026-10-14, A6b) - onboarding a controller {@code .binds} names by hex
- * waits for exactly this. The user's Apply comes first: an installation that missed the entry does not hold the move
- * back, it is reported and caught up later. When no installation took it, nothing was applied for the bindings to
- * follow, and they stay as they are for the next Apply. One of Frontier's names is never a target.
+ * <strong>Bindings follow a device to its name</strong> once the push has put that name in at least one installation
+ * - those naming it by hardware id (Alan, 2026-10-14, A6b), and those naming it by the old name of a rename (A11). The
+ * user's Apply comes first: an installation that missed the name does not hold the move back, it is reported and caught
+ * up later. When no installation took it, nothing was applied for the bindings to follow, and they stay as they are
+ * for the next Apply. One of Frontier's names is never a target. Both moves are derived from the files each time, so a
+ * move that stopped is retried by the next Apply with no record of its own.
  */
 public final class DeviceApply {
 
@@ -62,13 +64,19 @@ public final class DeviceApply {
         Set<String> read() throws IOException;
     }
 
-    /** Moves the bindings that name a device by hardware id - {@link BindsHardwareIdRewrite} in use. */
-    interface HardwareIdRewrite {
+    /**
+     * Moves bindings from one device reference to another - a hardware id to a name, or an old name to a new one -
+     * across {@code .binds}; {@link BindsDeviceRewrite} in use.
+     */
+    interface BindsRewrite {
         /** As {@link BindsDeviceReferences#hardwareIdCounts(java.nio.file.Path)}: strict. */
         Map<String, Integer> hardwareIdCounts() throws IOException;
 
-        /** Every reference whose value is one of {@code found} becomes {@code name}, all or nothing. */
-        Rewritten rewrite(String name, Set<String> found);
+        /** As {@link BindsDeviceReferences#referenceCounts(java.nio.file.Path)}: strict, keyed as written. */
+        Map<String, Integer> nameCounts() throws IOException;
+
+        /** Every reference the rewrite matches moves to its new value, all or nothing. */
+        Rewritten rewrite(DeviceReferenceRewrite rewrite);
     }
 
     /**
@@ -79,23 +87,35 @@ public final class DeviceApply {
     record Rewritten(DeviceRewriteResult.Status status, int bindings) {
     }
 
-    /** What became of the bindings naming one master device by hardware id. */
+    /** What became of the bindings a move was for. */
     public enum MoveOutcome {
         /** They name the device now. */
         MOVED,
-        /** No installation took the entry, so they were left on the hardware id for the next Apply. */
+        /** No installation took the device's name, so they were left as they were, for the next Apply. */
         NOT_APPLIED,
         /** Gone by the time the rewrite ran - the game saved {@code .binds} in between - so nothing was written. */
         NOT_FOUND,
-        /** The rewrite stopped and put everything back - {@link Move#status()} says why. */
+        /** The rewrite stopped and put everything back - the move's status says why. */
         FAILED
     }
 
     /**
+     * The bindings that named a master device by hardware id.
+     *
      * @param bindings how many bindings moved, when they did; otherwise how many named the device by hardware id
      * @param status   the rewrite's status when it ran, else {@code null}
      */
     public record Move(String name, int bindings, MoveOutcome outcome, DeviceRewriteResult.Status status) {
+    }
+
+    /**
+     * The bindings that named a renamed device by its old name (A11).
+     *
+     * @param bindings how many bindings moved, when they did; otherwise how many named the old name
+     * @param status   the rewrite's status when it ran, else {@code null}
+     */
+    public record RenameMove(String from, String to, int bindings, MoveOutcome outcome,
+                             DeviceRewriteResult.Status status) {
     }
 
     /**
@@ -108,10 +128,13 @@ public final class DeviceApply {
      *                      not be read
      * @param bindsUnread   whether {@code .binds} could not be read and an entry of the user's was held back for it
      * @param moves         the bindings that named a master device by hardware id, and what became of them
-     * @param movesUnread   whether {@code .binds} could not be read to find such bindings, so none was moved
+     * @param renames       the bindings that named a renamed device by its old name, and what became of them
+     * @param movesUnread   whether {@code .binds} could not be read to find bindings to move, so none was moved
+     * @param renamed       renames every installation and {@code .binds} have now taken - finished
      */
     public record Result(List<String> removed, Report report, List<String> cleanedUp, List<String> notEverywhere,
-                         List<String> heldBack, boolean bindsUnread, List<Move> moves, boolean movesUnread) {
+                         List<String> heldBack, boolean bindsUnread, List<Move> moves, List<RenameMove> renames,
+                         boolean movesUnread, List<String> renamed) {
         public Result {
             removed = List.copyOf(removed);
             Objects.requireNonNull(report, "report");
@@ -119,6 +142,8 @@ public final class DeviceApply {
             notEverywhere = List.copyOf(notEverywhere);
             heldBack = List.copyOf(heldBack);
             moves = List.copyOf(moves);
+            renames = List.copyOf(renames);
+            renamed = List.copyOf(renamed);
         }
     }
 
@@ -127,7 +152,7 @@ public final class DeviceApply {
     private final BindsNames bindsNames;
     private final FrontierStockDevices stock;
     private final BindForgeDeviceMasterManager master;
-    private final HardwareIdRewrite hardwareIds;
+    private final BindsRewrite binds;
 
     /**
      * Promotes the stored draft and pushes to the stored installations.
@@ -138,35 +163,40 @@ public final class DeviceApply {
         this(BindForgeDeviceDraftManager.getInstance()::promote, new DeviceFilesPush()::push,
                 () -> BindsDeviceReferences.referenceCounts(PlayerSession.getInstance().getBindingsDir()).keySet(),
                 FrontierStockDevices.getInstance(), BindForgeDeviceMasterManager.getInstance(),
-                BindsHardwareIdRewrite.stored(PlayerSession.getInstance().getBindingsDir()));
+                BindsDeviceRewrite.stored(PlayerSession.getInstance().getBindingsDir()));
     }
 
-    /** With nothing named by hardware id - for the tests that are about removals. */
+    /** With nothing for {@code .binds} to move - for the tests that are about removals. */
     DeviceApply(Supplier<List<String>> promote, Function<Set<String>, Report> push, BindsNames bindsNames,
                 FrontierStockDevices stock, BindForgeDeviceMasterManager master) {
-        this(promote, push, bindsNames, stock, master, NOTHING_BY_HARDWARE_ID);
+        this(promote, push, bindsNames, stock, master, NOTHING_TO_MOVE);
     }
 
     /** @param bindsNames must throw rather than answer when it cannot be sure - a missing folder is not "none" */
     DeviceApply(Supplier<List<String>> promote, Function<Set<String>, Report> push, BindsNames bindsNames,
-                FrontierStockDevices stock, BindForgeDeviceMasterManager master, HardwareIdRewrite hardwareIds) {
+                FrontierStockDevices stock, BindForgeDeviceMasterManager master, BindsRewrite binds) {
         this.promote = promote;
         this.push = push;
         this.bindsNames = bindsNames;
         this.stock = stock;
         this.master = master;
-        this.hardwareIds = hardwareIds;
+        this.binds = binds;
     }
 
-    private static final HardwareIdRewrite NOTHING_BY_HARDWARE_ID = new HardwareIdRewrite() {
+    private static final BindsRewrite NOTHING_TO_MOVE = new BindsRewrite() {
         @Override
         public Map<String, Integer> hardwareIdCounts() {
             return Map.of();
         }
 
         @Override
-        public Rewritten rewrite(String name, Set<String> found) {
-            throw new IllegalStateException("nothing is named by hardware id");
+        public Map<String, Integer> nameCounts() {
+            return Map.of();
+        }
+
+        @Override
+        public Rewritten rewrite(DeviceReferenceRewrite rewrite) {
+            throw new IllegalStateException("nothing is named for a move");
         }
     };
 
@@ -192,9 +222,85 @@ public final class DeviceApply {
                 notEverywhere = List.copyOf(split.removals());
             }
         }
+        Renames renames = moveRenamedReferences(report);
         Moves moves = moveHardwareIds(report);
         return new Result(removed, report, cleanedUp, notEverywhere, split.heldBack(), split.bindsUnread(),
-                moves.moves(), moves.unread());
+                moves.moves(), renames.moves(), moves.unread() || renames.unread(), renames.finished());
+    }
+
+    /**
+     * The bindings naming a renamed device by its old name, moved to the new one - or left, when no installation took
+     * the new name (Alan, 2026-10-14, A11). One rewrite per device, back to back, as the hardware-id moves are.
+     * <p>
+     * <strong>A rename that changes only case moves nothing</strong>: a {@code Device=} name finds its element
+     * ignoring case, and rewriting would only risk two spellings in one preset, which the game rejects (format §4.3,
+     * measured 2026-10-14).
+     * <p>
+     * <strong>A rename is finished</strong> - its old name forgotten - once every installation took the new name and
+     * no binding names the old one. Until then the push renames wherever the old name is still found, and the next
+     * Apply moves what is left.
+     */
+    private Renames moveRenamedReferences(Report report) {
+        List<DeviceRow> renamedDevices = master.findAll().stream()
+                .filter(row -> row.previousName() != null && !row.previousName().equals(row.deviceName()))
+                .filter(row -> !stock.ships(row.deviceName()) && !stock.ships(row.previousName()))
+                .toList();
+        if (renamedDevices.isEmpty()) return new Renames(List.of(), false, List.of());
+
+        Map<String, Integer> counts;
+        try {
+            counts = binds.nameCounts();
+        } catch (IOException e) {
+            log.warn("Could not read .binds, so no binding naming a renamed device by its old name was moved: {}",
+                    e.getMessage());
+            return new Renames(List.of(), true, List.of());
+        }
+
+        boolean applied = report.matchingCount() > 0;
+        boolean everywhere = everyInstallationTookIt(report);
+        List<RenameMove> moves = new ArrayList<>();
+        List<String> finished = new ArrayList<>();
+        for (DeviceRow row : renamedDevices) {
+            String from = row.previousName();
+            String to = row.deviceName();
+            boolean caseOnly = from.equalsIgnoreCase(to);
+            int bindings = caseOnly ? 0 : countIgnoringCase(counts, from);
+            boolean bindsSettled = bindings == 0;
+            if (bindings > 0) {
+                if (!applied) {
+                    moves.add(new RenameMove(from, to, bindings, MoveOutcome.NOT_APPLIED, null));
+                } else {
+                    Rewritten result = binds.rewrite(DeviceReferenceRewrite.rename(from, to));
+                    RenameMove move = switch (result.status()) {
+                        case REWRITTEN -> new RenameMove(from, to, result.bindings(), MoveOutcome.MOVED,
+                                result.status());
+                        case NO_REFERENCES -> new RenameMove(from, to, bindings, MoveOutcome.NOT_FOUND, result.status());
+                        default -> {
+                            log.warn("Could not move the bindings naming {} to {}: {}", from, to, result.status());
+                            yield new RenameMove(from, to, bindings, MoveOutcome.FAILED, result.status());
+                        }
+                    };
+                    moves.add(move);
+                    bindsSettled = move.outcome() == MoveOutcome.MOVED || move.outcome() == MoveOutcome.NOT_FOUND;
+                }
+            }
+            if (everywhere && bindsSettled) {
+                master.clearPreviousName(row.id());
+                finished.add(to);
+                log.info("Rename of {} to {} finished in every installation and in .binds", from, to);
+            }
+        }
+        return new Renames(moves, false, finished);
+    }
+
+    private record Renames(List<RenameMove> moves, boolean unread, List<String> finished) {
+    }
+
+    private static int countIgnoringCase(Map<String, Integer> counts, String name) {
+        return counts.entrySet().stream()
+                .filter(entry -> entry.getKey().equalsIgnoreCase(name))
+                .mapToInt(Map.Entry::getValue)
+                .sum();
     }
 
     /**
@@ -211,7 +317,7 @@ public final class DeviceApply {
     private Moves moveHardwareIds(Report report) {
         Map<String, Integer> counts;
         try {
-            counts = hardwareIds.hardwareIdCounts();
+            counts = binds.hardwareIdCounts();
         } catch (IOException e) {
             log.warn("Could not read .binds, so no binding naming a device by hardware id was moved: {}",
                     e.getMessage());
@@ -233,7 +339,7 @@ public final class DeviceApply {
                 moves.add(new Move(row.deviceName(), bindings, MoveOutcome.NOT_APPLIED, null));
                 continue;
             }
-            Rewritten result = hardwareIds.rewrite(row.deviceName(), found.keySet());
+            Rewritten result = binds.rewrite(new DeviceReferenceRewrite(found.keySet(), row.deviceName()));
             moves.add(switch (result.status()) {
                 case REWRITTEN -> new Move(row.deviceName(), result.bindings(), MoveOutcome.MOVED, result.status());
                 case NO_REFERENCES -> new Move(row.deviceName(), bindings, MoveOutcome.NOT_FOUND, result.status());

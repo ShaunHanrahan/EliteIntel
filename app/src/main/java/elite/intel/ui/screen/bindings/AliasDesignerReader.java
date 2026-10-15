@@ -160,9 +160,16 @@ final class AliasDesignerReader {
         List<MyDevice> devices = readMyDevices(readAttached().devices(), entries);
 
         Set<String> taken = new LinkedHashSet<>(FrontierStockDevices.getInstance().names());
-        BindForgeDeviceMasterManager.getInstance().findAll().forEach(row -> taken.add(row.deviceName()));
+        // WHY: old names too - one still waiting for its rename to reach every installation is taken (A11).
+        BindForgeDeviceMasterManager.getInstance().findAll().forEach(row -> {
+            taken.add(row.deviceName());
+            if (row.previousName() != null) taken.add(row.previousName());
+        });
         List<DraftRow> draft = BindForgeDeviceDraftManager.getInstance().findAll();
-        draft.forEach(row -> taken.add(row.deviceName()));
+        draft.forEach(row -> {
+            taken.add(row.deviceName());
+            if (row.previousName() != null) taken.add(row.previousName());
+        });
         entries.values().forEach(list -> list.forEach(entry -> taken.add(entry.name())));
         List<HardwareId> heldByDraft = draft.stream().map(row -> new HardwareId(row.vid(), row.pid())).toList();
 
@@ -188,17 +195,21 @@ final class AliasDesignerReader {
     // ------------------------------------------------------------------ the Device Editor
 
     /**
-     * What the Device Editor opens with. The name is the master's, or Frontier's for a built-in the master does not
-     * hold; with neither, the device has no name yet. The labels are the draft's when it holds the device - SAVE
-     * writes there - and the master's otherwise. The inputs are the controller's when it is attached, read by which
-     * axis they are, and the ones its labels name when it is not.
+     * What the Device Editor opens with. The name is the draft's for a master device it holds - renamed there, it
+     * opens under the new name - else the master's, or Frontier's for a built-in the master does not hold; with none,
+     * the device has no name yet. The labels are the draft's when it holds the device - SAVE writes there - and the
+     * master's otherwise. The inputs are the controller's when it is attached, read by which axis they are, and the
+     * ones its labels name when it is not.
      */
     DeviceEditorDialog.Opening openingFor(MyDevice device, List<DeviceEditorDialog.StripLine> strip) {
         FrontierStockDevices stock = FrontierStockDevices.getInstance();
-        String name = device.alias() != null
-                ? device.alias()
+        BindForgeDeviceMasterManager master = BindForgeDeviceMasterManager.getInstance();
+        DeviceRow masterRow = device.alias() == null ? null : master.findByName(device.alias());
+        DraftRow draftRow = draftRowFor(device, masterRow);
+        String name = draftRow != null ? draftRow.deviceName()
+                : device.alias() != null ? device.alias()
                 : device.builtIn() ? stock.covering(device.vid(), device.pid()).map(DeviceEntry::name).orElse(null)
-                : nameWaitingForApply(device);
+                : null;
         Map<String, String> saved = name == null ? Map.of() : storedLabels(name);
 
         Device live = device.attached() ? attachedController(device.hardware()) : null;
@@ -208,43 +219,83 @@ final class AliasDesignerReader {
         DeviceEditorInputs inputs = live == null
                 ? DeviceEditorInputs.ofSavedLabels(saved)
                 : DeviceEditorInputs.ofController(live.buttonCount(), live.axisCount(), description);
+        DeviceEditorMiddle middle = middleFor(device, name, masterRow, stock);
+        DeviceRename.Allowed rename = DeviceRename.allowed(name, name != null && stock.ships(name), middle.undoing(),
+                masterRow == null ? null : masterRow.deviceName(), masterRow == null ? null : masterRow.previousName());
+        Set<String> taken = rename == DeviceRename.Allowed.YES ? takenNames(name, masterRow, draftRow, stock) : Set.of();
         return new DeviceEditorDialog.Opening(device, name, live == null ? null : live.id(), description, inputs,
-                saved, name != null && stock.gameDrawsIt(name), strip, middleFor(device, name, stock));
+                saved, name != null && stock.gameDrawsIt(name), strip, middle, rename, taken);
+    }
+
+    /**
+     * The draft row for this device: the one copied from its master row, or - for a controller named in onboarding
+     * and waiting for APPLY - the one with its hardware. {@code null} when there is no draft, or it holds none.
+     */
+    private static DraftRow draftRowFor(MyDevice device, DeviceRow masterRow) {
+        BindForgeDeviceDraftManager draft = BindForgeDeviceDraftManager.getInstance();
+        if (!draft.isStarted()) return null;
+        List<DraftRow> rows = draft.findAll();
+        if (masterRow != null) {
+            return rows.stream().filter(row -> Objects.equals(row.masterId(), masterRow.id())).findFirst().orElse(null);
+        }
+        if (device.alias() != null) return null;
+        return rows.stream()
+                .filter(row -> new HardwareId(row.vid(), row.pid()).equals(device.hardware()))
+                .findFirst().orElse(null);
+    }
+
+    /**
+     * The names a rename must not clash with ({@link DeviceRename#taken}): Frontier's, every installation's entries,
+     * and every name and old name in the master and the draft - less this device's own.
+     */
+    private Set<String> takenNames(String name, DeviceRow masterRow, DraftRow draftRow, FrontierStockDevices stock) {
+        List<String> entries = new ArrayList<>();
+        entriesByInstall(registry.currentWithStartupScan()).values()
+                .forEach(list -> list.forEach(entry -> entries.add(entry.name())));
+        List<DeviceRename.Named> master = BindForgeDeviceMasterManager.getInstance().findAll().stream()
+                .map(row -> new DeviceRename.Named(row.deviceName(), row.previousName())).toList();
+        List<DeviceRename.Named> draft = BindForgeDeviceDraftManager.getInstance().findAll().stream()
+                .map(row -> new DeviceRename.Named(row.deviceName(), row.previousName())).toList();
+        List<String> own = new ArrayList<>();
+        own.add(name);
+        if (masterRow != null) {
+            own.add(masterRow.deviceName());
+            own.add(masterRow.previousName());
+        }
+        if (draftRow != null) own.add(draftRow.previousName());
+        return DeviceRename.taken(stock.names(), entries, master, draft, own);
     }
 
     /**
      * What the editor's middle button is: read from the master, the draft and {@code .binds} as it opens. A
      * {@code .binds} that cannot be read - a folder that is not there included - refuses CLEAR rather than offering it
      * on a device it might name, since the game would reject the whole preset. Labels can still be edited.
+     * <p>
+     * A device renamed in the draft is named in {@code .binds} by its master name until APPLY, so both are counted.
      */
-    private static DeviceEditorMiddle middleFor(MyDevice device, String name, FrontierStockDevices stock) {
+    private static DeviceEditorMiddle middleFor(MyDevice device, String name, DeviceRow masterRow,
+                                                FrontierStockDevices stock) {
         boolean builtIn = name == null ? device.builtIn() : stock.ships(name);
         if (name == null) return DeviceEditorMiddle.of(null, builtIn, false, false, false, 0);
         BindForgeDeviceDraftManager draft = BindForgeDeviceDraftManager.getInstance();
         boolean started = draft.isStarted();
+        boolean inMaster = masterRow != null || BindForgeDeviceMasterManager.getInstance().findByName(name) != null;
         OptionalInt bindings;
         try {
-            bindings = OptionalInt.of(DeviceEditorMiddle.bindingsNaming(name,
-                    BindsDeviceReferences.referenceCounts(PlayerSession.getInstance().getBindingsDir())));
+            Map<String, Integer> counts =
+                    BindsDeviceReferences.referenceCounts(PlayerSession.getInstance().getBindingsDir());
+            int naming = DeviceEditorMiddle.bindingsNaming(name, counts);
+            if (masterRow != null && !masterRow.deviceName().equalsIgnoreCase(name)) {
+                naming += DeviceEditorMiddle.bindingsNaming(masterRow.deviceName(), counts);
+            }
+            bindings = OptionalInt.of(naming);
         } catch (IOException e) {
             log.warn("Could not read which devices the bindings name, so Clear is refused for {}: {}", name,
                     e.getMessage());
             bindings = OptionalInt.empty();
         }
-        return DeviceEditorMiddle.of(name, builtIn,
-                BindForgeDeviceMasterManager.getInstance().findByName(name) != null,
-                started, started && draft.findByName(name) != null, bindings);
-    }
-
-    /**
-     * The name the draft holds for a controller named in onboarding and waiting for APPLY - so its gear opens it under
-     * that name rather than offering to name it again (Alan, 2026-10-14, A6b). {@code null} when the draft has none.
-     */
-    private static String nameWaitingForApply(MyDevice device) {
-        for (DraftRow row : BindForgeDeviceDraftManager.getInstance().findAll()) {
-            if (new HardwareId(row.vid(), row.pid()).equals(device.hardware())) return row.deviceName();
-        }
-        return null;
+        return DeviceEditorMiddle.of(name, builtIn, inMaster, started, started && draft.findByName(name) != null,
+                bindings);
     }
 
     private static Map<String, String> storedLabels(String name) {

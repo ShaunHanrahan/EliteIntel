@@ -19,9 +19,9 @@ import java.util.Set;
 import java.util.stream.Stream;
 
 /**
- * Moves the bindings that name a device by its hardware id to the device's name - Apply's half of onboarding a
- * controller {@code .binds} names by hex (Alan, 2026-10-14, A6b). Once an entry exists, {@code .binds} is expected
- * to name the device by it (format §4.0).
+ * Moves the bindings that name a device by one reference to another, across {@code .binds} - Apply's half of
+ * onboarding a controller {@code .binds} names by hex (Alan, 2026-10-14, A6b), and of renaming a device (A11). Once an
+ * entry exists, {@code .binds} is expected to name the device by it (format §4.0).
  * <p>
  * <strong>Every {@code .binds} in the bindings folder</strong>, not only the active preset, since the game validates
  * them all - and <strong>each one's working copy first</strong>, the game's own files last (Krondor, 2026-10-13):
@@ -29,12 +29,13 @@ import java.util.stream.Stream;
  * working copy still to come would read as changed and the whole rewrite would be put back. A rewritten working copy
  * then has its baseline recorded again, or the next {@code .binds} apply would refuse it as a conflict.
  * <p>
- * The rewrite is built from the values {@link BindsDeviceReferences} found, so a reference written in either order
- * or case is moved as written. All or nothing across the files, as {@link BindingsWriter} promises.
+ * A hardware-id move is built from the values {@link BindsDeviceReferences} found, so a reference written in either
+ * order or case is moved as written; a rename matches its old name ignoring case. All or nothing across the files, as
+ * {@link BindingsWriter} promises.
  */
-final class BindsHardwareIdRewrite implements DeviceApply.HardwareIdRewrite {
+final class BindsDeviceRewrite implements DeviceApply.BindsRewrite {
 
-    private static final Logger log = LogManager.getLogger(BindsHardwareIdRewrite.class);
+    private static final Logger log = LogManager.getLogger(BindsDeviceRewrite.class);
     private static final String BINDS_SUFFIX = ".binds";
 
     private final Path bindingsFolder;
@@ -42,7 +43,7 @@ final class BindsHardwareIdRewrite implements DeviceApply.HardwareIdRewrite {
     private final BindingsWriter writer;
     private final Path backupDirectory;
 
-    BindsHardwareIdRewrite(Path bindingsFolder, BindingsWorkingCopyRepository workingCopies, BindingsWriter writer,
+    BindsDeviceRewrite(Path bindingsFolder, BindingsWorkingCopyRepository workingCopies, BindingsWriter writer,
                            Path backupDirectory) {
         this.bindingsFolder = bindingsFolder;
         this.workingCopies = workingCopies;
@@ -51,8 +52,8 @@ final class BindsHardwareIdRewrite implements DeviceApply.HardwareIdRewrite {
     }
 
     /** The user's bindings folder, Elite-Intel's working copies, and the {@code .binds} backup folder. */
-    static BindsHardwareIdRewrite stored(Path bindingsFolder) throws IOException {
-        return new BindsHardwareIdRewrite(bindingsFolder, new BindingsWorkingCopyRepository(), new BindingsWriter(),
+    static BindsDeviceRewrite stored(Path bindingsFolder) throws IOException {
+        return new BindsDeviceRewrite(bindingsFolder, new BindingsWorkingCopyRepository(), new BindingsWriter(),
                 AppPaths.getBindingsBackupDir());
     }
 
@@ -62,12 +63,17 @@ final class BindsHardwareIdRewrite implements DeviceApply.HardwareIdRewrite {
     }
 
     @Override
-    public DeviceApply.Rewritten rewrite(String name, Set<String> found) {
+    public Map<String, Integer> nameCounts() throws IOException {
+        return BindsDeviceReferences.referenceCounts(bindingsFolder);
+    }
+
+    @Override
+    public DeviceApply.Rewritten rewrite(DeviceReferenceRewrite rewrite) {
         List<Path> gameFiles;
         try {
             gameFiles = bindsFiles();
         } catch (IOException e) {
-            log.warn("Could not list the .binds files to move {} to {}: {}", found, name, e.getMessage());
+            log.warn("Could not list the .binds files to move {} to {}: {}", rewrite.from(), rewrite.to(), e.getMessage());
             return new DeviceApply.Rewritten(DeviceRewriteResult.Status.READ_FAILED, 0);
         }
         List<Path> files = new ArrayList<>();
@@ -82,8 +88,7 @@ final class BindsHardwareIdRewrite implements DeviceApply.HardwareIdRewrite {
         }
         files.addAll(gameFiles);
 
-        DeviceRewriteResult result = writer.rewriteDeviceReferences(files, new DeviceReferenceRewrite(found, name),
-                backupDirectory);
+        DeviceRewriteResult result = writer.rewriteDeviceReferences(files, rewrite, backupDirectory);
         if (result.status() != DeviceRewriteResult.Status.REWRITTEN) {
             return new DeviceApply.Rewritten(result.status(), 0);
         }

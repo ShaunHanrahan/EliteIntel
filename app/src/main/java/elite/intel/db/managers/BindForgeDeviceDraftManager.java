@@ -161,6 +161,36 @@ public class BindForgeDeviceDraftManager {
     }
 
     /**
+     * The Device Editor's SAVE with the name changed: the rename and the whole label set, in one transaction with
+     * starting the draft (Alan, 2026-10-14, A11). A device under its old name keeps that name as its previous name,
+     * so Apply can find its element and {@code .buttonMap} in each installation; see the DAO's rename for when it
+     * keeps none.
+     * <p>
+     * Only a device the draft already holds can be renamed - a built-in the master has no labels for is not one of
+     * the user's to rename (A15).
+     *
+     * @return the draft row saved on, under its new name - or {@code null}, writing nothing, when the device is gone
+     *         or the new name is already a draft device's: the caller read a list that has changed since
+     */
+    public DraftRow saveDevice(String currentName, String newName, Map<String, String> labels) {
+        return inTransaction(daos -> {
+            startIfNone(daos);
+            BindForgeDeviceDraftDao draft = daos.draft();
+            DraftRow row = draft.findByName(currentName);
+            if (row == null) return null;
+            if (!currentName.equals(newName)) {
+                DraftRow holder = draft.findByName(newName);
+                if (holder != null && holder.id() != row.id()) return null;
+                draft.rename(row.id(), newName);
+            }
+            long id = row.id();
+            draft.deleteLabels(id);
+            labels.forEach((token, label) -> draft.putLabel(id, token, label));
+            return draft.findByName(newName);
+        });
+    }
+
+    /**
      * Onboarding's names, in one transaction (Alan, 2026-10-14, A6b).
      * <p>
      * <strong>Named now</strong> - a controller no binding names by hardware id - goes into the master, since its

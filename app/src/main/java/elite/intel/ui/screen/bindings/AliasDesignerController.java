@@ -16,6 +16,7 @@ import elite.intel.ui.event.AppLogEvent;
 import elite.intel.ui.event.DeviceFilesChangedEvent;
 import elite.intel.ui.screen.bindings.AliasDesignerReader.OnboardingReading;
 import elite.intel.ui.screen.bindings.AliasDesignerReader.Snapshot;
+import elite.intel.util.OsDetector;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -328,10 +329,16 @@ final class AliasDesignerController {
                     getText("bindings.aliasDesigner.firstSetup.close"));
             return;
         }
-        if (!HudConfirmDialog.confirm(view, title,
-                installations == 1
-                        ? getText("bindings.aliasDesigner.apply.confirm.one")
-                        : getText("bindings.aliasDesigner.apply.confirm", installations),
+        String question = installations == 1
+                ? getText("bindings.aliasDesigner.apply.confirm.one")
+                : getText("bindings.aliasDesigner.apply.confirm", installations);
+        // WHY: told, not fixed (Alan, 2026-10-14, A11). On Linux each installation has its own bindings folder, and
+        // BindForge moves bindings in the one Elite-Intel uses - so a rename can leave another installation's preset
+        // naming the old device.
+        if (installations > 1 && OsDetector.getOs() == OsDetector.OS.LINUX) {
+            question += "\n\n" + getText("bindings.aliasDesigner.apply.linuxNote");
+        }
+        if (!HudConfirmDialog.confirm(view, title, question,
                 getText("bindings.aliasDesigner.apply.do"),
                 getText("bindings.aliasDesigner.firstSetup.cancel"))) {
             return;

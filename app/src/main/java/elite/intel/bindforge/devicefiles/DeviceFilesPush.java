@@ -72,13 +72,25 @@ public final class DeviceFilesPush {
      * One device from the master.
      *
      * @param name   the element tag, and the {@code .buttonMap} filename stem
-     * @param labels label by input token; empty when the device has none, in which case no {@code .buttonMap}
-     *               is written for it
+     * @param labels       label by input token; empty when the device has none, in which case no {@code .buttonMap}
+     *                     is written for it
+     * @param previousName what the device was called before a rename still being carried out - the name some
+     *                     installation may still hold - or {@code null}
      */
-    public record MasterDevice(String name, String vid, String pid, Map<String, String> labels) {
+    public record MasterDevice(String name, String vid, String pid, Map<String, String> labels, String previousName) {
         public MasterDevice {
             Objects.requireNonNull(name, "name");
             labels = Map.copyOf(labels);
+        }
+
+        /** A device with no rename under way. */
+        public MasterDevice(String name, String vid, String pid, Map<String, String> labels) {
+            this(name, vid, pid, labels, null);
+        }
+
+        /** Whether a rename of this device is still being carried out - its old name may be in some installation. */
+        boolean isRenamed() {
+            return previousName != null && !previousName.equals(name);
         }
     }
 
@@ -244,10 +256,19 @@ public final class DeviceFilesPush {
         Path deviceMappings = GameInstallation.deviceMappingsIn(target.controlSchemes());
         byte[] current = readIfPresent(deviceMappings);
         boolean seeded = current == null;
-        DeviceMappingsMerge.Result merged =
-                DeviceMappingsMerge.merge(seeded ? stockFile() : current, userEntries(devices, stock));
-        byte[] mappings = merged.content();
-        boolean changed = merged.changed();
+        byte[] mappings = seeded ? stockFile() : current;
+        boolean changed = false;
+        // WHY: renamed in place before the merge, so the element keeps every child it has. The merge alone would add
+        // a bare element under the new name and leave the old one, and its <Alternative> pairs, behind it.
+        for (MasterDevice device : renamedUserDevices(devices, stock)) {
+            DeviceMappingsMerge.Result renamed = DeviceMappingsMerge.rename(mappings, device.previousName(),
+                    device.name());
+            mappings = renamed.content();
+            changed |= renamed.changed();
+        }
+        DeviceMappingsMerge.Result merged = DeviceMappingsMerge.merge(mappings, userEntries(devices, stock));
+        mappings = merged.content();
+        changed |= merged.changed();
         // WHY: one of Frontier's names keeps its element. On a built-in the element is Frontier's definition - RESET
         // LABELS took the labels away, never the entry.
         Set<String> userRemovals = new TreeSet<>();
@@ -267,6 +288,9 @@ public final class DeviceFilesPush {
             byte[] content = ButtonMapWriter.write(device.labels());
             byte[] previous = readIfPresent(buttonMap);
             if (!Arrays.equals(previous, content)) writes.add(new FileWrite(buttonMap, previous, content));
+        }
+        for (MasterDevice device : renamedUserDevices(devices, stock)) {
+            writes.addAll(renameButtonMap(target, device));
         }
         for (String name : new TreeSet<>(removals)) {
             FileWrite write = removeButtonMap(target, name, stockMaps);
@@ -288,6 +312,49 @@ public final class DeviceFilesPush {
         } catch (InvalidPathException e) {
             throw new IOException("\"" + name + "\" cannot be a filename for its .buttonMap", e);
         }
+    }
+
+    /**
+     * A rename's {@code .buttonMap}: the file under the old name goes, so none is left where nothing would ever clean it
+     * up (Alan, 2026-10-14, A11). The master's labels are written under the new name above; a device the master holds
+     * no labels for takes the old file's own content to the new name instead - renamed, never copied.
+     * <p>
+     * <strong>A rename that changes only case</strong> on a file system that ignores it - Windows - finds the old and
+     * the new name to be one file. Then nothing is deleted: the file is the device's, under either spelling, and the
+     * game finds it so (format §4.3, measured 2026-10-14).
+     *
+     * @return the writes - none when the installation holds no file under the old name
+     */
+    private static List<FileWrite> renameButtonMap(Target target, MasterDevice device) throws IOException {
+        Path oldMap;
+        try {
+            oldMap = GameInstallation.buttonMapIn(target.controlSchemes(), device.previousName());
+        } catch (InvalidPathException e) {
+            // WHY: an old name that cannot be a filename has no file to rename.
+            return List.of();
+        }
+        byte[] oldContent = readIfPresent(oldMap);
+        if (oldContent == null) return List.of();
+        Path newMap = buttonMapOf(target, device.name());
+        if (Files.exists(newMap) && Files.isSameFile(oldMap, newMap)) return List.of();
+
+        List<FileWrite> writes = new ArrayList<>();
+        if (device.labels().isEmpty() && !Files.exists(newMap)) {
+            writes.add(new FileWrite(newMap, null, oldContent));
+        }
+        writes.add(new FileWrite(oldMap, oldContent, null));
+        return writes;
+    }
+
+    /**
+     * The master's devices of the user's whose rename is still being carried out. A built-in is never among them:
+     * renaming one of Frontier's elements is slice A15's, and its {@code .buttonMap} is not renamed here either.
+     */
+    private static List<MasterDevice> renamedUserDevices(List<MasterDevice> devices, FrontierStockDevices stock) {
+        return devices.stream()
+                .filter(MasterDevice::isRenamed)
+                .filter(device -> !stock.ships(device.name()) && !stock.ships(device.previousName()))
+                .toList();
     }
 
     /**
@@ -417,7 +484,8 @@ public final class DeviceFilesPush {
         BindForgeDeviceMasterManager masterStore = BindForgeDeviceMasterManager.getInstance();
         List<MasterDevice> devices = new ArrayList<>();
         for (DeviceRow row : masterStore.findAll()) {
-            devices.add(new MasterDevice(row.deviceName(), row.vid(), row.pid(), masterStore.labelsOf(row.id())));
+            devices.add(new MasterDevice(row.deviceName(), row.vid(), row.pid(), masterStore.labelsOf(row.id()),
+                    row.previousName()));
         }
         return devices;
     }

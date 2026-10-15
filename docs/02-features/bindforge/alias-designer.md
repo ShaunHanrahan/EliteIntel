@@ -939,7 +939,7 @@ Onboarding says so rather than leaving a surprise: *"131 bindings will move to L
 Built as `bindforge.devices.Onboarding` (the pages, pure), `ui.screen.bindings.OnboardingDialog`,
 `bindforge.devicefiles.DeviceOnboarding` (the writes), `BindForgeDeviceDraftManager.onboard` (one transaction),
 `DeviceMappingsMerge.insert`, `BindsDeviceReferences.hardwareIdCounts` and `hardwareIdsFor`, and Apply's move in
-`DeviceApply` through `BindsHardwareIdRewrite`. Edit History for the device files is now one class, `EditHistory`,
+`DeviceApply` through `BindsDeviceRewrite`. Edit History for the device files is now one class, `EditHistory`,
 shared by the push and onboarding.
 
 - **Apply moves bindings for any master device of the user's that `.binds` still names by hardware id**, not only
@@ -1572,6 +1572,69 @@ Partial success is acceptable for the first and not for the second.
 completed renames are undone before reporting the failure — the files were named for a backup-covered write,
 so the previous names are recoverable. Leaving them renamed while `.binds` still says the old name is the
 same breakage in the other direction.
+
+#### Settled before building it — 2026-10-14 (Alan, A11)
+
+- **~~All or nothing~~ — a rename follows onboarding's partial rule** (Alan, option 3 of three). The user's Apply
+  comes first, as for [onboarding's hex move](#settled-before-building-it--2026-10-14-alan-a6b): every installation
+  that can be written is renamed, and `.binds` moves to the new name once **at least one** took it. One that missed
+  it is named in the report and caught up later — by the next Apply, by **Revert**, or by
+  [A14's catch-up](#actions-and-what-each-one-reaches) — since the push renames wherever the old name is still
+  found. Only when **no** installation took it does `.binds` stay on the old name, and the rename is reported as not
+  applied yet. *This knowingly accepts the cost measured above: until it is caught up, an installation that missed
+  the rename rejects the preset.* The four paragraphs above are kept for that reasoning.
+- **The `.binds` move is derived, not recorded**, as A6b's is: at each Apply, a master device that still carries a
+  `previous_name` which `.binds` uses has its bindings moved. A move that failed is retried by the next Apply.
+  `previous_name` is cleared once every installation has lost the old name and `.binds` no longer uses it.
+- **A rename that changes only case touches no `.binds`** — measured: a `Device=` name finds its element ignoring
+  case ([`.binds` format §4.3](domain-knowledge/EliteDangerous-BindsFileFormat.md#43-case-only-binds-cares-and-it-cares-about-one-spelling-per-device--measured-2026-10-14)),
+  and a preset spelling one device two ways is rejected, so rewriting only some references would be worse than
+  none. The element and the `.buttonMap` are renamed.
+- **One bindings folder, on Linux too — for now** (Alan, 2026-10-14). On Linux each Proton installation has its own
+  `.binds` folder ([input environment §7](../../00-overview/input-environment.md#7-linux-the-bindings-folder-is-not-shared)),
+  but the rename, like every other `.binds` read and write in BindForge, uses the one folder Elite-Intel is set to
+  (`PlayerSession.getBindingsDir()`, which on Linux is the prefix the launcher's `ed-bindings` link points at). That is
+  Elite-Intel's behaviour already, and correct on Windows and on a Linux machine with one installation. *Why not per
+  installation:* which installations should share controls is the user's to say, not BindForge's to infer — a
+  commander owns no input file, so "same commander" does not answer it — and asking belongs to a later slice that <!-- terminology-ok: the in-game commander, contrasted with the user -->
+  moves every `.binds` consumer together, not the rename alone.
+- **Several renames per Apply, no chains** (Alan, 2026-10-14). Each device's `.binds` move is its own rewrite, run one
+  after another as onboarding's hex moves are, and one that stops (the bindings monitor reloading under it) is
+  retried by the next Apply. **A name still waiting as some device's old name** — a `previous_name` in the master or
+  the draft — **is taken** until every installation has lost it, so it cannot be a new name. That rules out chains
+  (`LVWAP` → `LeftStick`, then another device → `LVWAP`), so no two moves depend on their order.
+- **First setup's *needs Rename* choices stay disabled in A11** (Alan, 2026-10-14). A11 renames from the Device
+  Editor only. Opening those choices — recording the losing name as the winner's `previous_name` so the first Apply
+  moves its bindings — is slice A16, which also designs the two cases one `previous_name` cannot cover: two losing
+  names that `.binds` uses, and first setup that cannot finish because `.binds` uses both names.
+- **A11 renames the user's own devices only** (Alan, 2026-10-14). On a built-in still under Frontier's name the
+  name field stays read-only, as today. Renaming or shadowing an attached built-in
+  ([above](#built-in-controllers-in-my-devices--settled-2026-09-13)) needs its presentation designed first, and is
+  slice A15.
+- **Linux with several installations is told, not fixed.** Apply's confirm says, when BindForge has found more than
+  one Linux installation, that controls are updated only for the installation Elite-Intel uses. Until the later slice,
+  a rename can leave another installation's preset naming the old device, and that installation falls back to
+  keyboard and mouse.
+
+#### Decided while building it — 2026-10-15 (A11)
+
+- **One rename at a time per device.** The master keeps one old name per device, so a device whose last rename has
+  not reached every installation and `.binds` yet keeps its name field read-only, saying so, until an Apply finishes
+  it. A second rename would overwrite the first old name, and the installations still holding it would never be
+  renamed.
+- **A device's own names are never "taken" for itself.** The clash check leaves out its current name, its master
+  name and its old name, matched exactly — so changing only case is a rename, and so is going back to the name the
+  installations still hold (which the draft then records as no rename at all).
+- **The element is renamed in place**, keeping its place in the file and every child it has (`<Alternative>`,
+  `<SupportsIcons>`). A second copy under the old name is removed, as CLEAR removes one; when the new name is already
+  in the file the old copies are removed and that element is kept.
+- **The `.buttonMap` is renamed, never copied.** The master's labels are written under the new name and the old file
+  deleted; a device with no labels in the master takes the old file's own content to the new name. **On a file system
+  that ignores case** (Windows) a case-only rename finds the old and new name to be one file, and nothing is deleted —
+  the game finds the file under either spelling ([format §2.2](domain-knowledge/EliteDangerous-DeviceMappings-ButtonMap.md)).
+- **Renaming is in the Device Editor's name box**, checked as it is typed by onboarding's rule and words. SAVE writes
+  the name and the labels in one transaction; a name another device took meanwhile writes nothing and says the device
+  changed. A device renamed in the draft opens under its new name, and CLEAR counts the bindings on both names.
 
 **Why the alias-confirm gate matters more than it looks.** Requiring the alias to be settled before button and
 axis naming unlocks means a `.buttonMap` is only ever created under a name the player has already looked at.

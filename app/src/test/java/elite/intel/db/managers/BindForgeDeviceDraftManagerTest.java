@@ -101,6 +101,41 @@ class BindForgeDeviceDraftManagerTest {
         assertNull(master.findByName("T-Rudder"));
     }
 
+    /** SAVE with the name changed (A11): one write, the old name kept for Apply, and no removal once applied. */
+    @Test
+    void savingWithANewNameRenamesAndKeepsTheOldNameForApply() {
+        DraftRow saved = draft.saveDevice("LVWAP", "LeftStick", labels("Joy_1", "TRIGGER"));
+
+        assertEquals("LeftStick", saved.deviceName());
+        assertEquals("LVWAP", saved.previousName());
+        assertEquals(lvwap, saved.masterId());
+        assertEquals(labels("Joy_1", "TRIGGER"), draft.labelsOf(saved.id()));
+        assertNotNull(master.findByName("LVWAP"), "the master waits for Apply");
+
+        assertTrue(draft.promote().isEmpty(), "a renamed device is not a removed one");
+        assertEquals("LVWAP", master.findByName("LeftStick").previousName());
+        assertTrue(master.pendingRemovals().isEmpty());
+    }
+
+    /** Renamed back before Apply: nothing is left to rename, so no old name is kept. */
+    @Test
+    void renamingBackToTheAppliedNameKeepsNoOldName() {
+        draft.saveDevice("LVWAP", "LeftStick", labels("Joy_1", "TRIGGER"));
+
+        DraftRow back = draft.saveDevice("LeftStick", "LVWAP", labels("Joy_1", "TRIGGER"));
+
+        assertNull(back.previousName());
+    }
+
+    /** A name another draft device holds, or a device that is gone, writes nothing - the editor read a stale list. */
+    @Test
+    void savingUnderATakenNameOrAGoneDeviceWritesNothing() {
+        assertNull(draft.saveDevice("LVWAP", "RVWAP", labels("Joy_1", "TRIGGER")));
+        assertNull(draft.saveDevice("Nobody", "LeftStick", labels("Joy_1", "TRIGGER")));
+        assertEquals(labels("Joy_1", "LV MAIN TRIGGER", "Joy_2", "PINKY"),
+                draft.labelsOf(draft.findByName("LVWAP").id()), "the transaction wrote nothing");
+    }
+
     @Test
     void promotingMakesTheDraftTheMasterAndEndsTheDraft() {
         draft.start();

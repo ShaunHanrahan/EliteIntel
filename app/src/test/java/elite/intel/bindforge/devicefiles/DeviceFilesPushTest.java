@@ -314,6 +314,70 @@ class DeviceFilesPushTest {
         }
     }
 
+    // ------------------------------------------------------------------ rename (A11)
+
+    /** The element is renamed in place and the .buttonMap is renamed - never a second file beside the first. */
+    @Test
+    void aRenameRenamesTheElementAndTheButtonMapInEveryInstallation() throws IOException {
+        Target steam = installation(1, "STEAM");
+        Target epic = installation(2, "EPIC");
+        push(List.of(steam, epic), List.of(RVWAP));
+
+        Report report = push(List.of(steam, epic), List.of(renamed("RightStick", RVWAP.labels())));
+
+        assertEquals(2, report.matchingCount());
+        for (Target target : List.of(steam, epic)) {
+            String mappings = read(target.controlSchemes().resolve("DeviceMappings.xml"));
+            assertTrue(mappings.contains("<RightStick>"), mappings);
+            assertFalse(mappings.contains("RVWAP"), mappings);
+            assertTrue(read(buttonMap(target, "RightStick")).contains("<Joy_1>RV Main Trigger</Joy_1>"));
+            assertFalse(Files.exists(buttonMap(target, "RVWAP")), "no orphan left under the old name");
+        }
+    }
+
+    /** With no labels in the master the old file's own content goes to the new name - renamed, not dropped. */
+    @Test
+    void aRenameOfADeviceWithNoLabelsMovesItsButtonMap() throws IOException {
+        Target steam = installation(1, "STEAM");
+        push(List.of(steam), List.of(RVWAP));
+        String before = read(buttonMap(steam, "RVWAP"));
+
+        push(List.of(steam), List.of(renamed("RightStick", Map.of())));
+
+        assertEquals(before, read(buttonMap(steam, "RightStick")));
+        assertFalse(Files.exists(buttonMap(steam, "RVWAP")));
+    }
+
+    /** The push renames wherever the old name is still found, so an installation that already took it is unchanged. */
+    @Test
+    void aRenameAnInstallationAlreadyTookWritesNothing() throws IOException {
+        Target steam = installation(1, "STEAM");
+        push(List.of(steam), List.of(RVWAP));
+        push(List.of(steam), List.of(renamed("RightStick", RVWAP.labels())));
+
+        Report again = push(List.of(steam), List.of(renamed("RightStick", RVWAP.labels())));
+
+        assertEquals(Outcome.UNCHANGED, resultFor(again, steam).outcome());
+    }
+
+    /** On Windows, LVWAP.buttonMap and Lvwap.buttonMap are one file: a case-only rename must not delete it. */
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    void aCaseOnlyRenameKeepsTheButtonMapOnWindows() throws IOException {
+        Target steam = installation(1, "STEAM");
+        push(List.of(steam), List.of(RVWAP));
+
+        Report report = push(List.of(steam), List.of(renamed("Rvwap", RVWAP.labels())));
+
+        assertEquals(1, report.matchingCount());
+        assertTrue(read(steam.controlSchemes().resolve("DeviceMappings.xml")).contains("<Rvwap>"));
+        assertTrue(read(buttonMap(steam, "Rvwap")).contains("<Joy_1>RV Main Trigger</Joy_1>"));
+    }
+
+    private static MasterDevice renamed(String name, Map<String, String> labels) {
+        return new MasterDevice(name, RVWAP.vid(), RVWAP.pid(), labels, RVWAP.name());
+    }
+
     private Report push(List<Target> targets, List<MasterDevice> master) {
         return pusher(targets, master).push();
     }

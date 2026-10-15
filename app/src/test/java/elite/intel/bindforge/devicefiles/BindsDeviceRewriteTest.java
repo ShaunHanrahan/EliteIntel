@@ -2,6 +2,7 @@ package elite.intel.bindforge.devicefiles;
 
 import elite.intel.bindforge.io.BindingsWorkingCopyRepository;
 import elite.intel.bindforge.io.BindingsWriter;
+import elite.intel.bindforge.io.DeviceReferenceRewrite;
 import elite.intel.bindforge.io.DeviceRewriteResult;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -17,11 +18,11 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Apply's half of onboarding a controller {@code .binds} names by hex (A6b, 2026-10-14): every {@code .binds} in the
- * folder and its working copy move to the name, from the value found, and a rewritten working copy keeps a baseline
+ * Apply's half of onboarding a controller {@code .binds} names by hex (A6b, 2026-10-14) and of a rename (A11): every
+ * {@code .binds} in the folder and its working copy move to the name, and a rewritten working copy keeps a baseline
  * matching its game file.
  */
-class BindsHardwareIdRewriteTest {
+class BindsDeviceRewriteTest {
 
     @TempDir
     Path temp;
@@ -37,8 +38,8 @@ class BindsHardwareIdRewriteTest {
         Files.writeString(working.resolve("Custom.4.2.binds"), custom);
         WorkingCopies copies = new WorkingCopies(working);
 
-        DeviceApply.Rewritten result = new BindsHardwareIdRewrite(bindings, copies, new BindingsWriter(),
-                temp.resolve("backups")).rewrite("LeftStick", Set.of("83f43344"));
+        DeviceApply.Rewritten result = new BindsDeviceRewrite(bindings, copies, new BindingsWriter(),
+                temp.resolve("backups")).rewrite(new DeviceReferenceRewrite(Set.of("83f43344"), "LeftStick"));
 
         assertEquals(DeviceRewriteResult.Status.REWRITTEN, result.status());
         assertEquals(2, result.bindings(), "the game's files only - the working copy holds the same binding again");
@@ -64,8 +65,8 @@ class BindsHardwareIdRewriteTest {
         WorkingCopies copies = new WorkingCopies(working);
         copies.recordGameFileBaseline("Custom.4.2.binds", game);
 
-        DeviceApply.Rewritten result = new BindsHardwareIdRewrite(bindings, copies, new BindingsWriter(),
-                temp.resolve("backups")).rewrite("LeftStick", Set.of("83f43344"));
+        DeviceApply.Rewritten result = new BindsDeviceRewrite(bindings, copies, new BindingsWriter(),
+                temp.resolve("backups")).rewrite(new DeviceReferenceRewrite(Set.of("83f43344"), "LeftStick"));
 
         assertEquals(DeviceRewriteResult.Status.REWRITTEN, result.status());
         assertFalse(copies.gameFileMatchesBaseline("Custom.4.2.binds", game),
@@ -78,8 +79,42 @@ class BindsHardwareIdRewriteTest {
         Files.writeString(bindings.resolve("Custom.4.2.binds"),
                 "<Root><A><Primary Device=\"334483F3\" Key=\"Joy_1\" /></A></Root>");
 
-        assertEquals(Map.of("334483F3", 1), new BindsHardwareIdRewrite(bindings, new WorkingCopies(temp),
+        assertEquals(Map.of("334483F3", 1), new BindsDeviceRewrite(bindings, new WorkingCopies(temp),
                 new BindingsWriter(), temp.resolve("backups")).hardwareIdCounts());
+    }
+
+    /** A rename (A11): the old name, however it is spelled, moves to the new one in every file. */
+    @Test
+    void aRenameMovesTheOldNameEverywhere() throws IOException {
+        Path bindings = Files.createDirectories(temp.resolve("Bindings"));
+        Files.writeString(bindings.resolve("Custom.4.2.binds"),
+                "<Root><A><Primary Device=\"LVWAP\" Key=\"Joy_1\" /></A>"
+                        + "<B><Primary Device=\"Keyboard\" Key=\"Key_A\" /></B></Root>");
+        Files.writeString(bindings.resolve("Racing.4.2.binds"),
+                "<Root><A><Primary Device=\"LVWAP\" Key=\"Joy_2\" /></A></Root>");
+
+        DeviceApply.Rewritten result = new BindsDeviceRewrite(bindings, new WorkingCopies(temp.resolve("working")),
+                new BindingsWriter(), temp.resolve("backups")).rewrite(DeviceReferenceRewrite.rename("LVWAP", "LeftStick"));
+
+        assertEquals(DeviceRewriteResult.Status.REWRITTEN, result.status());
+        assertEquals(2, result.bindings());
+        for (Path file : new Path[]{bindings.resolve("Custom.4.2.binds"), bindings.resolve("Racing.4.2.binds")}) {
+            String text = Files.readString(file);
+            assertTrue(text.contains("Device=\"LeftStick\""), file + ": " + text);
+            assertFalse(text.contains("LVWAP"), file + ": " + text);
+        }
+        assertTrue(Files.readString(bindings.resolve("Custom.4.2.binds")).contains("Device=\"Keyboard\""),
+                "nothing but the renamed device moves");
+    }
+
+    @Test
+    void nameCountsReadTheBindingsFolder() throws IOException {
+        Path bindings = Files.createDirectories(temp.resolve("Bindings"));
+        Files.writeString(bindings.resolve("Custom.4.2.binds"),
+                "<Root><A><Primary Device=\"LVWAP\" Key=\"Joy_1\" /></A></Root>");
+
+        assertEquals(1, new BindsDeviceRewrite(bindings, new WorkingCopies(temp), new BindingsWriter(),
+                temp.resolve("backups")).nameCounts().get("LVWAP"));
     }
 
     /** Working copies in a folder of the test's own, never Elite-Intel's data folder. */
