@@ -45,7 +45,7 @@ final class AliasDesignerController {
      * What the screen shows before its first refresh has finished.
      */
     private static final Snapshot NOTHING_YET = new Snapshot(Map.of(), Map.of(), null, List.of(), List.of(),
-            List.of(), AliasDesignerReader.Markers.NONE, false, List.of(), false, false);
+            List.of(), AliasDesignerReader.Markers.NONE, false, List.of(), false, false, false);
 
     private final AliasDesignerPanel view;
     private final AliasDesignerReader reader;
@@ -180,7 +180,8 @@ final class AliasDesignerController {
                 read.activated() != null ? read.activated() : shown.activated(),
                 read.changes(),
                 read.running() != null ? read.running() : shown.running(),
-                read.listed());
+                read.listed(),
+                read.applyWork());
     }
 
     private boolean activated() {
@@ -189,11 +190,16 @@ final class AliasDesignerController {
 
     /**
      * SET UP until BindForge is activated, and not while activation runs, which may open first setup itself. APPLY
-     * once activated, DISCARD while the draft changes something - and neither while a write runs.
+     * once activated and only when it has work ({@link ApplyWork}), DISCARD while the draft changes something - and
+     * neither while a write runs.
      */
     private void refreshButtons() {
-        view.refreshButtons(!activated() && !activationRunning, activated() && !actionRunning,
+        view.refreshButtons(!activated() && !activationRunning, canApply(),
                 !shown.changes().isEmpty() && !actionRunning, shown.changes());
+    }
+
+    private boolean canApply() {
+        return activated() && shown.applyWork() && !actionRunning;
     }
 
     // ------------------------------------------------------------------ activation and first setup
@@ -258,8 +264,7 @@ final class AliasDesignerController {
     void openFirstSetup() {
         // WHY: activation may open first setup itself any moment now - one dialog, not two (review, 2026-10-13).
         if (activationRunning) return;
-        view.refreshButtons(false, activated() && !actionRunning, !shown.changes().isEmpty() && !actionRunning,
-                shown.changes());
+        view.refreshButtons(false, canApply(), !shown.changes().isEmpty() && !actionRunning, shown.changes());
         Map<String, String> names = shown.labels();
         new Thread(() -> {
             FirstSetup setup = null;

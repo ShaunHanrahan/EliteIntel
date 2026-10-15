@@ -289,8 +289,8 @@ final class DeviceEditorDialog extends JDialog {
         }
         row = field(panel, row, "bindings.aliasDesigner.editor.field.vid", device.vid());
         row = field(panel, row, "bindings.aliasDesigner.editor.field.pid", device.pid());
-        row = readout(panel, row, "bindings.aliasDesigner.editor.field.windowsName",
-                device.windowsName() == null ? "-" : device.windowsName());
+        row = readout(panel, row, "bindings.aliasDesigner.editor.field.hardwareName",
+                device.hardwareName() == null ? "-" : device.hardwareName());
         row = readout(panel, row, "bindings.aliasDesigner.editor.field.status", getText(device.attached()
                 ? "bindings.aliasDesigner.status.attached"
                 : "bindings.aliasDesigner.status.missing"));
@@ -677,15 +677,18 @@ final class DeviceEditorDialog extends JDialog {
     }
 
     /**
-     * A lit box takes the selection fill - the canon allows a fill for activity - and goes back to its own colours
-     * the moment its input is released.
+     * A lit box takes a solid orange fill with dark text - the canon allows a fill for activity - and goes back to
+     * its own colours the moment its input is released.
+     * <p>
+     * WHY orange, not the selection blue (Alan, 2026-10-15): the half-transparent blue barely showed against the
+     * box, so a button pressed on the stick could be missed on screen.
      */
     private void paintLights() {
         Set<String> lit = lights.lit();
         boxes.forEach((token, box) -> {
             Color[] resting = restingColours.get(token);
             boolean on = lit.contains(token);
-            box.setBackground(on ? HudPalette.HUD_COLOR_ROLE_SELECTION_BACKGROUND : resting[0]);
+            box.setBackground(on ? HudPalette.HUD_COLOR_ROLE_PRIMARY_ACTION : resting[0]);
             box.setForeground(on ? HudPalette.HUD_COLOR_ROLE_SELECTED_TEXT : resting[1]);
         });
     }

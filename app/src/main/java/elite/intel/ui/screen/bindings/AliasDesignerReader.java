@@ -57,7 +57,8 @@ final class AliasDesignerReader {
      */
     record Snapshot(Map<String, String> labels, Map<String, String> paths, DeviceFilesCheck.Report report,
                     List<DeviceDivergence.Finding> findings, List<MyDevice> myDevices, List<BuiltInDevice> builtIn,
-                    Markers markers, Boolean activated, List<String> changes, Boolean running, boolean listed) {
+                    Markers markers, Boolean activated, List<String> changes, Boolean running, boolean listed,
+                    boolean applyWork) {
     }
 
     /**
@@ -86,6 +87,7 @@ final class AliasDesignerReader {
         List<String> changes = List.of();
         Boolean running = null;
         boolean listed = false;
+        boolean applyWork = false;
         try {
             activated = BindForgeActivationManager.getInstance().isActivated();
             changes = DraftChanges.stored();
@@ -105,6 +107,10 @@ final class AliasDesignerReader {
             } else {
                 findings = DeviceDivergenceScanner.scan(controlSchemesByInstall(rows), bindings);
             }
+            BindForgeDeviceMasterManager master = BindForgeDeviceMasterManager.getInstance();
+            boolean renameWaiting = master.findAll().stream()
+                    .anyMatch(row -> row.previousName() != null && !row.previousName().equals(row.deviceName()));
+            applyWork = ApplyWork.pending(changes, master.pendingRemovals(), renameWaiting, findings, report);
             Map<String, List<DeviceEntry>> entries = entriesByInstall(rows);
             Attached attached = readAttached();
             running = attached.running();
@@ -124,7 +130,7 @@ final class AliasDesignerReader {
             log.warn("Could not refresh the divergence list", e);
         }
         return new Snapshot(labels, paths, report, findings, myDevices, builtIn, markers, activated, changes, running,
-                listed);
+                listed, applyWork);
     }
 
     // ------------------------------------------------------------------ onboarding

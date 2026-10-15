@@ -36,7 +36,8 @@ Krondor's work is not reviewed as ours.
   not a change to shared code** and is built on `V1.2-BindForge` (Alan, 2026-10-11 — [the platform map](../01-host-integration/elite-intel-platform-map.md#the-shared-write-path-is-eliteintelio--built-2026-10-03)).
 - **`elite.intel.ai.hands` is keystroke execution only.** BindForge code never goes there.
 - **Migrations:** the next free number in BindForge's band, `12000–12499`. Never edit an applied one.
-- **Strings:** all nine `gui*.properties` bundles. `getText` runs `MessageFormat` only when arguments are passed,
+-
+**Strings:** all seven `gui*.properties` bundles (RU and UK were dropped 2026-10-15). `getText` runs `MessageFormat` only when arguments are passed,
   so a literal apostrophe is doubled in a string that takes arguments and single in one that does not.
 - **UI:** [the HUD canon](../02-features/bindforge/ui-component-map.md) — state is text colour, never a pill;
   `HudConfirmDialog`, never `JOptionPane`.
@@ -55,9 +56,9 @@ it is the machinery every tab writes through, so it comes first and is built onl
 | 2 | **Alias Designer** | [alias-designer.md](alias-designer.md) | [alias-designer.md](../02-features/bindforge/alias-designer.md) | device list, naming rule, startup `.buttonMap`, first setup, the label merge, divergence against the master and its ways out, the Installations markers, the Built-in Devices tab, which axes and hats a controller has, the Device Editor, the actions (CLEAR, RESET LABELS, APPLY, DISCARD), the missing-controller warning, activation (A1b), onboarding (A6b), rename (A11) built; **A14 next**; A7, A12, A15 and A16 ready |
 | 3 | **Preset Editor** | *not yet written* | [preset-editor.md](../02-features/bindforge/preset-editor.md) | nothing built; unblocked 2026-10-13 — F1's four-line read merged up |
 | 4 | **File Manager** — Edit History browsing, auto-backup and retention, restore scope | *not yet written* | [file-manager.md](../02-features/bindforge/file-manager.md) | Install Locations built; Player Backups manual only |
-| 5 | **Bind Editor: editing** — Game Mode, Settings, capture dialog, mouse inputs | *not yet written* | [bind-editor.md](../02-features/bindforge/bind-editor.md) | the grid exists in `BindingProfilePanel` |
+| 5 | **Bind Editor: editing** — Game Mode, Settings, capture dialog, mouse inputs | [bind-editor-editing.md](bind-editor-editing.md) | [bind-editor.md](../02-features/bindforge/bind-editor.md) | E1 (controller buttons and hats in the capture dialog) built 2026-10-15; **E2 next** |
 | 6 | **Bind Editor: Anomalies** and shared conflict detection | *not yet written* | [bind-editor.md](../02-features/bindforge/bind-editor.md#anomalies) | scanner exists; three known defects |
-| 7 | **Rename the section to BindForge** | — | [v1.2-scope.md](../00-overview/v1.2-scope.md#phased-rollout--revised-2026-09-08) | three keys across nine bundles, done by whichever session finishes last |
+| 7 | **Rename the section to BindForge** | — | [v1.2-scope.md](../00-overview/v1.2-scope.md#phased-rollout--revised-2026-09-08) | three keys across seven bundles, done by whichever session finishes last |
 
 **A brief marked *not yet written* is written by the first session for that section** — it is that session's
 first slice. Written the week its section starts, it is accurate; written months ahead, it would not be.

@@ -30,7 +30,7 @@ Columns, and why only these:
 
 | Column | Source |
 |---|---|
-| **Windows name** | what the hardware reports through the Device Service |
+| **Hardware name** | what the hardware reports through the Device Service, on any OS — *renamed from "Windows name" 2026-10-15 (Alan): it is the controller's own USB name on Linux too* |
 | **VID / PID** | the hardware |
 | **Status** | `ATTACHED` or `MISSING` — whether the hardware is present right now |
 | **Alias** | the name in the master, or *not added* |
@@ -1129,7 +1129,7 @@ still to come.*
   [read as it connects](#which-axes-and-hats-a-controller-has--2026-10-10-alan) (A8b); SDL alone gives only an
   axis count, and two VIRPIL sticks put their twist on Z and on RZ. ~~Where the axes cannot be read, the AXES tab
   needs A9 to decide what to show.~~ *Decided in A9 — [below](#built-as-a-dialog--2026-10-10-alan-a9).*
-- **DEVICE** holds the name, VID and PID, the Windows name, whether it is attached, and the
+- **DEVICE** holds the name, VID and PID, the hardware name, whether it is attached, and the
   [install strip](#the-install-strip--a-readout-not-a-switch).
 - **AXES** has one label box per axis the controller reports, named by the axis it is (`Joy_XAxis`,
   `Joy_RZAxis`), six to a column and a second column when there are more.
@@ -1294,6 +1294,8 @@ with the master, that is drift to be resolved, not a configuration to be preserv
     so jitter never shows.
   - **The dialog never changes tab for an input.** Most buttons are momentary, and a light on another tab shows
     nothing; a box lights only where the user is looking.
+  - **A lit box is solid orange with dark
+    text** (Alan, 2026-10-15). The half-transparent selection blue it used first was too faint to notice.
   - Axes are lit by which axis they are, so axis highlighting needs [A8b](../../05-build-plan/alias-designer.md#slices)
     — SDL numbers a controller's axes without gaps, and its axis 2 may be Z or RZ.
 
@@ -1463,8 +1465,10 @@ Alan answered five questions, one at a time:
 - **A device cleared or reset in the draft, not yet applied, says so** — *"Cleared. Apply removes it from every
   installation."* — its input tabs are disabled, and the middle button becomes **UNDO CLEAR** (or **UNDO RESET**),
   which puts it back as the master holds it. The undo asks nothing: it changes no game file.
-- **APPLY and DISCARD are in the screen's footer.** APPLY is the primary, on the right, and is offered whenever the
-  master exists — with nothing saved it still pushes the master, which is the retry after a partial Apply. It asks
+- **APPLY and DISCARD are in the screen's footer.** APPLY is the primary, on the right. **It is offered only when it has
+  work** (Alan, 2026-10-15, reversing *"whenever the master
+  exists"*). Work means the draft changes something, a removal or rename is still on its way, or an installation differs from the master in a way the push repairs:
+  the rows that offer Revert (`ApplyWork`). The last case is still the retry after a partial Apply, since the installation it failed on still differs. Dimmed, its tooltip says there is nothing to apply. A button that answers every press, with nothing to do, had users pressing it again and again. It asks
   first, naming the installation count, and reports per installation: *"Updated 2 of 3"*, each failure's reason,
   what was removed, what was held back and why. **DISCARD throws the whole draft away** — the second DISCARD
   [above](#one-record-and-where-it-lands--reworked-2026-09-26), now settled; the dialog's BACK is the first. It is

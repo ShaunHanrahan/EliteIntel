@@ -3,6 +3,7 @@ package elite.intel.ui.screen.bindings;
 import com.google.common.eventbus.Subscribe;
 import elite.intel.ai.brain.actions.handlers.commands.custom.CustomCommandDefinition;
 import elite.intel.ai.brain.actions.handlers.commands.custom.CustomCommandRegistry;
+import elite.intel.bindforge.devices.CaptureControllers;
 import elite.intel.bindforge.io.*;
 import elite.intel.bindforge.model.BindingDisplayNames;
 import elite.intel.bindforge.model.BindingModifier;
@@ -24,6 +25,8 @@ import elite.intel.ui.event.KeymapSyncStateChangedEvent;
 import elite.intel.ui.support.*;
 import elite.intel.ui.theme.AppTheme;
 import elite.intel.ui.widget.*;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
@@ -52,6 +55,8 @@ import static elite.intel.ui.theme.HudPalette.*;
  * footer. Extracted from the former monolithic {@code BindingsTabPanel}.
  */
 public class BindingProfilePanel extends JPanel {
+    private static final Logger log = LogManager.getLogger(BindingProfilePanel.class);
+
 
     private static final int SCROLL_UNIT_ROWS = 2;
     /**
@@ -92,6 +97,10 @@ public class BindingProfilePanel extends JPanel {
     private JButton revertButton;
     private JButton fixAllButton;
     private JCheckBox conflictsOnlyCheck;
+    /**
+     * Narrows the grid to the controls Vega uses - the ones with something in the AI ACCESS column.
+     */
+    private JCheckBox vegaOnlyCheck;
     private JTextField bindingSearchField;
 
     private Map<String, KeyBindingsParser.ReadOnlyBindingSlots> currentSlots = Map.of();
@@ -311,10 +320,14 @@ public class BindingProfilePanel extends JPanel {
         conflictsOnlyCheck = makeCheckBox(getText("bindings.filter.conflictsOnly"), false);
         conflictsOnlyCheck.addActionListener(e -> renderBindingTables());
 
+        vegaOnlyCheck = makeCheckBox(getText("bindings.filter.vegaOnly"), false);
+        vegaOnlyCheck.setToolTipText(getText("bindings.filter.vegaOnly.tooltip"));
+        vegaOnlyCheck.addActionListener(e -> renderBindingTables());
+
         // Non-modal footer: sync status on the left, then the conflicts-only filter, AUTO-ASSIGN MISSING BINDS,
         // REVERT and APPLY (primary) on the right, no BACK.
         return HudFooter.build(false, null, syncStatusBadge,
-                List.of(conflictsOnlyCheck, fixAllButton, revertButton, applyButton));
+                List.of(conflictsOnlyCheck, vegaOnlyCheck, fixAllButton, revertButton, applyButton));
     }
 
     public void initData() {
@@ -973,7 +986,7 @@ public class BindingProfilePanel extends JPanel {
 
         renderGroupedTables(
                 usedBindingsPanel,
-                groupedBindings(filterRows(usedBindings), currentSlots, BindingsGroupTableFactory.RowAction.CLEAR, aiAccess),
+                groupedBindings(filterRows(usedBindings, aiAccess), currentSlots, BindingsGroupTableFactory.RowAction.CLEAR, aiAccess),
                 BindingsGroupTableFactory.RowAction.CLEAR,
                 getText("bindings.column.action"),
                 getText("bindings.column.primary"),
@@ -984,7 +997,7 @@ public class BindingProfilePanel extends JPanel {
 
         renderGroupedTables(
                 missingBindingsPanel,
-                groupedBindings(filterRows(missingBindings), currentSlots, BindingsGroupTableFactory.RowAction.AUTO_FIX, aiAccess),
+                groupedBindings(filterRows(missingBindings, aiAccess), currentSlots, BindingsGroupTableFactory.RowAction.AUTO_FIX, aiAccess),
                 BindingsGroupTableFactory.RowAction.AUTO_FIX,
                 getText("bindings.column.action"),
                 getText("bindings.column.primary"),
@@ -1034,17 +1047,30 @@ public class BindingProfilePanel extends JPanel {
     }
 
     /**
-     * When the filter is on, narrows the ids to those that participate in a conflict; otherwise a no-op.
-     */
-    /**
-     * Both view filters, in one place so the two tables always narrow the same way: the
-     * conflicts-only checkbox and the search field. Purely a view concern - the tab counts and the
+     * The view filters, in one place so the two tables always narrow the same way: the conflicts-only and
+     * required-by-Vega checkboxes, and the search field. Purely a view concern - the tab counts and the
      * Auto-Assign Missing Binds enabled state are computed from the unfiltered lists.
      */
-    private List<String> filterRows(List<String> bindingIds) {
-        return filterBySearch(filterConflictsOnly(bindingIds));
+    private List<String> filterRows(List<String> bindingIds, AiAccess aiAccess) {
+        return filterBySearch(filterVegaOnly(filterConflictsOnly(bindingIds), aiAccess));
     }
 
+    /**
+     * When the filter is on, narrows the ids to the controls Vega uses - its built-in commands' and every one a
+     * custom command taps, the same set the AI ACCESS column judges; otherwise a no-op.
+     */
+    private List<String> filterVegaOnly(List<String> bindingIds, AiAccess aiAccess) {
+        if (vegaOnlyCheck == null || !vegaOnlyCheck.isSelected()) {
+            return bindingIds;
+        }
+        return bindingIds.stream()
+                .filter(id -> aiAccess.stateOf(id, currentSlots.get(id)) != AiAccess.State.NOT_USED)
+                .toList();
+    }
+
+    /**
+     * When the filter is on, narrows the ids to those that participate in a conflict; otherwise a no-op.
+     */
     private List<String> filterConflictsOnly(List<String> bindingIds) {
         if (conflictsOnlyCheck == null || !conflictsOnlyCheck.isSelected()) {
             return bindingIds;
@@ -1218,68 +1244,109 @@ public class BindingProfilePanel extends JPanel {
         // callout - drop it explicitly so it does not float over the modal.
         tableFactory.hideConflictPopup();
 
+        // WHY no gate on what the slots hold: a controller slot opens like any other (Alan, 2026-10-15). The
+        // writer refuses, without rewriting, a slot whose structure it does not know, and SAVE says so.
         KeyBindingsParser.ReadOnlyBindingSlots slots = currentSlots.get(bindingId);
-        KeyBindingsParser.ReadOnlyBindingSlot slot = slotType == BindingSlotType.PRIMARY
-                ? (slots == null ? null : slots.primary())
-                : (slots == null ? null : slots.secondary());
-        if (!isBasicEditableSlot(slot)) {
-            JOptionPane.showMessageDialog(
-                    this,
-                    getText("bindings.assign.unsupportedReadOnlyMessage"),
-                    getText("bindings.assign.dialogTitle"),
-                    JOptionPane.INFORMATION_MESSAGE
-            );
-            return;
-        }
-        // The dialog edits this one slot, so it reports this slot's collision - not whichever of the
-        // binding's chords happened to be indexed first. A null slot is the ordinary Missing-Bindings
-        // case (the control is absent from the file), and nothing unbound can be in conflict.
-        Set<String> chordPartners = slot == null
-                ? null
-                : conflicts.partnersByChord(bindingId).get(BindingConflictScanner.chordOf(slot));
         AssignKeyboardBindingDialog dialog = new AssignKeyboardBindingDialog(
                 this,
                 activeBindingsFile.toPath(),
                 bindingId,
                 slotType,
-                slot,
+                slots,
                 availabilityService,
                 parser.toExecutableSlots(currentSlots),
-                chordPartners,
-                chordPartners == null ? "" : slotFormatter.formatChord(slot.bindingModifiers(), slot.key())
+                currentSlots,
+                existingConflicts(bindingId, slots),
+                CaptureControllers.all(currentSlots),
+                currentAiAccess().stateOf(bindingId, slots) != AiAccess.State.NOT_USED
         );
 
         assignDialogOpen = true;
         try {
             AppTheme.runWithModalScrim(
                     SwingUtilities.getWindowAncestor(this),
-                    () -> dialog.showDialog().ifPresent(selection -> saveKeyboardBinding(bindingId, selection)));
+                    () -> saveSelections(bindingId, dialog.showDialog(), slots));
         } finally {
             assignDialogOpen = false;
         }
     }
 
-    private void saveKeyboardBinding(String bindingId, AssignKeyboardBindingSelection selection) {
+    /**
+     * Each slot's own keyboard clash, as the grid found it - so the dialog reports that slot's collision, not
+     * whichever of the binding's chords happened to be indexed first. A missing or empty slot has none.
+     */
+    private Map<BindingSlotType, AssignKeyboardBindingDialog.ExistingConflict> existingConflicts(
+            String bindingId, KeyBindingsParser.ReadOnlyBindingSlots slots) {
+        Map<BindingSlotType, AssignKeyboardBindingDialog.ExistingConflict> found = new EnumMap<>(BindingSlotType.class);
+        if (slots == null) return found;
+        for (BindingSlotType type : BindingSlotType.values()) {
+            KeyBindingsParser.ReadOnlyBindingSlot slot = type == BindingSlotType.PRIMARY ? slots.primary() : slots.secondary();
+            if (slot == null) continue;
+            Set<String> partners = conflicts.partnersByChord(bindingId).get(BindingConflictScanner.chordOf(slot));
+            if (partners != null && !partners.isEmpty()) {
+                found.put(type, new AssignKeyboardBindingDialog.ExistingConflict(
+                        slotFormatter.formatChord(slot.bindingModifiers(), slot.key()), partners));
+            }
+        }
+        return found;
+    }
+
+    /**
+     * Writes what the dialog changed, one slot after the other, then reloads once.
+     * <p>
+     * WHY the file is stamped again between writes: the writer refuses a file that changed since it was read,
+     * and the first write changes it. The stamp is taken right after our own write, so a change by the game in
+     * between is still caught at the next load. The first refusal stops the rest - half a row written is
+     * reported, not hidden.
+     */
+    private void saveSelections(String bindingId, List<AssignSelection> selections,
+                                KeyBindingsParser.ReadOnlyBindingSlots slots) {
+        if (selections.isEmpty()) return;
         if (activeBindingsFile == null || activeBindingsLastModified == null || activeBindingsFileSize < 0) {
             saveResultPresenter.showWriteFailed();
             return;
         }
-
         Path file = activeBindingsFile.toPath();
-        KeyboardBindingEdit edit = new KeyboardBindingEdit(
-                file,
-                bindingId,
-                selection.slotType(),
-                selection.key(),
-                activeBindingsLastModified,
-                activeBindingsFileSize
-        );
-        BindingSaveResult result = saveKeyboardBinding(edit, selection.modifiers());
+        FileTime stamp = activeBindingsLastModified;
+        long size = activeBindingsFileSize;
+        BindingSaveResult result = BindingSaveResult.NO_CHANGE;
+        for (AssignSelection selection : selections) {
+            BindingSaveResult one = switch (selection) {
+                case AssignKeyboardBindingSelection keyboard -> saveKeyboardBinding(
+                        new KeyboardBindingEdit(file, bindingId, keyboard.slotType(), keyboard.key(), stamp, size),
+                        keyboard.modifiers());
+                case AssignSlotSelection any -> bindingsWriter.assignSlot(new SlotAssignment(
+                        file, bindingId, any.slotType(), any.input(), any.modifiers(),
+                        // The slot keeps its Hold - an inline setting of the slot, not part of what was captured.
+                        any.input() != null && holds(slots, any.slotType()),
+                        stamp, size));
+            };
+            if (one != BindingSaveResult.SAVED && one != BindingSaveResult.NO_CHANGE) {
+                result = one;
+                break;
+            }
+            if (one == BindingSaveResult.SAVED) {
+                result = one;
+                try {
+                    stamp = Files.getLastModifiedTime(file);
+                    size = Files.size(file);
+                } catch (IOException e) {
+                    log.warn("Could not re-read {} after saving {}: {}", file, bindingId, e.getMessage());
+                    result = BindingSaveResult.WRITE_FAILED;
+                    break;
+                }
+            }
+        }
         saveResultPresenter.show(result);
-
         if (result == BindingSaveResult.SAVED || result == BindingSaveResult.NO_CHANGE || result == BindingSaveResult.STALE_FILE) {
             initData();
         }
+    }
+
+    private static boolean holds(KeyBindingsParser.ReadOnlyBindingSlots slots, BindingSlotType type) {
+        if (slots == null) return false;
+        KeyBindingsParser.ReadOnlyBindingSlot slot = type == BindingSlotType.PRIMARY ? slots.primary() : slots.secondary();
+        return slot != null && slot.hold();
     }
 
     private BindingSaveResult saveKeyboardBinding(KeyboardBindingEdit edit, List<BindingModifier> modifiers) {
@@ -1333,15 +1400,6 @@ public class BindingProfilePanel extends JPanel {
             initData();
         }
         return new ClearKeyboardBindingDialog.ClearOutcome(success, currentSlots.get(bindingId));
-    }
-
-    private boolean isBasicEditableSlot(KeyBindingsParser.ReadOnlyBindingSlot slot) {
-        return slot == null || slot.editable() || isClearedSlot(slot);
-    }
-
-    private boolean isClearedSlot(KeyBindingsParser.ReadOnlyBindingSlot slot) {
-        return "{NoDevice}".equals(slot.device())
-                && (slot.key() == null || slot.key().isBlank());
     }
 
     private void clearLoadedBindingsSnapshot() {

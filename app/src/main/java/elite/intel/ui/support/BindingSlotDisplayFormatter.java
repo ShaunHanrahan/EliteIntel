@@ -142,6 +142,14 @@ public class BindingSlotDisplayFormatter {
         return formatChord(KEYBOARD, modifiers, key);
     }
 
+    /**
+     * One input on a device and its modifiers as a slot reads in the grid - {@code VKB-Stick | 1st Hat Up} - for
+     * a choice not yet written.
+     */
+    public String formatInputs(String device, List<BindingModifier> modifiers, String key) {
+        return device + " | " + formatChord(device, modifiers, key);
+    }
+
     private String formatChord(String device, List<BindingModifier> modifiers, String key) {
         List<String> modifierLabels = modifiers.stream()
                 .filter(modifier -> modifier.key() != null && !modifier.key().isBlank() && !"Key_".equals(modifier.key()))
