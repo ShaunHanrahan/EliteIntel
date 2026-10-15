@@ -48,5 +48,13 @@ public enum HudDisplayMode {
      * so it cannot even be selected. This mode is the same shell drawn flat and
      * opaque, in a window those pickers list.
      */
-    CAPTURE_WINDOW
+    CAPTURE_WINDOW;
+
+    /**
+     * Whether this mode puts a card on the commander's monitor that can be moved by section. Not the capture
+     * window: that one is a texture in the headset, placed by the capture tool.
+     */
+    public boolean hasDesktopCard() {
+        return this == DESKTOP || this == BOTH;
+    }
 }

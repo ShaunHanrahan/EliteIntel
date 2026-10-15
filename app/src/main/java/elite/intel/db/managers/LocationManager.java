@@ -15,6 +15,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.util.*;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -31,13 +32,17 @@ public class LocationManager {
      * Journal events for the same body (e.g. SAASignalsFound + Scan) fire on separate virtual threads within the
      * same instant; without this they race and the later writer overwrites the earlier writer's fields (blind
      * whole-JSON upsert). See {@link #updateNamedBody}.
+     * <p>
+     * WHY ReentrantLock and not {@code synchronized}: those writers are virtual threads, and on Java 21 one blocked
+     * on a monitor pins its carrier. Enough writers queued on one stripe pin every carrier, and the writer holding
+     * the database connection then has nowhere to resume - a deadlock. A ReentrantLock waiter parks instead.
      */
     private static final int WRITE_LOCK_STRIPES = 64;
-    private final Object[] writeLocks = new Object[WRITE_LOCK_STRIPES];
+    private final ReentrantLock[] writeLocks = new ReentrantLock[WRITE_LOCK_STRIPES];
 
     private LocationManager() {
         for (int i = 0; i < writeLocks.length; i++) {
-            writeLocks[i] = new Object();
+            writeLocks[i] = new ReentrantLock();
         }
     }
 
@@ -52,7 +57,7 @@ public class LocationManager {
      * WHY the name: it is the record's identity - the table's unique key, and the one a record is saved under - so
      * two writers of the same record always take the same lock, whichever BodyID each of their events reported.
      */
-    private Object lockFor(String locationName) {
+    private ReentrantLock lockFor(String locationName) {
         return writeLocks[Math.floorMod(locationName.hashCode(), WRITE_LOCK_STRIPES)];
     }
 
@@ -81,13 +86,17 @@ public class LocationManager {
         }
         LocationDto location;
         boolean surveyWasComplete;
-        synchronized (lockFor(locationName)) {
+        ReentrantLock lock = lockFor(locationName);
+        lock.lock();
+        try {
             LocationDto stored = findByLocationName(locationName);
             boolean sameSystem = stored != null && (stored.getSystemAddress() == 0 || stored.getSystemAddress() == systemAddress);
             location = sameSystem ? stored : new LocationDto(bodyId, systemAddress);
             surveyWasComplete = location.isBioScansCompleted();
             mutator.accept(location);
             save(location, locationName);
+        } finally {
+            lock.unlock();
         }
         // Every writer of the survey-complete latch comes through here, so this is where a flip is
         // announced - after the lock is released, since a listener may well read this body back.

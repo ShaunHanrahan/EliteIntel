@@ -159,10 +159,12 @@ class OverlayProtocolTest {
     }
 
     @Test
-    void aDraggedPositionComesBackUpThePipe() {
-        assertEquals(new Point(1920, 40), OverlayProtocol.parsePosition("POS\t1920\t40").orElseThrow());
-        assertEquals(new Point(-8, -8), OverlayProtocol.parsePosition("POS\t-8\t-8").orElseThrow(),
-                "a window dragged partly off-screen still reports where it is");
+    void aPlacementComesBackUpThePipe() {
+        assertEquals(new HudPlacement(HudScreenSection.NORTH_EAST, new Point(1920, 40)),
+                OverlayProtocol.parsePlacement("PLACE\tne\t1920\t40").orElseThrow());
+        assertEquals(new HudPlacement(HudScreenSection.WEST, new Point(-1880, 540)),
+                OverlayProtocol.parsePlacement("PLACE\tw\t-1880\t540").orElseThrow(),
+                "a card on a monitor left of the primary reports negative coordinates");
     }
 
     /**
@@ -172,31 +174,43 @@ class OverlayProtocolTest {
      */
     @Test
     void anythingElseOnThatStreamIsIgnored() {
-        assertTrue(OverlayProtocol.parsePosition(null).isEmpty());
-        assertTrue(OverlayProtocol.parsePosition("").isEmpty());
-        assertTrue(OverlayProtocol.parsePosition("Gtk-WARNING: something").isEmpty());
-        assertTrue(OverlayProtocol.parsePosition("POS\t12").isEmpty(), "a short line is not a position");
-        assertTrue(OverlayProtocol.parsePosition("POS\tleft\ttop").isEmpty(), "non-numeric is not a position");
-        assertTrue(OverlayProtocol.parsePosition("SIZE\t10\t20").isEmpty(), "an unknown verb is not a position");
+        assertTrue(OverlayProtocol.parsePlacement(null).isEmpty());
+        assertTrue(OverlayProtocol.parsePlacement("").isEmpty());
+        assertTrue(OverlayProtocol.parsePlacement("Gtk-WARNING: something").isEmpty());
+        assertTrue(OverlayProtocol.parsePlacement("PLACE\tne\t12").isEmpty(), "a short line is not a placement");
+        assertTrue(OverlayProtocol.parsePlacement("PLACE\tne\tleft\ttop").isEmpty(), "non-numeric is not a placement");
+        assertTrue(OverlayProtocol.parsePlacement("PLACE\tup\t1\t2").isEmpty(), "an unknown section is not a placement");
+        assertTrue(OverlayProtocol.parsePlacement("POS\t10\t20").isEmpty(), "the old position report is gone");
     }
 
     /**
      * The overlay announces which shell came up - desktop or VR - and why, when
      * VR was asked for and could not be had. That line shares the stdout the
-     * position reports travel on, and the three-field form has exactly the shape
-     * a position has, so it is the one thing on that stream most likely to be
-     * misread as one. Nothing moves the overlay window on a fallback.
+     * placement reports travel on. Nothing moves the overlay window on a fallback.
      */
     @Test
-    void aModeReportIsNotAPosition() {
-        assertTrue(OverlayProtocol.parsePosition("MODE\tdesktop").isEmpty());
-        assertTrue(OverlayProtocol.parsePosition("MODE\tvr").isEmpty());
-        assertTrue(OverlayProtocol.parsePosition("MODE\tdesktop\tno headset detected").isEmpty());
+    void aModeReportIsNotAPlacement() {
+        assertTrue(OverlayProtocol.parsePlacement("MODE\tdesktop").isEmpty());
+        assertTrue(OverlayProtocol.parsePlacement("MODE\tvr").isEmpty());
+        assertTrue(OverlayProtocol.parsePlacement("MODE\tdesktop\tno headset detected").isEmpty());
     }
 
     @Test
-    void positionIsSentAsACfgTheOverlayAlreadyUnderstands() {
-        assertEquals("CFG\tx=100\ty=200", OverlayProtocol.position(100, 200));
+    void aLegacyCornerIsSentAsBareCoordinates() {
+        assertEquals("CFG\tx=100\ty=200", OverlayProtocol.legacyPosition(100, 200));
+    }
+
+    @Test
+    void restoreCarriesTheSectionAndItsAnchor() {
+        assertEquals("CFG\trestore=sw\tx=40\ty=1040",
+                OverlayProtocol.restore(new HudPlacement(HudScreenSection.SOUTH_WEST, new Point(40, 1040))));
+    }
+
+    @Test
+    void moveCarriesTheRememberedSpotOnlyWhenThereIsOne() {
+        assertEquals("CFG\tmove=ne\tx=1720\ty=40",
+                OverlayProtocol.move(HudScreenSection.NORTH_EAST, Optional.of(new Point(1720, 40))));
+        assertEquals("CFG\tmove=s", OverlayProtocol.move(HudScreenSection.SOUTH, Optional.empty()));
     }
 
     @Test
@@ -213,6 +227,18 @@ class OverlayProtocolTest {
      * see it. So the two lists are compared here rather than trusted to stay in
      * step.
      */
+    /**
+     * The desktop sections, for the same reason: the C side resolves a name by its index, which is also how
+     * it works out a section's row and column.
+     */
+    @Test
+    void everyScreenSectionNameIsOneTheOverlayKnows() {
+        assertEquals(
+                Arrays.stream(HudScreenSection.values()).map(HudScreenSection::wireName).toList(),
+                namesFromTheCSide("SECTION_NAMES[]", cSource("hud_place.c")),
+                "SECTION_NAMES in overlay/src/hud_place.c must match HudScreenSection, in order");
+    }
+
     @Test
     void everyPlacementNameIsOneTheOverlayKnows() {
         List<String> inTheOverlay = vrPositionNamesFromTheCSide();
