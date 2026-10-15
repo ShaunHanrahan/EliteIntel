@@ -11,8 +11,8 @@ import elite.intel.session.PlayerSession;
 import elite.intel.session.SystemSession;
 import elite.intel.ui.dialog.AudioInterfaceDialog;
 import elite.intel.ui.event.*;
+import elite.intel.ui.overlay.HudOverlayPresence;
 import elite.intel.ui.overlay.HudOverlaySettingsDialog;
-import elite.intel.ui.overlay.NativeHudOverlay;
 import elite.intel.ui.support.AiSetupReport;
 import elite.intel.ui.support.SupportBundle;
 import elite.intel.ui.telemetry.LlmSessionStatsSnapshot;
@@ -60,8 +60,11 @@ public class AiTabPanel extends JPanel {
     private JButton sleepWakeButton;
     private JButton hudOverlayButton;
     private JButton hudOverlaySettingsButton;
+    /**
+     * What the button shows, following {@link HudOverlayVisibilityChangedEvent}: voice switches the overlay too.
+     */
     private boolean hudOverlayVisible;
-    private final NativeHudOverlay hudOverlay = new NativeHudOverlay();
+    private final HudOverlayPresence hudOverlay = HudOverlayPresence.getInstance();
 
     private JButton startStopServicesButton;
     private JButton recalibrateAudioButton;
@@ -115,36 +118,7 @@ public class AiTabPanel extends JPanel {
         summaryClockTimer.start();
         // Deferred rather than started inline: this runs while the window is still being assembled
         // around the panel, and the overlay is a child process that should not race that.
-        SwingUtilities.invokeLater(this::restoreHudOverlay);
-    }
-
-    /**
-     * Puts the overlay back on screen if that is where the commander left it when the app last ran.
-     * <p>
-     * A read of the setting, never a write. An overlay that cannot start - a missing binary, a half
-     * install - must leave the stored preference alone, so fixing the install brings the overlay back
-     * instead of the commander finding a setting that turned itself off while they were not looking.
-     */
-    private void restoreHudOverlay() {
-        if (!SystemSession.getInstance().isHudOverlayVisible()) return;
-
-        hudOverlayVisible = hudOverlay.start();
-        if (!hudOverlayVisible) {
-            UiBus.publish(new AppLogEvent(getText("overlay.error.notStarted")));
-        }
-        hudOverlayButton.setText(hudOverlayText());
-    }
-
-    /**
-     * Stores which way the overlay button was left, for the next launch. A settings write must never
-     * cost the commander the toggle they just pressed, so a failure here is logged and swallowed.
-     */
-    private void rememberHudOverlayVisibility(boolean visible) {
-        try {
-            SystemSession.getInstance().setHudOverlayVisible(visible);
-        } catch (RuntimeException e) {
-            log.warn("Could not store the HUD overlay visibility: {}", e.getMessage());
-        }
+        SwingUtilities.invokeLater(hudOverlay::restore);
     }
 
     public void dispose() {
@@ -176,26 +150,11 @@ public class AiTabPanel extends JPanel {
 
         hudOverlayButton = makeButtonSubtle(hudOverlayText());
         hudOverlayButton.setToolTipText(getText("ai.hudOverlay.tooltip"));
+        // The label is not set here: the presence announces the result, and the subscriber below moves the
+        // label, so it is right whoever switched the overlay.
         hudOverlayButton.addActionListener(e -> SwingUtilities.invokeLater(() -> {
-            boolean wasVisible = hudOverlayVisible;
-            if (hudOverlayVisible) {
-                hudOverlay.stop();
-                hudOverlayVisible = false;
-            } else {
-                // Only flip the toggle if the process actually came up, so a
-                // missing binary leaves the button honest instead of claiming
-                // an overlay that is not there.
-                hudOverlayVisible = hudOverlay.start();
-                if (!hudOverlayVisible) {
-                    UiBus.publish(new AppLogEvent(getText("overlay.error.notStarted")));
-                }
-            }
-            // This button is the overlay's only control, so the way it was left IS the setting - there
-            // is no checkbox anywhere that could disagree with it. What is stored is what the commander
-            // asked for, not what happened: a press that failed to spawn the process is a broken install,
-            // not a change of mind, and recording it as "off" would quietly retire the overlay for good.
-            rememberHudOverlayVisibility(!wasVisible);
-            hudOverlayButton.setText(hudOverlayText());
+            if (hudOverlay.isShowing()) hudOverlay.hide();
+            else hudOverlay.show();
         }));
         // The overlay runs out-of-process and has no menu of its own, so its
         // settings need a door here. A button rather than a right-click on the
@@ -204,7 +163,7 @@ public class AiTabPanel extends JPanel {
         hudOverlaySettingsButton = makeButtonSubtle(getText("ai.hudOverlay.settings"));
         hudOverlaySettingsButton.setToolTipText(getText("ai.hudOverlay.settings.tooltip"));
         hudOverlaySettingsButton.addActionListener(e ->
-                SwingUtilities.invokeLater(() -> new HudOverlaySettingsDialog(hudOverlay).setVisible(true)));
+                SwingUtilities.invokeLater(() -> new HudOverlaySettingsDialog(hudOverlay.overlay()).setVisible(true)));
 
         recalibrateAudioButton = makeButtonSubtle(getText("button.calibrateAudio"));
         recalibrateAudioButton.setEnabled(false);
@@ -781,6 +740,14 @@ public class AiTabPanel extends JPanel {
     private String sleepWakeText() {
         // sleeping -> offer to wake up; listening -> offer to sleep
         return getText(sleeping ? "ai.action.wake" : "ai.action.sleep");
+    }
+
+    @Subscribe
+    public void onHudOverlayVisibilityChanged(HudOverlayVisibilityChangedEvent event) {
+        SwingUtilities.invokeLater(() -> {
+            hudOverlayVisible = event.visible();
+            hudOverlayButton.setText(hudOverlayText());
+        });
     }
 
     private String hudOverlayText() {

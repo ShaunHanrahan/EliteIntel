@@ -31,7 +31,7 @@ public interface GameSessionDao {
                                                              noiseReductionEnabled, noiseReductionStrength,
                                                              overlayAlpha, overlayFontScale, overlayWidth, overlayX, overlayY,
                                                              overlayDisplayMode, overlayVrPosition, overlayVisible,
-                                                             overlayColors
+                                                             overlayColors, overlaySection, overlaySectionPoints
                                                 )
                                   VALUES (1, :kokoroVoice, :googleVoice,
                                                       :rmsThresholdHigh,
@@ -49,7 +49,7 @@ public interface GameSessionDao {
                                                       :noiseReductionEnabled, :noiseReductionStrength,
                                                       :overlayAlpha, :overlayFontScale, :overlayWidth, :overlayX, :overlayY,
                                                       :overlayDisplayMode, :overlayVrPosition, :overlayVisible,
-                                                      :overlayColors
+                                                      :overlayColors, :overlaySection, :overlaySectionPoints
                                           )
             """)
     void save(@BindBean GameSessionDao.GameSession data);
@@ -111,6 +111,8 @@ public interface GameSessionDao {
             session.setOverlayVrPosition(rs.getString("overlayVrPosition"));
             session.setOverlayVisible(rs.getBoolean("overlayVisible"));
             session.setOverlayColors(rs.getString("overlayColors"));
+            session.setOverlaySection(rs.getString("overlaySection"));
+            session.setOverlaySectionPoints(rs.getString("overlaySectionPoints"));
             return session;
         }
     }
@@ -191,6 +193,15 @@ public interface GameSessionDao {
          * colours". Only overridden roles are stored - see {@link elite.intel.ui.overlay.HudOverlayColor}.
          */
         private String overlayColors = "";
+        /**
+         * The section of the last desktop placement, by {@link elite.intel.ui.overlay.HudScreenSection} name.
+         * Empty for a row from before sections, whose {@link #overlayX}/{@link #overlayY} are a top-left corner.
+         */
+        private String overlaySection = "";
+        /**
+         * The spot last left in each section - see {@link elite.intel.ui.overlay.HudScreenSection#parsePoints}.
+         */
+        private String overlaySectionPoints = "";
 
 
         /**
@@ -535,6 +546,23 @@ public interface GameSessionDao {
             // NOT NULL DEFAULT '' in the schema, but a row read through a mapper that predates the
             // column still hands back null, and the parser must not have to know that.
             this.overlayColors = overlayColors == null ? "" : overlayColors;
+        }
+
+        public String getOverlaySection() {
+            return overlaySection;
+        }
+
+        public void setOverlaySection(String overlaySection) {
+            // Same null guard as the colours: NOT NULL DEFAULT '' in the schema, never null to readers.
+            this.overlaySection = overlaySection == null ? "" : overlaySection;
+        }
+
+        public String getOverlaySectionPoints() {
+            return overlaySectionPoints;
+        }
+
+        public void setOverlaySectionPoints(String overlaySectionPoints) {
+            this.overlaySectionPoints = overlaySectionPoints == null ? "" : overlaySectionPoints;
         }
 
         public void setOverlayVrPosition(String overlayVrPosition) {

@@ -717,8 +717,10 @@ public class SystemSession {
      * @param fontScale text size multiplier; {@code 0} means the commander has not chosen one, so the
      *                  caller derives it from screen height
      * @param width     card width in pixels
-     * @param x         screen position, or {@code -1} for "wherever the overlay opens"
-     * @param y         screen position, or {@code -1} for "wherever the overlay opens"
+     * @param x         the anchor point of {@code section} in screen pixels, a window top-left corner when
+     *                  {@code section} is empty, or {@code OverlayProtocol.POSITION_UNSET} for "wherever the
+     *                  overlay opens"
+     * @param y         as {@code x}
      * @param displayMode where the HUD is drawn - {@code DESKTOP}, {@code VR} or {@code BOTH}. Text
      *                  rather than the enum so the session layer does not depend on the UI layer,
      *                  and so a value written by a newer build is something an older one can fall
@@ -726,9 +728,13 @@ public class SystemSession {
      * @param colors    commander-chosen overlay text colours as stored, empty for the shipped palette.
      *                  Text for the same reason as {@code displayMode}, and parsed leniently, so a role
      *                  a newer build introduced costs an older one that role and not the whole palette
+     * @param section   the desktop card's section at its last placement, by enum name, empty when the row
+     *                  predates sections. Text for the same reason as {@code displayMode}
+     * @param sectionPoints the spot last left in each section, as stored, empty when none was adjusted
      */
     public record HudOverlayLayout(double alpha, double fontScale, int width, int x, int y,
-                                   String displayMode, String vrPosition, String colors) {
+                                   String displayMode, String vrPosition, String colors,
+                                   String section, String sectionPoints) {
     }
 
     public HudOverlayLayout getHudOverlayLayout() {
@@ -742,7 +748,9 @@ public class SystemSession {
                     session.getOverlayY(),
                     session.getOverlayDisplayMode(),
                     session.getOverlayVrPosition(),
-                    session.getOverlayColors());
+                    session.getOverlayColors(),
+                    session.getOverlaySection(),
+                    session.getOverlaySectionPoints());
         });
     }
 
@@ -757,6 +765,8 @@ public class SystemSession {
             session.setOverlayDisplayMode(layout.displayMode());
             session.setOverlayVrPosition(layout.vrPosition());
             session.setOverlayColors(layout.colors());
+            session.setOverlaySection(layout.section());
+            session.setOverlaySectionPoints(layout.sectionPoints());
             dao.save(session);
             return null;
         });

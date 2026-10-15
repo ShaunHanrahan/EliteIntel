@@ -27,7 +27,7 @@ static void   *g_bits;          // DIB pixels, written by cairo
 static cairo_surface_t *g_surface;
 static int     g_width  = 760;
 static int     g_height = 200;
-static int     g_x, g_y;
+static HudPlacement g_pl;        // window position and the anchor holding it
 static int     g_dragging;
 static POINT   g_drag_origin;
 static int     g_quit;
@@ -55,35 +55,47 @@ static void resize_surface(int width, int height) {
     g_height = height;
 }
 
-/// The rectangle the card is actually sitting on, in desktop coordinates.
-///
-/// WHY not SM_CXSCREEN: that is the PRIMARY monitor's size, while g_x and g_y are
-/// virtual-desktop coordinates covering every monitor. On a two-screen setup with
-/// the game on the second one, g_x can exceed the primary width outright, so the
-/// lean saturates and stops responding to being dragged - which is exactly the
-/// symptom this feature is meant to have. Elite commanders commonly run more than
-/// one display, so the monitor under the window is the only sensible reference.
-///
-/// Falls back to the primary monitor if the lookup fails, which is the old
-/// behaviour and correct for the single-monitor case it is really describing.
-static void screen_rect(int *ox, int *oy, int *width, int *height) {
-    if (g_win) {
-        HMONITOR mon = MonitorFromWindow(g_win, MONITOR_DEFAULTTONEAREST);
-        MONITORINFO info;
-        info.cbSize = sizeof(info);
-        if (mon && GetMonitorInfo(mon, &info)) {
-            *ox = info.rcMonitor.left;
-            *oy = info.rcMonitor.top;
-            *width = info.rcMonitor.right - info.rcMonitor.left;
-            *height = info.rcMonitor.bottom - info.rcMonitor.top;
-            return;
-        }
-    }
-    *ox = 0;
-    *oy = 0;
-    *width = GetSystemMetrics(SM_CXSCREEN);
-    *height = GetSystemMetrics(SM_CYSCREEN);
+static RECT monitor_rect(HMONITOR mon) {
+    MONITORINFO info;
+    info.cbSize = sizeof(info);
+    if (mon && GetMonitorInfo(mon, &info)) return info.rcMonitor;
+    RECT primary = {0, 0, GetSystemMetrics(SM_CXSCREEN), GetSystemMetrics(SM_CYSCREEN)};
+    return primary;
 }
+
+static HudRect to_hud(RECT r) {
+    return (HudRect) {r.left, r.top, r.right - r.left, r.bottom - r.top};
+}
+
+/// The monitor the point (x, y) sits on, in desktop coordinates.
+///
+/// WHY not SM_CXSCREEN: that is the PRIMARY monitor's size, while the card's
+/// position is in virtual-desktop coordinates covering every monitor. On a
+/// two-screen setup with the game on the second one, x can exceed the primary
+/// width outright, so the lean saturates and stops responding to being dragged.
+/// Elite commanders commonly run more than one display, so the monitor under the
+/// card is the only sensible reference.
+///
+/// A point on no monitor falls back to the nearest one, and says so.
+static int monitor_at(void *ctx, int x, int y, HudRect *out) {
+    (void) ctx;
+    POINT pt = {x, y};
+    HMONITOR mon = MonitorFromPoint(pt, MONITOR_DEFAULTTONULL);
+    int found = mon != NULL;
+    if (!found) mon = MonitorFromPoint(pt, MONITOR_DEFAULTTONEAREST);
+    *out = to_hud(monitor_rect(mon));
+    return found;
+}
+
+/// Where a card with no history opens. Once it has been placed, the card's own
+/// position decides which monitor it is on.
+static HudRect primary_monitor(void *ctx) {
+    (void) ctx;
+    POINT origin = {0, 0};
+    return to_hud(monitor_rect(MonitorFromPoint(origin, MONITOR_DEFAULTTOPRIMARY)));
+}
+
+static const HudMonitors g_mons = {monitor_at, primary_monitor, NULL};
 
 static void present(void) {
     // Measured at the CARD's width, which is not the window's once the card
@@ -95,20 +107,31 @@ static void present(void) {
     cairo_destroy(measure);
     if (card_h < 1) card_h = 1;
 
+    // Placed before the lean is worked out, because the lean depends on where
+    // the card sits - and placed again after, because the lean makes the window
+    // taller and a bottom anchor has to account for it.
+    int report = 0;
+    if (!g_dragging) {
+        report = hud_place_resolve(&g_pl, &model.place_start, card_w, card_h, &g_mons);
+        report |= hud_place_resolve(&g_pl, &model.place_move, card_w, card_h, &g_mons);
+        hud_place_fit(&g_pl, card_w, card_h, &g_mons);
+    }
+
     // Measured first, because the lean now depends on where the card's centre
     // sits vertically and that is not known until its height is. Offsets are
     // subtracted so the card's position is relative to ITS monitor, not to the
     // whole desktop.
-    int sx, sy, sw, sh;
-    screen_rect(&sx, &sy, &sw, &sh);
+    int cx = g_pl.x + card_w / 2, cy = g_pl.y + card_h / 2;
+    HudRect mon;
+    monitor_at(NULL, cx, cy, &mon);
     // Flat when the window is being captured: the lean is a perspective trick
     // that reads as depth only in the plane of the monitor it was measured
     // against. Pinned in a headset it is just a skewed card, and it costs width.
-    double slope = model.capture
-                   ? 0.0
-                   : hud_tilt_slope(g_x + card_w / 2 - sx, g_y + card_h / 2 - sy, sw, sh);
+    double slope = model.capture ? 0.0 : hud_tilt_slope(cx - mon.x, cy - mon.y, mon.w, mon.h);
 
     int win_h = hud_tilt_height(slope, card_w, card_h);
+    if (!g_dragging) hud_place_fit(&g_pl, card_w, win_h, &g_mons);
+    if (report) hud_report_placement(&g_pl);
     if (card_w != g_width || win_h != g_height) resize_surface(card_w, win_h);
 
     cairo_t *cr = cairo_create(g_surface);
@@ -126,7 +149,9 @@ static void present(void) {
     cairo_surface_flush(g_surface);
 
     POINT src = {0, 0};
-    POINT dst = {g_x, g_y};
+    // Position and size land together, so a card growing upward from a bottom
+    // anchor never shows a frame at the new size in the old spot.
+    POINT dst = {g_pl.x, g_pl.y};
     SIZE size = {g_width, g_height};
     BLENDFUNCTION blend;
     blend.BlendOp = AC_SRC_OVER;
@@ -143,22 +168,28 @@ static LRESULT CALLBACK wnd_proc(HWND hwnd, UINT msg, WPARAM wp, LPARAM lp) {
     switch (msg) {
         case WM_LBUTTONDOWN:
             g_dragging = 1;
+            // Unpinned for the drag: the hand holds the card now, and a row
+            // arriving mid-drag must not yank it back to the old anchor.
+            g_pl.anchor = HUD_SEC_FREE;
             GetCursorPos(&g_drag_origin);
-            g_drag_origin.x -= g_x;
-            g_drag_origin.y -= g_y;
+            g_drag_origin.x -= g_pl.x;
+            g_drag_origin.y -= g_pl.y;
             SetCapture(hwnd);
             return 0;
         case WM_MOUSEMOVE:
             if (g_dragging) {
                 POINT p;
                 GetCursorPos(&p);
-                g_x = p.x - g_drag_origin.x;
-                g_y = p.y - g_drag_origin.y;
+                g_pl.x = p.x - g_drag_origin.x;
+                g_pl.y = p.y - g_drag_origin.y;
                 present();
             }
             return 0;
         case WM_LBUTTONUP:
-            if (g_dragging) hud_report_position(g_x, g_y);
+            if (g_dragging) {
+                hud_place_settle(&g_pl, g_width, g_height, &g_mons);
+                hud_report_placement(&g_pl);
+            }
             g_dragging = 0;
             ReleaseCapture();
             return 0;
@@ -208,11 +239,9 @@ int hud_run_desktop(int argc, char **argv) {
     wc.hCursor = LoadCursor(NULL, IDC_ARROW);
     RegisterClassEx(&wc);
 
-    // The window does not exist yet, so this is the primary monitor by
-    // definition. Once it does, present() re-resolves against whichever monitor
-    // the card has been dragged onto.
-    g_x = (GetSystemMetrics(SM_CXSCREEN) - hud_card_width()) / 2;
-    g_y = (int) (GetSystemMetrics(SM_CYSCREEN) * 0.04);
+    // The window does not exist yet, so it opens on the primary monitor. Once it
+    // does, present() re-resolves against whichever monitor the card is on.
+    hud_place_init(&g_pl, hud_card_width(), g_height, &g_mons);
 
     // WS_EX_NOACTIVATE is what keeps every keystroke going to the game: the
     // window can be clicked and dragged but never takes keyboard focus. It is
@@ -242,7 +271,7 @@ int hud_run_desktop(int argc, char **argv) {
     g_win = CreateWindowEx(
             ex_style, wc.lpszClassName,
             model.capture ? "EliteIntel HUD (VR capture)" : "EliteIntel HUD Overlay",
-            WS_POPUP, g_x, g_y, hud_card_width(), g_height, NULL, NULL, inst, NULL);
+            WS_POPUP, g_pl.x, g_pl.y, hud_card_width(), g_height, NULL, NULL, inst, NULL);
     if (!g_win) { fprintf(stderr, "overlay: CreateWindowEx failed\n"); return 1; }
 
     HDC screen = GetDC(NULL);
@@ -265,12 +294,9 @@ int hud_run_desktop(int argc, char **argv) {
         int eof = 0;
         int dirty = pump_stdin(&eof);
 
-        if (model.want_x != HUD_POS_UNSET || model.want_y != HUD_POS_UNSET) {
-            if (model.want_x != HUD_POS_UNSET) g_x = model.want_x;
-            if (model.want_y != HUD_POS_UNSET) g_y = model.want_y;
-            model.want_x = model.want_y = HUD_POS_UNSET;
-            dirty = 1;
-        }
+        // Resolved in present(), where the card's size is known. Not while
+        // dragging: the hand wins, and the request waits for release.
+        if (hud_place_pending() && !g_dragging) dirty = 1;
         // Only flagged, never resized here: present() sizes the surface itself
         // now, because the height it needs depends on the lean as well as on the
         // content and only it knows both.

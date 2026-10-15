@@ -96,8 +96,32 @@ public final class OverlayProtocol {
      */
     public static final int POSITION_UNSET = Integer.MIN_VALUE;
 
-    public static String position(int x, int y) {
+    /**
+     * A window top-left corner stored before the overlay placed its card by section. The overlay places it as
+     * given, then reports the section it landed in, which converts the stored row on first start.
+     */
+    public static String legacyPosition(int x, int y) {
         return "CFG" + TAB + "x=" + x + TAB + "y=" + y;
+    }
+
+    /**
+     * Puts the card back where it was last left, e.g. {@code CFG restore=ne x=1720 y=40}. Sent at start.
+     */
+    public static String restore(HudPlacement placement) {
+        return "CFG" + TAB + "restore=" + placement.section().wireName() + point(placement.anchor());
+    }
+
+    /**
+     * Moves the card to a section of the monitor it is on now, e.g. {@code CFG move=ne x=1720 y=40}. The
+     * point is where the commander last left the card in that section; the overlay uses it only if it lies
+     * on that monitor, and its default spot for the section otherwise or when no point is sent.
+     */
+    public static String move(HudScreenSection section, Optional<Point> rememberedAnchor) {
+        return "CFG" + TAB + "move=" + section.wireName() + rememberedAnchor.map(OverlayProtocol::point).orElse("");
+    }
+
+    private static String point(Point point) {
+        return TAB + "x=" + point.x + TAB + "y=" + point.y;
     }
 
     /**
@@ -112,19 +136,22 @@ public final class OverlayProtocol {
     }
 
     /**
-     * Reads a {@code POS x y} line, the one thing the overlay sends back.
+     * Reads a {@code PLACE <section> <x> <y>} line: which section the card is pinned to and where its
+     * anchor is, sent when a drag ends and after a move.
      * <p>
-     * The window is dragged with the mouse, so its position is the only piece of
-     * state the overlay owns and the app cannot derive. Anything else on that
-     * stream is ignored, which is what lets an older binary that reports nothing,
-     * and a newer one that reports more, both work against this reader.
+     * The commander drags the card with the mouse and only the overlay knows the monitor a section is
+     * measured against, so this is the one piece of state the overlay owns and the app cannot derive.
+     * Anything else on that stream is ignored.
      */
-    public static Optional<Point> parsePosition(String line) {
+    public static Optional<HudPlacement> parsePlacement(String line) {
         if (line == null) return Optional.empty();
         String[] fields = line.split("\t", -1);
-        if (fields.length != 3 || !"POS".equals(fields[0])) return Optional.empty();
+        if (fields.length != 4 || !"PLACE".equals(fields[0])) return Optional.empty();
+        Optional<HudScreenSection> section = HudScreenSection.fromWireName(fields[1].trim());
+        if (section.isEmpty()) return Optional.empty();
         try {
-            return Optional.of(new Point(Integer.parseInt(fields[1].trim()), Integer.parseInt(fields[2].trim())));
+            Point anchor = new Point(Integer.parseInt(fields[2].trim()), Integer.parseInt(fields[3].trim()));
+            return Optional.of(new HudPlacement(section.get(), anchor));
         } catch (NumberFormatException e) {
             return Optional.empty();
         }
