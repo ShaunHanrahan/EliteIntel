@@ -32,7 +32,7 @@ class LinuxGameInstallationProviderTest {
         assertEquals(Storefront.STEAM, found.getFirst().storefront());
         assertEquals(root, found.getFirst().root());
         assertEquals(LinuxGameInstallationProvider.protonBindingsIn(steam), found.getFirst().bindingsFolder());
-        assertTrue(found.getFirst().bindingsFolder().toString().contains("compatdata/359320/pfx"));
+        assertTrue(found.getFirst().bindingsFolder().startsWith(steam.resolve("steamapps/compatdata/359320/pfx")));
     }
 
     /**
