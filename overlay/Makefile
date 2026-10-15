@@ -4,6 +4,7 @@
 # way it packages the TTS/STT models.
 #
 #   make          native build - X11 on Linux, Win32 under MSYS2
+#   make test     placement arithmetic, no window system needed
 #   make clean
 #
 # The model, the stdin protocol and all drawing are shared between platforms;
@@ -14,7 +15,7 @@ OUT_DIR := ../distribution/overlays
 # The SteamVR shell is in every build on both platforms: it loads openvr_api at
 # runtime rather than linking it, so it adds no build dependency and no DLL a
 # flat-screen commander has to have.
-CORE    := src/main.c src/hud_model.c src/hud_render.c src/hud_tilt.c src/stdin_pump.c src/platform_openvr.c
+CORE    := src/main.c src/hud_model.c src/hud_render.c src/hud_tilt.c src/hud_place.c src/stdin_pump.c src/platform_openvr.c
 
 ifeq ($(OS),Windows_NT)
   BIN           := elite-intel-overlay.exe
@@ -37,7 +38,7 @@ endif
 CFLAGS  += -O2 -Wall -Wextra -std=c11 -isystem third_party/openvr $(shell pkg-config --cflags $(DEPS))
 LDFLAGS += $(shell pkg-config --libs $(DEPS)) $(PLATFORM_LIBS) -lm
 
-.PHONY: all clean check-deps
+.PHONY: all clean check-deps test
 
 all: check-deps $(OUT_DIR)/$(BIN)
 
@@ -47,10 +48,19 @@ check-deps:
 		echo "  $(DEPS_HINT)"; \
 		exit 1; }
 
-$(OUT_DIR)/$(BIN): $(SRC) src/hud.h
+$(OUT_DIR)/$(BIN): $(SRC) src/hud.h src/hud_place.h
 	@mkdir -p $(OUT_DIR)
 	$(CC) $(CFLAGS) -o $@ $(SRC) $(LDFLAGS)
 	@echo "built $@"
 
+# Plain C, no cairo or window system: hud_place.c is kept free of both so its
+# geometry can be checked on any machine that has a compiler.
+test: build/test_place
+	./build/test_place
+
+build/test_place: test/test_place.c src/hud_place.c src/hud_place.h
+	@mkdir -p build
+	$(CC) -O0 -g -Wall -Wextra -std=c11 -Isrc -o $@ test/test_place.c src/hud_place.c
+
 clean:
-	rm -f $(OUT_DIR)/elite-intel-overlay $(OUT_DIR)/elite-intel-overlay.exe
+	rm -f $(OUT_DIR)/elite-intel-overlay $(OUT_DIR)/elite-intel-overlay.exe build/test_place

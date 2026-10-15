@@ -28,7 +28,9 @@ Configuration. Any subset, any order, at any time.
 |---------|--------------------------------------------|
 | `alpha` | background alpha, `0.0`-`1.0`. Text is unaffected. |
 | `scale` | font scale, `1.0` is calibrated for 1440p |
-| `x`,`y` | window position in screen pixels          |
+| `move`  | move the desktop card to a section of the monitor it is on now: `nw`, `n`, `ne`, `w`, `e`, `sw`, `s`, `se` (`c` is accepted too). With `x`,`y` it is the anchor point the commander last left in that section, used only if it lies on that monitor. See [Placement on the desktop](#placement-on-the-desktop) |
+| `restore` | put the desktop card back where it was last left, at startup: a section plus its anchor point in `x`,`y` |
+| `x`,`y` | with `move` or `restore`, an anchor point in screen pixels. On their own, a window top-left corner stored before sections existed: placed as given, then classified and reported, which converts it |
 | `width` | window width in pixels; height follows content |
 | `vrpos` | where the card hangs in the headset: `top`, `top_right`, `right`, `bottom_right`, `bottom`, `bottom_left`, `left`, `top_left`. Ignored by the desktop shells; an unknown name leaves the card where it is |
 | `col_<role>` | text colour for one role, as `RRGGBB` — no `#`, no alpha. Roles: `primary`, `success`, `warning`, `danger`, `disabled`, `user`, `ai`, `radio`. An unknown role, or a value that is not six hex digits, leaves that colour as it was |
@@ -116,6 +118,21 @@ That last row is the reason this is a mode and not advice. Capture pickers enume
 
 Placement, curvature and opacity in the headset belong to the capture tool in this mode — `CFG vrpos=` is ignored, because there is no SteamVR overlay to place.
 
+## Placement on the desktop
+
+The card's monitor is cut into a 3x3 grid named for the compass: `nw n ne / w c e / sw s se`. **The monitor is always
+the one the card is on
+now.** The overlay never stores or names monitors: a card dragged onto a second screen is measured against that screen from then on.
+
+The card is pinned to its section by an
+**anchor**, the corner or edge midpoint facing the screen edge: `ne` holds the card's top-right corner, `s` its bottom-centre, `w` its left-middle, `c` its centre. When the card changes size - a row arrives, the lean makes it taller, the width changes - it grows away from that edge, so a card low on the screen grows upward instead of off the bottom. If the card is too big for the room around its anchor it is pushed back onto the monitor without moving the anchor, so it returns to the exact spot when it shrinks.
+
+A drag ends by classifying the card's centre into a cell and reporting `PLACE`. The app keeps one point per section and sends it back with the next `move` to that section. A `move` whose point is on a different monitor, or that has no point, goes to the section's default spot on the card's monitor: its corner or edge midpoint, inset by 4% of the monitor's height.
+
+A card with no history opens at the top centre of the primary monitor.
+
+Requests resolve in the next layout pass, once the card's size is known. A `restore` and a `move` that arrive together resolve in that order, so "move the overlay" while it is closed is judged against the monitor the card was last on, not the one the fresh window opened on.
+
 ## Placement in VR
 
 There is no window to drag in a headset, so the card is placed in two parts.
@@ -135,10 +152,10 @@ Lines the overlay writes to **stdout
 **, same tab-separated format. The app ignores anything it does not recognise, so an older binary that reports less and a newer one that reports more both work.
 
 ```
-POS <x> <y>
+PLACE <section> <x> <y>
 ```
 
-Where the window ended up after a drag. The only state the overlay owns and the app cannot derive, since the commander moves it with the mouse. Never sent in VR mode, where there is no window to drag.
+Which section the desktop card is pinned to and where its anchor point is, in screen pixels. Sent when a drag ends, and after a `move` or a bare `x`,`y` has been applied. Not sent after a `restore`, which the app already knows. Never sent in VR mode, where there is no window to place.
 
 ```
 MODE <desktop|vr|waiting|none> [<reason>]

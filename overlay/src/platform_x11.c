@@ -31,7 +31,13 @@ static long now_ms(void) {
     return tv.tv_sec * 1000L + tv.tv_usec / 1000L;
 }
 
-/// The monitor the point (cx, cy) sits on, in root-window coordinates.
+/// What the monitor lookups need from the shell.
+typedef struct {
+    Display *dpy;
+    int screen;
+} X11Monitors;
+
+/// The monitor the point (x, y) sits on, in root-window coordinates.
 ///
 /// WHY XRandR rather than DisplayWidth/DisplayHeight: on a multi-head setup those
 /// describe the whole virtual screen spanning every monitor, so the computed
@@ -39,31 +45,47 @@ static long now_ms(void) {
 /// game's monitor is treated as far off centre. Elite commanders commonly run
 /// more than one display.
 ///
-/// Degrades to the full screen when XRandR reports nothing, when the point is on
-/// no monitor (dragged into a gap between two of them), or on a server without
+/// Falls back to the full screen when XRandR reports nothing, when the point is
+/// on no monitor (dragged into a gap between two of them), or on a server without
 /// the extension. That is the single-monitor answer, which is exactly right for
-/// the case it is describing.
-static void monitor_rect(Display *dpy, int screen, int cx, int cy,
-                         int *ox, int *oy, int *width, int *height) {
-    *ox = 0;
-    *oy = 0;
-    *width = DisplayWidth(dpy, screen);
-    *height = DisplayHeight(dpy, screen);
+/// the case it is describing - and the return value says it was a fallback.
+static int monitor_at(void *ctx, int x, int y, HudRect *out) {
+    X11Monitors *m = ctx;
+    *out = (HudRect) {0, 0, DisplayWidth(m->dpy, m->screen), DisplayHeight(m->dpy, m->screen)};
 
     int count = 0;
-    XRRMonitorInfo *monitors = XRRGetMonitors(dpy, RootWindow(dpy, screen), True, &count);
-    if (!monitors) return;
+    XRRMonitorInfo *monitors = XRRGetMonitors(m->dpy, RootWindow(m->dpy, m->screen), True, &count);
+    if (!monitors) return 0;
 
-    for (int i = 0; i < count; i++) {
-        if (cx < monitors[i].x || cx >= monitors[i].x + monitors[i].width) continue;
-        if (cy < monitors[i].y || cy >= monitors[i].y + monitors[i].height) continue;
-        *ox = monitors[i].x;
-        *oy = monitors[i].y;
-        *width = monitors[i].width;
-        *height = monitors[i].height;
-        break;
+    int found = 0;
+    for (int i = 0; i < count && !found; i++) {
+        if (x < monitors[i].x || x >= monitors[i].x + monitors[i].width) continue;
+        if (y < monitors[i].y || y >= monitors[i].y + monitors[i].height) continue;
+        *out = (HudRect) {monitors[i].x, monitors[i].y, monitors[i].width, monitors[i].height};
+        found = 1;
     }
     XRRFreeMonitors(monitors);
+    return found;
+}
+
+/// The monitor XRandR calls primary, else the first it lists, else the whole
+/// screen. Only where a card with no history opens: once it has been placed, the
+/// card's own position decides which monitor it is on.
+static HudRect primary_monitor(void *ctx) {
+    X11Monitors *m = ctx;
+    HudRect rect = {0, 0, DisplayWidth(m->dpy, m->screen), DisplayHeight(m->dpy, m->screen)};
+
+    int count = 0;
+    XRRMonitorInfo *monitors = XRRGetMonitors(m->dpy, RootWindow(m->dpy, m->screen), True, &count);
+    if (!monitors) return rect;
+    for (int i = 0; i < count; i++) {
+        if (i == 0 || monitors[i].primary) {
+            rect = (HudRect) {monitors[i].x, monitors[i].y, monitors[i].width, monitors[i].height};
+        }
+        if (monitors[i].primary) break;
+    }
+    XRRFreeMonitors(monitors);
+    return rect;
 }
 
 int hud_run_desktop(int argc, char **argv) {
@@ -85,10 +107,14 @@ int hud_run_desktop(int argc, char **argv) {
         return 2;
     }
 
+    X11Monitors monitors = {dpy, screen};
+    HudMonitors mons = {monitor_at, primary_monitor, &monitors};
+
     int width = hud_card_width();
     int height = 200;
-    int x = (DisplayWidth(dpy, screen) - width) / 2;
-    int y = (int) (DisplayHeight(dpy, screen) * 0.04);
+    HudPlacement pl;
+    hud_place_init(&pl, width, height, &mons);
+    int win_x = pl.x, win_y = pl.y;     // where the window actually is
 
     XSetWindowAttributes attrs;
     attrs.colormap = XCreateColormap(dpy, root, vinfo.visual, AllocNone);
@@ -102,7 +128,7 @@ int hud_run_desktop(int argc, char **argv) {
     attrs.override_redirect = (managed || model.capture) ? False : True;
     attrs.event_mask = ExposureMask | ButtonPressMask | ButtonReleaseMask | PointerMotionMask;
 
-    Window win = XCreateWindow(dpy, root, x, y, width, height, 0, 32,
+    Window win = XCreateWindow(dpy, root, pl.x, pl.y, width, height, 0, 32,
                                InputOutput, vinfo.visual,
                                CWColormap | CWBackPixel | CWBorderPixel |
                                CWOverrideRedirect | CWEventMask, &attrs);
@@ -159,15 +185,23 @@ int hud_run_desktop(int argc, char **argv) {
             if (ev.type == Expose) dirty = 1;
             else if (ev.type == ButtonPress && ev.xbutton.button == Button1) {
                 dragging = 1;
-                drag_x = ev.xbutton.x_root - x;
-                drag_y = ev.xbutton.y_root - y;
+                // Unpinned for the drag: the hand holds the card now, and a row
+                // arriving mid-drag must not yank it back to the old anchor.
+                pl.anchor = HUD_SEC_FREE;
+                drag_x = ev.xbutton.x_root - pl.x;
+                drag_y = ev.xbutton.y_root - pl.y;
             } else if (ev.type == ButtonRelease && ev.xbutton.button == Button1) {
-                if (dragging) hud_report_position(x, y);
+                if (dragging) {
+                    hud_place_settle(&pl, width, height, &mons);
+                    hud_report_placement(&pl);
+                }
                 dragging = 0;
             } else if (ev.type == MotionNotify && dragging) {
-                x = ev.xmotion.x_root - drag_x;
-                y = ev.xmotion.y_root - drag_y;
-                XMoveWindow(dpy, win, x, y);
+                pl.x = ev.xmotion.x_root - drag_x;
+                pl.y = ev.xmotion.y_root - drag_y;
+                XMoveWindow(dpy, win, pl.x, pl.y);
+                win_x = pl.x;
+                win_y = pl.y;
                 // Moving the window used to be the whole of a drag, because
                 // nothing about the card depended on where it was. The lean does,
                 // so a move is now a reason to redraw: without this the card
@@ -184,13 +218,9 @@ int hud_run_desktop(int argc, char **argv) {
             if (hud_tick_typewriter()) dirty = 1;
         }
 
-        if (model.want_x != HUD_POS_UNSET || model.want_y != HUD_POS_UNSET) {
-            if (model.want_x != HUD_POS_UNSET) x = model.want_x;
-            if (model.want_y != HUD_POS_UNSET) y = model.want_y;
-            model.want_x = model.want_y = HUD_POS_UNSET;
-            XMoveWindow(dpy, win, x, y);
-            dirty = 1;                  // same reason as the drag above
-        }
+        // Resolved in the layout pass below, where the card's size is known.
+        // Not while dragging: the hand wins, and the request waits for release.
+        if (hud_place_pending() && !dragging) dirty = 1;
         if (hud_card_width() != width) dirty = 1;
 
         if (dirty) {
@@ -205,21 +235,40 @@ int hud_run_desktop(int argc, char **argv) {
             cairo_destroy(measure);
             if (card_h < 1) card_h = 1;
 
+            // Placed before the lean is worked out, because the lean depends on
+            // where the card sits - and placed again after, because the lean
+            // makes the window taller and a bottom anchor has to account for it.
+            int report = 0;
+            if (!dragging) {
+                report = hud_place_resolve(&pl, &model.place_start, card_w, card_h, &mons);
+                report |= hud_place_resolve(&pl, &model.place_move, card_w, card_h, &mons);
+                hud_place_fit(&pl, card_w, card_h, &mons);
+            }
+
             // Measured first: the lean depends on where the card's centre sits
             // vertically, which is not known until its height is. Offsets are
             // subtracted so the card's position is relative to ITS monitor, not
             // to a virtual screen spanning all of them.
-            int cx = x + card_w / 2, cy = y + card_h / 2;
-            int sx, sy, sw, sh;
-            monitor_rect(dpy, screen, cx, cy, &sx, &sy, &sw, &sh);
+            int cx = pl.x + card_w / 2, cy = pl.y + card_h / 2;
+            HudRect mon;
+            monitor_at(&monitors, cx, cy, &mon);
             // Flat when captured: see the same decision in platform_win32.c.
-            double slope = model.capture ? 0.0 : hud_tilt_slope(cx - sx, cy - sy, sw, sh);
+            double slope = model.capture ? 0.0 : hud_tilt_slope(cx - mon.x, cy - mon.y, mon.w, mon.h);
 
             int win_h = hud_tilt_height(slope, card_w, card_h);
+            if (!dragging) hud_place_fit(&pl, card_w, win_h, &mons);
+            if (report) hud_report_placement(&pl);
+            // Moved and resized in one request, so a card growing upward from a
+            // bottom anchor never shows a frame at the new size in the old spot.
+            // Only on a change: this pass runs on every typewriter tick.
+            if (pl.x != win_x || pl.y != win_y || card_w != width || win_h != height) {
+                XMoveResizeWindow(dpy, win, pl.x, pl.y, card_w, win_h);
+                win_x = pl.x;
+                win_y = pl.y;
+            }
             if (card_w != width || win_h != height) {
                 width = card_w;
                 height = win_h;
-                XResizeWindow(dpy, win, width, height);
                 cairo_xlib_surface_set_size(target, width, height);
                 cairo_surface_destroy(buffer);
                 buffer = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, width, height);
