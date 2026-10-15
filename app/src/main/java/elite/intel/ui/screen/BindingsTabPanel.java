@@ -43,9 +43,6 @@ public class BindingsTabPanel extends JPanel {
         tabs.setTabPlacement(JTabbedPane.TOP);
         tabs.addTab(getText("bindings.tab.bindingProfile"), bindingProfilePanel);
         tabs.addTab(getText("bindings.tab.bindingManagement"), bindingManagementPanel);
-        // WHY: shown while it holds only the divergence list, at Alan's request, so the red and yellow on a
-        // real machine can be looked at. It is not yet what "Alias Designer" promises - the device list and
-        // the editor are still to come - so the name is ahead of the thing for now, deliberately.
         tabs.addTab(getText("bindings.tab.aliasDesigner"), aliasDesignerPanel);
 
         add(tabs, BorderLayout.CENTER);

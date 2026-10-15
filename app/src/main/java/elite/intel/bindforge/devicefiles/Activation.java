@@ -4,6 +4,10 @@ import elite.intel.bindforge.devicefiles.DeviceFilesPush.MasterDevice;
 import elite.intel.bindforge.devicefiles.DeviceFilesPush.Target;
 import elite.intel.db.managers.BindForgeActivationManager;
 import elite.intel.db.managers.BindForgeDeviceDraftManager;
+import elite.intel.db.managers.BindForgeDeviceDraftManager.StoredDevice;
+import elite.intel.eventbus.UiBus;
+import elite.intel.ui.event.BindForgeActivatedEvent;
+import elite.intel.util.StringUtls;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -92,7 +96,18 @@ public final class Activation {
                 backup::ensureTaken,
                 FirstSetup::stored,
                 (target, master) -> !DeviceFilesPush.plan(target, master, stock).writes().isEmpty(),
-                BindForgeDeviceDraftManager.getInstance()::establish);
+                Activation::establish);
+    }
+
+    /**
+     * The one way BindForge is activated - {@link BindForgeDeviceDraftManager#establish} - announced when it
+     * happens, for activation without a prompt and for first setup alike, so what waits on activation hears it
+     * either way. Startup {@code .buttonMap} generation waits on it.
+     */
+    static boolean establish(List<StoredDevice> devices, List<String> pendingRemovals) {
+        boolean activatedNow = BindForgeDeviceDraftManager.getInstance().establish(devices, pendingRemovals);
+        if (activatedNow) UiBus.publish(new BindForgeActivatedEvent());
+        return activatedNow;
     }
 
     Activation(BooleanSupplier activated, Backup backup, FirstSetupSource firstSetup, PushPlanner planner,
@@ -116,7 +131,7 @@ public final class Activation {
             // WHY: broad, because recording the backup is a database write, and JDBI's failures are unchecked.
             // Whatever the cause, nothing may be activated without the backup; the next run tries again.
             log.warn("BindForge was not activated: the backup before BindForge could not be taken", e);
-            return new Result(Outcome.BACKUP_FAILED, null, null, FirstSetup.messageOf(e));
+            return new Result(Outcome.BACKUP_FAILED, null, null, StringUtls.messageOf(e));
         }
 
         FirstSetup setup;
@@ -128,12 +143,12 @@ public final class Activation {
             // WHY: an unread file could hold the one entry the master must not lose, so it stops silent activation,
             // and the reason names it.
             log.info("BindForge activation opens first setup: {}", e.getMessage());
-            return new Result(Outcome.FIRST_SETUP, null, null, FirstSetup.messageOf(e));
+            return new Result(Outcome.FIRST_SETUP, null, null, StringUtls.messageOf(e));
         } catch (RuntimeException e) {
             // WHY: the stored installations are read from the database, whose failures are unchecked. Not activated,
             // so SET UP stays offered.
             log.warn("BindForge activation could not read the installations", e);
-            return new Result(Outcome.FAILED, null, null, FirstSetup.messageOf(e));
+            return new Result(Outcome.FAILED, null, null, StringUtls.messageOf(e));
         }
 
         Optional<FirstSetupPlan.Resolution> fill;
@@ -143,7 +158,7 @@ public final class Activation {
             // WHY: the same rule as a failed read - the file is named, so first setup does not open on a reading that
             // looks complete (review, 2026-10-13).
             log.info("BindForge activation opens first setup, a file could not be read: {}", e.getMessage());
-            return new Result(Outcome.FIRST_SETUP, setup, reading, FirstSetup.messageOf(e));
+            return new Result(Outcome.FIRST_SETUP, setup, reading, StringUtls.messageOf(e));
         }
         if (fill.isEmpty()) {
             log.info("The installations' device files differ, so BindForge activation opens first setup");
@@ -159,7 +174,7 @@ public final class Activation {
             // WHY: one transaction, whose failures are unchecked - it leaves nothing activated and nothing filled, so
             // the next run can simply try again.
             log.error("BindForge was not activated: the master could not be saved", e);
-            return new Result(Outcome.FAILED, null, null, FirstSetup.messageOf(e));
+            return new Result(Outcome.FAILED, null, null, StringUtls.messageOf(e));
         }
         log.info("BindForge activated: the installations agree, {} devices taken into the master",
                 resolution.devices().size());

@@ -1,17 +1,13 @@
 package elite.intel.bindforge.devicefiles;
 
 import elite.intel.bindforge.devicefiles.DeviceEntry.HardwareId;
-import elite.intel.bindforge.devicefiles.DeviceFilesCheck.ElementChange;
-import elite.intel.bindforge.devicefiles.DeviceFilesCheck.ElementKind;
-import elite.intel.bindforge.devicefiles.DeviceFilesCheck.InstallationCheck;
-import elite.intel.bindforge.devicefiles.DeviceFilesCheck.LabelChange;
-import elite.intel.bindforge.devicefiles.DeviceFilesCheck.LabelKind;
-import elite.intel.bindforge.devicefiles.DeviceFilesCheck.Report;
-import elite.intel.bindforge.devicefiles.DeviceFilesCheck.State;
+import elite.intel.bindforge.devicefiles.DeviceFilesCheck.*;
 import elite.intel.bindforge.devicefiles.DeviceFilesPush.MasterDevice;
 import elite.intel.bindforge.devicefiles.DeviceFilesPush.Target;
 import elite.intel.io.TimestampedBackups;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
@@ -23,9 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * The startup check for the device files: each installation against the saved master, and each outcome found
@@ -272,6 +266,25 @@ class DeviceFilesCheckTest {
 
         assertEquals(State.EDITED, check.check(2).orElseThrow().state());
         assertTrue(check.check(9).isEmpty());
+    }
+
+    /**
+     * An element added by hand whose tag holds a colon - legal XML, never a Windows filename - is reported as added,
+     * with no labels, rather than stopping the check and with it the whole screen's refresh.
+     */
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    void anAddedElementWhoseNameCannotBeAFilenameIsReportedNotThrown() throws IOException {
+        Target steam = pushed(installation(1, "STEAM"), List.of(RVWAP));
+        Files.writeString(deviceMappings(steam),
+                read(deviceMappings(steam)).replace("</Root>", "<a:b><PID>0001</PID><VID>0002</VID></a:b></Root>"));
+
+        InstallationCheck result = only(check(List.of(steam), List.of(RVWAP)));
+
+        assertEquals(State.EDITED, result.state());
+        assertTrue(result.elements().contains(new ElementChange("a:b", ElementKind.ADDED, null,
+                new HardwareId("0002", "0001"))), result.elements().toString());
+        assertTrue(result.labels().isEmpty(), result.labels().toString());
     }
 
     private Report check(List<Target> targets, List<MasterDevice> master) {

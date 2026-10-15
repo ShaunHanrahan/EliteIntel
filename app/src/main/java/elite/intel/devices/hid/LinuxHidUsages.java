@@ -31,10 +31,14 @@ final class LinuxHidUsages {
 
     /**
      * WHY: empty rather than an error for every expected miss - a controller that is not HID (an old gameport
-     * stick), a path SDL did not give, a {@code /sys} a sandbox hides. The caller then knows nothing about the
+     * stick), a path SDL did not give or gave as null, a {@code /sys} a sandbox hides. The caller then knows nothing about the
      * axes, which is what it knew before this existed.
      */
     static Optional<List<HidUsage>> read(Path sys, String devicePath) {
+        if (devicePath == null) {
+            log.debug("SDL gave no device path, so there is no HID report descriptor to read");
+            return Optional.empty();
+        }
         var node = EVDEV_NODE.matcher(devicePath);
         if (!node.matches()) {
             log.debug("No evdev node in device path '{}'", devicePath);

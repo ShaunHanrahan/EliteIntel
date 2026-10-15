@@ -3,12 +3,15 @@ package elite.intel.bindforge.devices;
 import com.google.common.eventbus.Subscribe;
 import elite.intel.bindforge.devicefiles.ButtonMapGeneration;
 import elite.intel.bindforge.devicefiles.ButtonMapGeneration.Controller;
+import elite.intel.db.managers.BindForgeActivationManager;
 import elite.intel.devices.DeviceService;
 import elite.intel.devices.events.DeviceConnectedEvent;
 import elite.intel.devices.model.Device;
 import elite.intel.devices.model.DeviceDescription;
 import elite.intel.eventbus.DeviceBus;
+import elite.intel.eventbus.UiBus;
 import elite.intel.ui.controller.ManagedService;
+import elite.intel.ui.event.BindForgeActivatedEvent;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -17,6 +20,7 @@ import java.util.Optional;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.IntFunction;
 import java.util.function.Supplier;
@@ -24,6 +28,11 @@ import java.util.function.Supplier;
 /**
  * Gives every connected, named controller a generated {@code .buttonMap} when it has none - at Elite-Intel
  * startup, so the labels are there the first time the capture dialog opens.
+ * <p>
+ * <strong>Only once BindForge is activated</strong> (Krondor, 2026-10-14). Before then it writes nothing into a game
+ * folder: the "before BindForge" backup is taken at activation and must show the files as they were, and a user who
+ * never opens BindForge has asked for nothing. When activation happens, the controllers connected then are handled
+ * ({@link BindForgeActivatedEvent}).
  * <p>
  * <strong>Every connect, not only the ones at startup</strong> (Alan, 2026-10-06). {@code DeviceService} says
  * nothing when its first enumeration is done, but it publishes a {@link DeviceConnectedEvent} for every
@@ -43,18 +52,23 @@ public final class ButtonMapStartup implements ManagedService {
     private final Consumer<Controller> generation;
     private final Supplier<List<Device>> alreadyConnected;
     private final IntFunction<Optional<DeviceDescription>> descriptions;
+    private final BooleanSupplier activated;
     private ExecutorService worker;
 
     public ButtonMapStartup() {
         this(new ButtonMapGeneration()::generateFor, DeviceService.getInstance()::getConnectedDevices,
-                DeviceService.getInstance()::description);
+                DeviceService.getInstance()::description, BindForgeActivationManager.getInstance()::isActivated);
     }
 
+    /**
+     * @param activated whether BindForge is activated - asked on the worker thread, before each controller
+     */
     ButtonMapStartup(Consumer<Controller> generation, Supplier<List<Device>> alreadyConnected,
-                     IntFunction<Optional<DeviceDescription>> descriptions) {
+                     IntFunction<Optional<DeviceDescription>> descriptions, BooleanSupplier activated) {
         this.generation = generation;
         this.alreadyConnected = alreadyConnected;
         this.descriptions = descriptions;
+        this.activated = activated;
     }
 
     /**
@@ -71,6 +85,7 @@ public final class ButtonMapStartup implements ManagedService {
             return thread;
         });
         DeviceBus.register(this);
+        UiBus.register(this);
         alreadyConnected.get().forEach(this::submit);
     }
 
@@ -83,6 +98,7 @@ public final class ButtonMapStartup implements ManagedService {
     public synchronized void stop() {
         if (worker == null) return;
         DeviceBus.unregister(this);
+        UiBus.unregister(this);
         worker.shutdownNow();
         try {
             if (!worker.awaitTermination(STOP_WAIT_SECONDS, TimeUnit.SECONDS)) {
@@ -97,6 +113,14 @@ public final class ButtonMapStartup implements ManagedService {
     @Subscribe
     public void onDeviceConnected(DeviceConnectedEvent event) {
         submit(event.device());
+    }
+
+    /**
+     * Activation has just happened: the controllers connected now get what startup held back from them.
+     */
+    @Subscribe
+    public void onActivated(BindForgeActivatedEvent event) {
+        alreadyConnected.get().forEach(this::submit);
     }
 
     /**
@@ -116,6 +140,12 @@ public final class ButtonMapStartup implements ManagedService {
 
     private void generate(Device device, DeviceDescription description) {
         try {
+            // WHY: asked here, on the worker, not on the device bus's thread, which also carries push-to-talk -
+            // it is a database read.
+            if (!activated.getAsBoolean()) {
+                log.debug("BindForge is not activated, so no .buttonMap is generated for '{}'", device.name());
+                return;
+            }
             DeviceIdentities.of(device).ifPresent(identity -> generation.accept(new Controller(identity.vid(),
                     identity.pid(), device.buttonCount(), device.axisCount(), description)));
         } catch (RuntimeException e) {

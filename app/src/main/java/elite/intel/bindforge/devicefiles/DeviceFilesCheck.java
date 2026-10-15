@@ -13,17 +13,9 @@ import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 
@@ -221,7 +213,7 @@ public final class DeviceFilesCheck {
         Map<String, HardwareId> inFile;
         try {
             pushWouldWrite = !DeviceFilesPush.plan(target, devices, stock).writes().isEmpty();
-            current = readIfPresent(deviceMappings);
+            current = DeviceFilesPush.readIfPresent(deviceMappings);
             inFile = current == null ? Map.of() : DeviceMappingsParser.primaries(current);
         } catch (IOException e) {
             return nothingCompared(target, State.UNREADABLE, "could not read its device files: " + e.getMessage());
@@ -315,7 +307,15 @@ public final class DeviceFilesCheck {
         }
         for (ElementChange element : elements) {
             if (element.kind() != ElementKind.ADDED) continue;
-            Path buttonMap = GameInstallation.buttonMapIn(target.controlSchemes(), element.deviceName());
+            Path buttonMap;
+            try {
+                buttonMap = GameInstallation.buttonMapIn(target.controlSchemes(), element.deviceName());
+            } catch (InvalidPathException e) {
+                // WHY: an added element's name comes from the file itself, and an XML tag may hold a colon, which no
+                // Windows filename can. Such an element has no .buttonMap the game could load, so it has no labels -
+                // the element is still reported as added, as first setup reads it (FirstSetupReader).
+                continue;
+            }
             if (Files.isRegularFile(buttonMap)) changes.addAll(compareLabels(element.deviceName(), Map.of(), buttonMap));
         }
         return changes;
@@ -325,7 +325,7 @@ public final class DeviceFilesCheck {
         byte[] content;
         Map<String, String> found;
         try {
-            content = readIfPresent(buttonMap);
+            content = DeviceFilesPush.readIfPresent(buttonMap);
             if (content == null) return List.of(new LabelChange(device, LabelKind.FILE_MISSING, null, null, null));
             if (!wanted.isEmpty() && Arrays.equals(content, ButtonMapWriter.write(wanted))) return List.of();
             found = ButtonMapReader.read(content);
@@ -350,10 +350,6 @@ public final class DeviceFilesCheck {
 
     private static InstallationCheck nothingCompared(Target target, State state, String reason) {
         return new InstallationCheck(target, state, reason, List.of(), List.of());
-    }
-
-    private static byte[] readIfPresent(Path file) throws IOException {
-        return Files.isRegularFile(file) ? Files.readAllBytes(file) : null;
     }
 
     private static Set<String> storedLeftovers() {

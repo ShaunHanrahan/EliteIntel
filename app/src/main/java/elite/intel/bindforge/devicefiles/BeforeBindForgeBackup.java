@@ -102,7 +102,7 @@ public final class BeforeBindForgeBackup {
                 // the next attempt takes another, and that one is recorded. Deleting it would throw away a good backup
                 // because the database refused one row.
                 throw new IOException("the backup was taken at " + folder + " but could not be recorded: "
-                        + FirstSetup.messageOf(e), e);
+                        + StringUtls.messageOf(e), e);
             }
             announce.accept(folder);
             return Optional.of(folder);

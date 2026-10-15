@@ -1,29 +1,15 @@
 package elite.intel.ui.screen.bindings;
 
-import com.google.common.eventbus.Subscribe;
 import elite.intel.bindforge.devicefiles.*;
 import elite.intel.bindforge.devicefiles.DeviceEntry.HardwareId;
 import elite.intel.bindforge.devicefiles.DivergenceWaysOut.WayOut;
-import elite.intel.bindforge.devices.*;
-import elite.intel.bindforge.install.GameInstallation;
+import elite.intel.bindforge.devices.BuiltInDevice;
+import elite.intel.bindforge.devices.InstallationMarkers;
+import elite.intel.bindforge.devices.MissingControllerWarning;
+import elite.intel.bindforge.devices.MyDevice;
+import elite.intel.bindforge.install.GameInstallationProvider;
 import elite.intel.bindforge.install.InstallationRegistry;
-import elite.intel.bindforge.install.WindowsGameInstallationProvider;
-import elite.intel.bindforge.io.DeviceRewriteResult;
-import elite.intel.db.dao.BindForgeDeviceDraftDao.DraftRow;
-import elite.intel.db.dao.BindForgeDeviceMasterDao.DeviceRow;
-import elite.intel.db.dao.BindForgeInstallationsDao.InstallationRow;
-import elite.intel.db.managers.BindForgeActivationManager;
-import elite.intel.db.managers.BindForgeDeviceDraftManager;
-import elite.intel.db.managers.BindForgeDeviceMasterManager;
-import elite.intel.devices.DeviceService;
-import elite.intel.devices.model.Device;
-import elite.intel.devices.model.DeviceDescription;
-import elite.intel.devices.model.DeviceIdentity;
-import elite.intel.eventbus.UiBus;
 import elite.intel.session.PlayerSession;
-import elite.intel.ui.dialog.HudConfirmDialog;
-import elite.intel.ui.event.AppLogEvent;
-import elite.intel.ui.event.DeviceFilesChangedEvent;
 import elite.intel.ui.theme.AppTheme;
 import elite.intel.ui.theme.HudGlyphs;
 import elite.intel.ui.theme.HudPalette;
@@ -31,8 +17,6 @@ import elite.intel.ui.widget.HudFooter;
 import elite.intel.ui.widget.HudPanel;
 import elite.intel.ui.widget.HudSection;
 import elite.intel.ui.widget.HudTable;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -41,13 +25,10 @@ import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
 import java.awt.*;
 import java.awt.event.HierarchyEvent;
-import java.io.IOException;
-import java.nio.file.Path;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.EventObject;
 import java.util.List;
-import java.util.concurrent.Callable;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Consumer;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 import static elite.intel.ui.i18n.MultiLingualTextProvider.getText;
@@ -55,11 +36,16 @@ import static elite.intel.ui.theme.AppTheme.*;
 import static elite.intel.ui.theme.HudPalette.*;
 
 /**
- * Alias Designer, being built in stages: My Devices above the divergence list, and first setup opened from here
- * until BindForge is activated. The list compares each installation with the master, or before activation, the
- * installations with each other.
+ * Alias Designer, the view: My Devices and Built-in Devices above the divergence list, the selected row's ways out, and
+ * the footer's SET UP, CHECK AGAIN, DISCARD and APPLY. The list compares each installation with the master, or before
+ * activation, the installations with each other.
  * <p>
- * <strong>Activation runs from here</strong> the first time the BindForge tab is shown in a run (Alan, 2026-10-13,
+ * <strong>It draws; {@link AliasDesignerController} acts.</strong> Every button hands its press to the controller, which
+ * runs the flow - reading and writing off the EDT, asking and telling the user - and hands back a
+ * {@link AliasDesignerReader.Snapshot} to draw. What the screen reads is {@link AliasDesignerReader}'s; what it says once
+ * a write has run is {@link AliasDesignerReports}'.
+ * <p>
+ * <strong>Activation runs from here</strong>, through the controller, the first time the BindForge tab is shown in a run (Alan, 2026-10-13,
  * A1b; {@link Activation}): the master filled with no prompt when the installations are identical, first setup
  * opened when they are not. Every test of "set up" here is "activated", never "the master has rows" - a user who
  * owns nothing is activated with an empty master.
@@ -93,13 +79,11 @@ import static elite.intel.ui.theme.HudPalette.*;
  * bindings name, spoken and logged, once (Alan, 2026-10-11, A13; {@link MissingControllerWarning}).
  * <p>
  * <strong>Onboarding opens once per run, right after activation</strong>, when an attached controller has no name
- * - again on CHECK AGAIN, and from the gear, for one controller (Alan, 2026-10-14, A6b; {@link OnboardingDialog}). A controller no binding
- * names by hardware id is written to every installation when the user finishes; one {@code .binds} names by hex is
- * held in the draft for APPLY, which moves those bindings to the name.
+ * - again on CHECK AGAIN, and from the gear, for one controller (Alan, 2026-10-14, A6b; {@link OnboardingDialog}). A
+ * controller no binding names by hardware id is written to every installation when the user finishes; one
+ * {@code .binds} names by hex is held in the draft for APPLY, which moves those bindings to the name.
  */
 public class AliasDesignerPanel extends JPanel {
-
-    private static final Logger log = LogManager.getLogger(AliasDesignerPanel.class);
 
     private static final int MAX_COLUMN_WIDTH = 420;
 
@@ -127,7 +111,7 @@ public class AliasDesignerPanel extends JPanel {
     /** Pairs per line of that tooltip - GamePad's 79 on one line would run off the screen. */
     private static final int PAIRS_PER_TOOLTIP_LINE = 6;
 
-    private final InstallationRegistry registry;
+    private final AliasDesignerController controller;
 
     private DefaultTableModel tableModel;
     private JTable table;
@@ -135,80 +119,58 @@ public class AliasDesignerPanel extends JPanel {
     private JTable myDevicesTable;
     private DefaultTableModel builtInModel;
     private JTable builtInTable;
+    private JPanel waysOutPanel;
+    private JButton setUpButton;
+    private JButton applyButton;
+    private JButton discardButton;
+    private JLabel pendingLine;
+
+    // WHY: what was last drawn, kept for the renderers, the ways out and the gear - all on the EDT, all set by render().
     private List<BuiltInDevice> currentBuiltIn = List.of();
     private List<DeviceDivergence.Finding> currentFindings = List.of();
-    private Markers currentMarkers = Markers.NONE;
-    /** The check the findings came from, or {@code null} before first setup, when there are no ways out. */
+    private AliasDesignerReader.Markers currentMarkers = AliasDesignerReader.Markers.NONE;
+    /**
+     * The check the findings came from, or {@code null} before activation, when there are no ways out.
+     */
     private DeviceFilesCheck.Report currentReport;
-    private JPanel waysOutPanel;
     private Map<String, String> installLabels = Map.of();
     /** Each installation's folder, keyed as findings key them - for the Device Editor's install strip. */
     private Map<String, String> installPaths = Map.of();
     /** The My Devices rows, in table order - the gear opens the one it sits on. */
     private List<MyDevice> currentMyDevices = List.of();
-    private final RefreshCoalescer refreshes = new RefreshCoalescer();
-    /**
-     * Set when the screen is shown while this run's missing-controller warning is still to come, and taken by the next
-     * refresh to start. A refresh already running when the screen appeared may have read the hardware before the
-     * Device Service had listed it, so it is never the one that judges.
-     */
-    private final AtomicBoolean missingWarningWanted = new AtomicBoolean();
-    /** Whether the Device Service was running at the last refresh. Written and read on the EDT only. */
+    /** Whether the Device Service was running at the last refresh. */
     private boolean deviceServiceRunning;
-    private final InstallationDeviceScanner deviceScanner = new InstallationDeviceScanner();
-    private JButton setUpButton;
-    private JButton applyButton;
-    private JButton discardButton;
-    private JLabel pendingLine;
-    /** Whether BindForge is activated, as of the last refresh. Written and read on the EDT only. */
-    private boolean activated;
-    /** Activation is tried once per run - abandoned first setup is then SET UP's, and the next run's to offer again. */
-    private final AtomicBoolean activationTried = new AtomicBoolean();
-    /**
-     * Whether activation is running. SET UP waits for it, or the two could open first setup twice (review,
-     * 2026-10-13). Written and read on the EDT only.
-     */
-    private boolean activationRunning;
-    private List<String> currentChanges = List.of();
-    private boolean screenActionRunning;
-    /**
-     * Set when activation is tried and on CHECK AGAIN, and taken by the first refresh after it that finds BindForge
-     * activated and the hardware listed: onboarding opens then, for the controllers attached (Alan, 2026-10-14, A6b).
-     */
-    private final AtomicBoolean onboardingWanted = new AtomicBoolean();
 
     public AliasDesignerPanel() {
         this(new InstallationRegistry(
-                new WindowsGameInstallationProvider(PlayerSession.getInstance().getBindingsDir())));
+                GameInstallationProvider.forThisPlatform(PlayerSession.getInstance().getBindingsDir())));
     }
 
     AliasDesignerPanel(InstallationRegistry registry) {
-        this.registry = registry;
         buildUi();
-        // WHY: the first time the user opens this screen in a run, not at startup (Alan, 2026-10-11, A13). initData()
-        // first runs as the application starts, before the Device Service has looked at any hardware, so this asks
-        // for a refresh of its own and the warning judges that one. Onboarding's offer, still waiting, asks the same.
+        controller = new AliasDesignerController(this, registry);
         addHierarchyListener(event -> {
             if ((event.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) == 0 || !isShowing()) return;
-            boolean warning = MissingControllerWarning.getInstance().pending();
-            if (!warning && !onboardingWanted.get()) return;
-            if (warning) missingWarningWanted.set(true);
-            initData();
+            controller.onShown();
         });
-        UiBus.register(this);
     }
 
     public void dispose() {
-        UiBus.unregister(this);
+        controller.dispose();
     }
 
     /**
-     * An installation's device files changed on disk - read again, so the check runs on what is there now. A refresh
-     * already running may have read them before the change, so it is followed by another rather than trusted.
+     * Reads everything again - the tab's refresh.
      */
-    @Subscribe
-    public void onDeviceFilesChanged(DeviceFilesChangedEvent event) {
-        initData();
+    public void initData() {
+        controller.refresh();
+    }
+
+    /**
+     * Activation, the first time the BindForge tab is shown in a run - see {@link AliasDesignerController}.
+     */
+    public void activateOnFirstShowing() {
+        controller.activateOnFirstShowing();
     }
 
     private void buildUi() {
@@ -274,19 +236,13 @@ public class AliasDesignerPanel extends JPanel {
         myDevices.addTab(getText("bindings.aliasDesigner.section.builtIn"), builtIn);
 
         JButton rescanButton = makeButton(getText("bindings.aliasDesigner.button.recheck"));
-        // WHY: it offers onboarding again too. Backed out of, onboarding is spent for the run, and a refresh alone
-        // changes nothing on screen - so CHECK AGAIN looked dead to a user who still had controllers to name. It says
-        // nothing when nobody needs a name.
-        rescanButton.addActionListener(e -> {
-            onboardingWanted.set(true);
-            initData();
-        });
+        rescanButton.addActionListener(e -> controller.checkAgain());
 
         // WHY: offered only until BindForge is activated - first setup runs once. Activation opens it on its own the
         // first time the tab is shown; abandoned, it waits here for the user (Alan, 2026-10-13).
         setUpButton = makeButton(getText("bindings.aliasDesigner.firstSetup.button"));
         setUpButton.setEnabled(false);
-        setUpButton.addActionListener(e -> openFirstSetup());
+        setUpButton.addActionListener(e -> controller.openFirstSetup());
 
         // WHY: stacked rather than tabbed. The two answer different questions - what devices there are, and
         // where the installations disagree about them - and a user resolving a divergence wants the device it
@@ -301,10 +257,10 @@ public class AliasDesignerPanel extends JPanel {
         // throw away, so the two are never side by side.
         applyButton = makeButton(getText("bindings.aliasDesigner.button.apply"));
         applyButton.setEnabled(false);
-        applyButton.addActionListener(e -> applyAll());
+        applyButton.addActionListener(e -> controller.apply());
         discardButton = makeButtonSubtle(getText("bindings.aliasDesigner.button.discard"));
         discardButton.setEnabled(false);
-        discardButton.addActionListener(e -> discardAll());
+        discardButton.addActionListener(e -> controller.discard());
         pendingLine = AppTheme.hudReadoutValue("", HudPalette.HUD_COLOR_ROLE_WARNING);
         JPanel left = transparentPanel(new FlowLayout(FlowLayout.LEFT, HudPalette.HUD_GAP, 0));
         left.add(discardButton);
@@ -315,155 +271,44 @@ public class AliasDesignerPanel extends JPanel {
     }
 
     /**
-     * APPLY once BindForge is activated, DISCARD while the draft changes something - and neither while one of them, or a
-     * way out, is running.
+     * Draws one refresh. On the EDT.
      */
-    private void refreshScreenActions() {
-        applyButton.setEnabled(activated && !screenActionRunning);
-        discardButton.setEnabled(!currentChanges.isEmpty() && !screenActionRunning);
-        pendingLine.setText(currentChanges.isEmpty()
+    void render(AliasDesignerReader.Snapshot snapshot) {
+        deviceServiceRunning = Boolean.TRUE.equals(snapshot.running());
+        installLabels = snapshot.labels();
+        installPaths = snapshot.paths();
+        showMyDevices(snapshot.myDevices(), snapshot.markers());
+        showBuiltIn(snapshot.builtIn());
+        currentReport = snapshot.report();
+        showFindings(snapshot.findings());
+    }
+
+    /**
+     * The footer's buttons, as the controller judges them, and the line naming what DISCARD would throw away.
+     *
+     * @param changes what the draft changes, by device; empty when nothing
+     */
+    void refreshButtons(boolean setUp, boolean apply, boolean discard, List<String> changes) {
+        setUpButton.setEnabled(setUp);
+        applyButton.setEnabled(apply);
+        discardButton.setEnabled(discard);
+        pendingLine.setText(changes.isEmpty()
                 ? ""
-                : getText("bindings.aliasDesigner.pending", String.join(", ", currentChanges)));
+                : getText("bindings.aliasDesigner.pending", String.join(", ", changes)));
     }
 
     /**
-     * Reads the installations and their device files off the EDT, same as
-     * {@code BindingManagementPanel.performBackup()} - parsing every {@code .binds} and every installation's
-     * {@code DeviceMappings.xml} would otherwise freeze the window, and an installation on a spun-down or
-     * disconnected drive freezes it for as long as the filesystem takes to answer.
-     * <p>
-     * A refresh already in flight is left to finish rather than a second one being started beside it, and one more
-     * follows it, however many requests came in meanwhile - see {@link RefreshCoalescer} for why none is dropped. A
-     * ship-profile change mid-refresh therefore costs one extra refresh; nothing here depends on the ship.
+     * While a write runs, none of the ways out can start another.
      */
-    public void initData() {
-        if (!refreshes.tryStart()) return;
-        new Thread(() -> {
-            boolean judgeMissing = missingWarningWanted.getAndSet(false);
-            Map<String, String> labels = Map.of();
-            Map<String, String> paths = Map.of();
-            Divergence divergence = new Divergence(null, List.of());
-            List<MyDevice> myDevices = List.of();
-            List<BuiltInDevice> builtIn = List.of();
-            Markers markers = Markers.NONE;
-            // WHY: null until read, so a refresh that failed leaves the last answer on screen - an activated user is
-            // not sent back to SET UP by one failed query (review, 2026-10-13).
-            Boolean isActivated = null;
-            List<String> changes = List.of();
-            // WHY: null until read, so a refresh that failed before the hardware leaves the last answer on screen.
-            Boolean running = null;
-            boolean listed = false;
-            try {
-                isActivated = BindForgeActivationManager.getInstance().isActivated();
-                changes = DraftChanges.stored();
-                List<InstallationRow> rows = registry.currentWithStartupScan();
-                labels = labelsFor(rows);
-                paths = rows.stream().collect(Collectors.toMap(AliasDesignerPanel::keyOf, InstallationRow::rootPath,
-                        (first, second) -> first, LinkedHashMap::new));
-                recordWhatEachInstallationHolds(rows);
-                divergence = divergenceFor(rows);
-                Map<String, List<DeviceEntry>> entries = entriesByInstall(rows);
-                Attached attached = readAttached();
-                running = attached.running();
-                listed = attached.listed();
-                myDevices = readMyDevices(attached.devices(), entries);
-                builtIn = BuiltInDeviceList.build(FrontierStockDevices.getInstance(), attached.devices());
-                // WHY: only against a master. Before first setup M, not added and the divergence colour mean
-                // nothing, and the column is left out rather than filled with an invented state.
-                if (divergence.report() != null) markers = markersFor(rows, entries, myDevices, divergence.findings());
-                // WHY: last, so nothing it does can cost the screen what this refresh has already read.
-                if (judgeMissing) {
-                    MissingControllerWarning.getInstance().judgeOnce(attached.listed(), myDevices,
-                            PlayerSession.getInstance().getBindingsDir());
-                }
-            } catch (RuntimeException e) {
-                // WHY: broad on purpose. This is a thread boundary, and an exception escaping it would kill
-                // the thread silently and leave the table showing whatever it showed before, with no clue why.
-                log.warn("Could not refresh the divergence list", e);
-            }
-            Map<String, String> loadedLabels = labels;
-            Map<String, String> loadedPaths = paths;
-            Divergence loadedDivergence = divergence;
-            List<MyDevice> loadedMyDevices = myDevices;
-            List<BuiltInDevice> loadedBuiltIn = builtIn;
-            Markers loadedMarkers = markers;
-            Boolean loadedActivated = isActivated;
-            List<String> loadedChanges = changes;
-            Boolean loadedRunning = running;
-            boolean loadedListed = listed;
-            SwingUtilities.invokeLater(() -> {
-                if (loadedRunning != null) deviceServiceRunning = loadedRunning;
-                installLabels = loadedLabels;
-                installPaths = loadedPaths;
-                if (loadedActivated != null) activated = loadedActivated;
-                currentChanges = loadedChanges;
-                refreshSetUp();
-                refreshScreenActions();
-                showMyDevices(loadedMyDevices, loadedMarkers);
-                showBuiltIn(loadedBuiltIn);
-                currentReport = loadedDivergence.report();
-                showFindings(loadedDivergence.findings());
-                // WHY: only once the hardware is listed, and only while the user is looking. Before the listing every
-                // controller reads absent, so nobody would need a name and this run's one offer would be spent on
-                // nothing; a refresh the user did not start would put the dialog over another screen.
-                if (activated && loadedListed && isShowing() && onboardingWanted.compareAndSet(true, false)) {
-                    openOnboarding(null);
-                }
-                // WHY: something asked for a refresh while this one ran - the screen shown, a device file changed, an
-                // action finished - and this one may have read what it changed too early.
-                if (refreshes.finish()) initData();
-            });
-        }, "BindForge-Divergence").start();
-    }
-
-    /**
-     * Each installation against the master, once first setup has filled it. Before then there is nothing to compare
-     * against, so the installations are compared with each other - which is what shows the user why SET UP is
-     * worth pressing (Alan, 2026-10-08).
-     */
-    private Divergence divergenceFor(List<InstallationRow> rows) {
-        Path bindings = PlayerSession.getInstance().getBindingsDir();
-        // WHY: decided by the check's own reading of the master, not a separate one, so the rows and the master
-        // they are judged against are always the same master.
-        DeviceFilesCheck.Report report = new DeviceFilesCheck().check();
-        return report.activated()
-                ? new Divergence(report, DeviceDivergenceScanner.scanAgainstMaster(report, bindings))
-                : new Divergence(null, DeviceDivergenceScanner.scan(controlSchemesByInstall(rows), bindings));
-    }
-
-    /** @param report the check the findings came from, or {@code null} when they compare installations */
-    private record Divergence(DeviceFilesCheck.Report report, List<DeviceDivergence.Finding> findings) {
-    }
-
-    /**
-     * The Installations columns: one per installation, keyed as findings key them, and each device's markers in the
-     * order My Devices lists the devices. Empty before first setup.
-     */
-    private record Markers(List<String> installs, List<Map<String, InstallationMarkers.Marker>> perDevice) {
-        static final Markers NONE = new Markers(List.of(), List.of());
-    }
-
-    /**
-     * Every installation gets a column, its folder there or not - one that is gone says <em>not found</em> rather
-     * than vanishing, since the user still has it (Alan, 2026-10-08).
-     */
-    private static Markers markersFor(List<InstallationRow> rows, Map<String, List<DeviceEntry>> entries,
-                                      List<MyDevice> devices, List<DeviceDivergence.Finding> findings) {
-        List<String> installs = rows.stream().map(AliasDesignerPanel::keyOf).toList();
-        Set<String> notFound = rows.stream().filter(InstallationRow::missing)
-                .map(AliasDesignerPanel::keyOf)
-                .collect(Collectors.toSet());
-        List<Map<String, InstallationMarkers.Marker>> perDevice = devices.stream()
-                .map(device -> InstallationMarkers.of(device, installs, notFound, entries, findings))
-                .toList();
-        return new Markers(installs, perDevice);
+    void disableWaysOut() {
+        for (Component button : waysOutPanel.getComponents()) button.setEnabled(false);
     }
 
     /**
      * The selected row's ways out, one button each - or, where there is none, why. Before first setup there is no
      * master to revert to or adopt into, so SET UP is the way out.
      */
-    private void showWaysOut() {
+    void showWaysOut() {
         waysOutPanel.removeAll();
         int index = table.getSelectedRow();
         if (index >= 0 && index < currentFindings.size()) {
@@ -491,639 +336,22 @@ public class AliasDesignerPanel extends JPanel {
     }
 
     private JButton wayOutButton(WayOut way, DeviceDivergence.Finding finding) {
+        AliasDesignerReports names = new AliasDesignerReports(installLabels);
         JButton button = makeButtonSubtle(switch (way.kind()) {
-            case REVERT -> getText("bindings.aliasDesigner.wayOut.revert", namesOf(way.installIds()));
-            case ADOPT -> getText("bindings.aliasDesigner.wayOut.adopt", namesOf(way.installIds()),
+            case REVERT -> getText("bindings.aliasDesigner.wayOut.revert", names.namesOf(way.installIds()));
+            case ADOPT -> getText("bindings.aliasDesigner.wayOut.adopt", names.namesOf(way.installIds()),
                     String.valueOf(way.hardware()));
             case REMERGE -> getText("bindings.aliasDesigner.wayOut.remerge");
         });
         button.addActionListener(e -> {
             switch (way.kind()) {
-                case REVERT -> revert(way);
-                case ADOPT -> adopt(way, finding);
-                case REMERGE -> reMerge(way, finding);
+                case REVERT -> controller.revert(way);
+                case ADOPT -> controller.adopt(way, finding);
+                case REMERGE -> controller.reMerge(way, finding);
             }
         });
-        button.setEnabled(!screenActionRunning);
+        button.setEnabled(!controller.actionRunning());
         return button;
-    }
-
-    /**
-     * Pushes the master to each installation the row names. That is the whole installation, not the row, so the
-     * confirm says how many rows it reaches.
-     */
-    private void revert(WayOut way) {
-        Set<String> keys = new LinkedHashSet<>();
-        way.installIds().forEach(id -> keys.add(DeviceDivergence.installKey(id)));
-        long rows = currentFindings.stream()
-                .filter(finding -> finding.installs().stream().anyMatch(keys::contains))
-                .count();
-        if (!HudConfirmDialog.confirm(this, getText("bindings.aliasDesigner.wayOut.title"),
-                getText("bindings.aliasDesigner.wayOut.revert.confirm", namesOf(way.installIds()), rows),
-                getText("bindings.aliasDesigner.wayOut.revert.do"),
-                getText("bindings.aliasDesigner.firstSetup.cancel"))) {
-            return;
-        }
-        runWayOut(() -> {
-            DeviceFilesPush push = new DeviceFilesPush();
-            List<DeviceFilesPush.InstallationResult> results = new ArrayList<>();
-            for (long installId : way.installIds()) results.addAll(push.push(installId).installations());
-            return revertText(new DeviceFilesPush.Report(results));
-        });
-    }
-
-    private String revertText(DeviceFilesPush.Report report) {
-        StringBuilder text = new StringBuilder(getText("bindings.aliasDesigner.wayOut.revert.result",
-                report.matchingCount(), report.installations().size()));
-        for (DeviceFilesPush.InstallationResult result : report.installations()) {
-            if (result.reason() == null) continue;
-            text.append('\n').append(getText("bindings.aliasDesigner.firstSetup.result.installation",
-                    namesOf(List.of(result.target().installId())), result.reason()));
-        }
-        return text.toString();
-    }
-
-    /** Takes the row's device, as one installation holds it, into the master - and nothing else of that installation's. */
-    private void adopt(WayOut way, DeviceDivergence.Finding finding) {
-        long installId = way.installIds().getFirst();
-        String installName = namesOf(way.installIds());
-        if (!HudConfirmDialog.confirm(this, getText("bindings.aliasDesigner.wayOut.title"),
-                getText("bindings.aliasDesigner.wayOut.adopt.confirm", finding.deviceName(), installName,
-                        String.valueOf(way.hardware())),
-                getText("bindings.aliasDesigner.wayOut.adopt.do"),
-                getText("bindings.aliasDesigner.firstSetup.cancel"))) {
-            return;
-        }
-        runWayOut(() -> adoptText(new DeviceFilesAdopt().adopt(installId, finding.deviceName()),
-                getText("bindings.aliasDesigner.wayOut.adopt.done", finding.deviceName(), installName)));
-    }
-
-    /**
-     * The label merge with the master as one side. The labels are read off the EDT, the merge view asks about the
-     * inputs that collide - none, when the sides only add to each other - and the answer goes into the master.
-     */
-    private void reMerge(WayOut way, DeviceDivergence.Finding finding) {
-        String device = finding.deviceName();
-        String title = getText("bindings.aliasDesigner.wayOut.title");
-        offEdt(title, () -> LabelReMerge.stored(device, way.installIds()), merge -> {
-            Map<String, String> answers = Map.of();
-            if (!merge.collisions().isEmpty()) {
-                Map<String, String> sideNames = new LinkedHashMap<>(installLabels);
-                sideNames.put(LabelReMerge.MASTER, getText("bindings.aliasDesigner.wayOut.masterSide"));
-                Optional<Map<String, String>> chosen =
-                        new LabelMergeDialog(this, device, merge, sideNames, Map.of()).showDialog();
-                if (chosen.isEmpty()) return;
-                answers = chosen.get();
-            }
-            List<String> unanswered = merge.unanswered(answers);
-            if (!unanswered.isEmpty()) {
-                HudConfirmDialog.info(this, getText("bindings.aliasDesigner.wayOut.title"),
-                        getText("bindings.aliasDesigner.wayOut.remerge.unanswered", unanswered.size()),
-                        getText("bindings.aliasDesigner.firstSetup.close"));
-                return;
-            }
-            Map<String, String> merged = merge.merged(answers);
-            if (!HudConfirmDialog.confirm(this, getText("bindings.aliasDesigner.wayOut.title"),
-                    getText("bindings.aliasDesigner.wayOut.remerge.confirm", device),
-                    getText("bindings.aliasDesigner.wayOut.remerge.do"),
-                    getText("bindings.aliasDesigner.firstSetup.cancel"))) {
-                return;
-            }
-            runWayOut(() -> adoptText(new DeviceFilesAdopt().adoptLabels(device, merged),
-                    getText("bindings.aliasDesigner.wayOut.remerge.done", device)));
-        });
-    }
-
-    private String adoptText(DeviceFilesAdopt.Result result, String doneText) {
-        return switch (result.outcome()) {
-            case ADOPTED -> result.conflicts().isEmpty()
-                    ? doneText
-                    : doneText + "\n" + getText("bindings.aliasDesigner.wayOut.conflicts",
-                    result.conflicts().stream()
-                            .map(conflict -> conflict.inputToken() == null
-                                    ? conflict.deviceName()
-                                    : conflict.deviceName() + " " + conflict.inputToken())
-                            .distinct()
-                            .collect(Collectors.joining(", ")));
-            case NOTHING_TO_ADOPT -> getText("bindings.aliasDesigner.wayOut.nothing");
-            case REFUSED -> getText("bindings.aliasDesigner.wayOut.refused", result.reason());
-        };
-    }
-
-    /** Runs a way out off the EDT, says what happened, and reads everything again. */
-    private void runWayOut(Callable<String> work) {
-        runAndReport(getText("bindings.aliasDesigner.wayOut.title"), work);
-    }
-
-    /**
-     * Runs a write off the EDT - a way out, APPLY or DISCARD - says what happened when there is something to say, and
-     * reads everything again.
-     */
-    private void runAndReport(String title, Callable<String> work) {
-        offEdt(title, work, message -> {
-            if (message != null) {
-                HudConfirmDialog.info(this, title, message, getText("bindings.aliasDesigner.firstSetup.close"));
-            }
-            initData();
-        });
-    }
-
-    /**
-     * Reads or writes game files and the master off the EDT, with the buttons disabled meanwhile, then hands the
-     * result back on it. A failure is shown under {@code title}, not only logged - the user pressed a button and must
-     * be told - and the screen is read again, since a write may have got part of the way.
-     */
-    private <T> void offEdt(String title, Callable<T> work, Consumer<T> onEdt) {
-        for (Component button : waysOutPanel.getComponents()) button.setEnabled(false);
-        // WHY: APPLY and DISCARD wait too - a revert and an Apply writing the same installation at once would each
-        // keep an Edit History copy of a file the other was replacing.
-        screenActionRunning = true;
-        refreshScreenActions();
-        new Thread(() -> {
-            T result = null;
-            String failure = null;
-            try {
-                result = work.call();
-            } catch (Exception e) {
-                // WHY: broad on purpose - a thread boundary, and anything escaping it would leave the buttons
-                // disabled with no word of why.
-                log.warn("{} failed", title, e);
-                failure = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
-            }
-            T loaded = result;
-            String loadedFailure = failure;
-            SwingUtilities.invokeLater(() -> {
-                screenActionRunning = false;
-                refreshScreenActions();
-                showWaysOut();
-                if (loadedFailure != null) {
-                    HudConfirmDialog.info(this, title, getText("bindings.aliasDesigner.wayOut.failed", loadedFailure),
-                            getText("bindings.aliasDesigner.firstSetup.close"));
-                    initData();
-                    return;
-                }
-                onEdt.accept(loaded);
-            });
-        }, "BindForge-ScreenWrite").start();
-    }
-
-    /** The installations' names as the list shows them, sorted. */
-    private String namesOf(List<Long> installIds) {
-        return installIds.stream()
-                .map(DeviceDivergence::installKey)
-                .map(key -> installLabels.getOrDefault(key, key))
-                .sorted()
-                .collect(Collectors.joining(", "));
-    }
-
-    /**
-     * APPLY: the draft into the master, then the master and the pending removals out to every installation, reported
-     * per installation. Asked first - it is the one button on the screen that writes a game file.
-     */
-    private void applyAll() {
-        if (!HudConfirmDialog.confirm(this, getText("bindings.aliasDesigner.apply.title"),
-                getText("bindings.aliasDesigner.apply.confirm", installLabels.size()),
-                getText("bindings.aliasDesigner.apply.do"),
-                getText("bindings.aliasDesigner.firstSetup.cancel"))) {
-            return;
-        }
-        runAndReport(getText("bindings.aliasDesigner.apply.title"), () -> applyText(new DeviceApply().apply()));
-    }
-
-    private String applyText(DeviceApply.Result result) {
-        StringBuilder text = new StringBuilder(revertText(result.report()));
-        if (!result.cleanedUp().isEmpty()) {
-            text.append('\n').append(getText("bindings.aliasDesigner.apply.removed",
-                    String.join(", ", result.cleanedUp())));
-        }
-        if (!result.notEverywhere().isEmpty()) {
-            text.append('\n').append(getText("bindings.aliasDesigner.apply.notEverywhere",
-                    String.join(", ", result.notEverywhere())));
-        }
-        if (result.bindsUnread()) {
-            text.append('\n').append(getText("bindings.aliasDesigner.apply.bindsUnread"));
-        } else if (!result.heldBack().isEmpty()) {
-            text.append('\n').append(getText("bindings.aliasDesigner.apply.heldBack",
-                    String.join(", ", result.heldBack())));
-        }
-        if (result.movesUnread()) {
-            text.append('\n').append(getText("bindings.aliasDesigner.apply.movesUnread"));
-        }
-        for (DeviceApply.Move move : result.moves()) {
-            text.append('\n').append(switch (move.outcome()) {
-                case MOVED -> getText("bindings.aliasDesigner.apply.moved", move.bindings(), move.name());
-                case NOT_APPLIED -> getText("bindings.aliasDesigner.apply.moveNotApplied", move.name());
-                case NOT_FOUND -> getText("bindings.aliasDesigner.apply.moveNotFound", move.name());
-                case FAILED -> getText("bindings.aliasDesigner.apply.moveFailed", move.name(),
-                        moveReason(move.status()));
-            });
-        }
-        return text.toString();
-    }
-
-    /** Why a move stopped, in the user's words - the status itself is in the log. */
-    private static String moveReason(DeviceRewriteResult.Status status) {
-        return switch (status) {
-            case STALE_FILE -> getText("bindings.aliasDesigner.apply.moveReason.stale");
-            case READ_FAILED, UNSUPPORTED_XML -> getText("bindings.aliasDesigner.apply.moveReason.unread");
-            case BACKUP_FAILED -> getText("bindings.aliasDesigner.apply.moveReason.backup");
-            case WRITE_FAILED, REWRITTEN, NO_REFERENCES -> getText("bindings.aliasDesigner.apply.moveReason.write");
-        };
-    }
-
-    /**
-     * Onboarding: reads who needs a name off the EDT, opens the dialog, and writes what the user chose when they
-     * finish (Alan, 2026-10-14, A6b).
-     *
-     * @param only the controller to name, from the gear - or {@code null} for every controller that needs one, which
-     *             says nothing when nobody does
-     */
-    private void openOnboarding(MyDevice only) {
-        String title = getText("bindings.aliasDesigner.onboarding.title");
-        offEdt(title, () -> readOnboarding(only), reading -> {
-            if (reading.problem() != null) {
-                HudConfirmDialog.info(this, title, reading.problem(),
-                        getText("bindings.aliasDesigner.firstSetup.close"));
-                return;
-            }
-            if (reading.pages().isEmpty()) {
-                if (only != null) {
-                    HudConfirmDialog.info(this, title, getText("bindings.aliasDesigner.onboarding.nobody"),
-                            getText("bindings.aliasDesigner.firstSetup.close"));
-                }
-                return;
-            }
-            new OnboardingDialog(this, reading.pages(), reading.taken(),
-                    names -> runAndReport(title, () -> onboardText(nameAll(reading.pages(), names)))).showDialog();
-        });
-    }
-
-    /**
-     * Who onboarding asks, what each is offered, and every name already taken - the master's, the draft's, every
-     * installation's entries and Frontier's. A {@code .binds} that cannot be read stops it: without it, a controller
-     * the bindings name by hardware id would be named straight away, leaving those bindings on an id that may no
-     * longer resolve.
-     */
-    private OnboardingReading readOnboarding(MyDevice only) {
-        if (!BindForgeActivationManager.getInstance().isActivated()) {
-            return new OnboardingReading(List.of(), List.of(), getText("bindings.aliasDesigner.onboarding.notActivated"));
-        }
-        Map<String, Integer> hardwareIds;
-        try {
-            hardwareIds = BindsDeviceReferences.hardwareIdCounts(PlayerSession.getInstance().getBindingsDir());
-        } catch (IOException e) {
-            log.warn("Onboarding did not open: the bindings could not be read", e);
-            return new OnboardingReading(List.of(), List.of(),
-                    getText("bindings.aliasDesigner.onboarding.bindsUnread", messageOf(e)));
-        }
-        List<InstallationRow> rows = registry.currentWithStartupScan();
-        Map<String, List<DeviceEntry>> entries = entriesByInstall(rows);
-        List<MyDevice> devices = readMyDevices(readAttached().devices(), entries);
-
-        Set<String> taken = new LinkedHashSet<>(FrontierStockDevices.getInstance().names());
-        BindForgeDeviceMasterManager.getInstance().findAll().forEach(row -> taken.add(row.deviceName()));
-        List<DraftRow> draft = BindForgeDeviceDraftManager.getInstance().findAll();
-        draft.forEach(row -> taken.add(row.deviceName()));
-        entries.values().forEach(list -> list.forEach(entry -> taken.add(entry.name())));
-        List<HardwareId> heldByDraft = draft.stream().map(row -> new HardwareId(row.vid(), row.pid())).toList();
-
-        List<MyDevice> asked = only == null
-                ? devices
-                : devices.stream().filter(device -> device.hardware().equals(only.hardware())).toList();
-        List<Onboarding.Page> pages = Onboarding.pages(asked, heldByDraft, taken, hardwareIds,
-                AliasDesignerPanel::generatedLabels);
-        return new OnboardingReading(pages, List.copyOf(taken), null);
-    }
-
-    /** @param problem what stopped onboarding, already worded, or {@code null} */
-    private record OnboardingReading(List<Onboarding.Page> pages, List<String> taken, String problem) {
-    }
-
-    /** The labels a controller gets when named - what startup generation would give it, read from it now. */
-    private static Map<String, String> generatedLabels(MyDevice device) {
-        Device live = attachedController(device.hardware());
-        if (live == null) return Map.of();
-        DeviceDescription description =
-                DeviceService.getInstance().description(live.id()).orElse(DeviceDescription.axesUnknown(0));
-        return ButtonMapLabels.generate(live.buttonCount(), live.axisCount(), description);
-    }
-
-    private static DeviceOnboarding.Result nameAll(List<Onboarding.Page> pages, List<String> names) throws IOException {
-        List<DeviceOnboarding.Naming> namings = new ArrayList<>();
-        for (int i = 0; i < pages.size(); i++) {
-            Onboarding.Page page = pages.get(i);
-            namings.add(new DeviceOnboarding.Naming(names.get(i), page.device().vid(), page.device().pid(),
-                    page.labels(), page.bindings()));
-        }
-        return DeviceOnboarding.stored().name(namings);
-    }
-
-    private String onboardText(DeviceOnboarding.Result result) {
-        if (!result.recorded()) return getText("bindings.aliasDesigner.onboarding.result.notRecorded");
-        StringBuilder text = new StringBuilder();
-        // WHY: said even with no installation to write - "updated 0 of 0" - unless every name waits for Apply.
-        if (!result.installations().isEmpty() || result.atApply().isEmpty()) {
-            text.append(getText("bindings.aliasDesigner.wayOut.revert.result", result.matchingCount(),
-                    result.installations().size()));
-            for (DeviceOnboarding.InstallationResult installation : result.installations()) {
-                String install = namesOf(List.of(installation.target().installId()));
-                if (installation.reason() != null) {
-                    text.append('\n').append(getText("bindings.aliasDesigner.firstSetup.result.installation", install,
-                            installation.reason()));
-                }
-                for (String kept : installation.keptButtonMaps()) {
-                    text.append('\n').append(getText("bindings.aliasDesigner.onboarding.result.keptButtonMap",
-                            install, kept));
-                }
-            }
-        }
-        for (DeviceOnboarding.Naming naming : result.atApply()) {
-            if (!text.isEmpty()) text.append('\n');
-            text.append(getText("bindings.aliasDesigner.onboarding.result.atApply", naming.name(), naming.bindings()));
-        }
-        return text.toString();
-    }
-
-    /** DISCARD: the whole draft thrown away, after naming what it holds. No installation is touched. */
-    private void discardAll() {
-        if (currentChanges.isEmpty()) return;
-        if (!HudConfirmDialog.confirm(this, getText("bindings.aliasDesigner.discard.title"),
-                getText("bindings.aliasDesigner.discard.confirm", String.join(", ", currentChanges)),
-                getText("bindings.aliasDesigner.discard.do"),
-                getText("bindings.aliasDesigner.firstSetup.cancel"))) {
-            return;
-        }
-        runAndReport(getText("bindings.aliasDesigner.discard.title"), () -> {
-            BindForgeDeviceDraftManager.getInstance().discard();
-            return null;
-        });
-    }
-
-    /**
-     * Reads every installation for first setup off the EDT, then opens it. Nothing is written until the user
-     * confirms the summary inside it.
-     */
-    private void openFirstSetup() {
-        // WHY: activation may open first setup itself any moment now - one dialog, not two (review, 2026-10-13).
-        if (activationRunning) return;
-        setUpButton.setEnabled(false);
-        Map<String, String> names = installLabels;
-        new Thread(() -> {
-            FirstSetup setup = null;
-            FirstSetup.Reading reading = null;
-            String problem = null;
-            try {
-                // WHY: SET UP is a way into activation too, so it takes the "before BindForge" backup if activation
-                // could not - otherwise finishing first setup would activate without it, for good (review, 2026-10-13).
-                BeforeBindForgeBackup.stored().ensureTaken();
-            } catch (IOException | RuntimeException e) {
-                // WHY: broad on purpose - a thread boundary, and the user pressed a button and must be told.
-                log.warn("First setup did not open: the backup before BindForge could not be taken", e);
-                problem = getText("bindings.aliasDesigner.firstSetup.result.backupFailed", messageOf(e));
-            }
-            if (problem == null) {
-                try {
-                    setup = FirstSetup.stored();
-                    reading = setup.read();
-                } catch (IOException | RuntimeException e) {
-                    // WHY: broad on purpose - a thread boundary, and the user pressed a button and must be told.
-                    log.warn("First setup could not read the installations", e);
-                    problem = getText("bindings.aliasDesigner.firstSetup.readFailed", messageOf(e));
-                }
-            }
-            FirstSetup loadedSetup = setup;
-            FirstSetup.Reading loadedReading = reading;
-            String loadedProblem = problem;
-            SwingUtilities.invokeLater(() -> {
-                refreshSetUp();
-                showFirstSetup(loadedSetup, loadedReading, loadedProblem, names);
-            });
-        }, "BindForge-FirstSetupRead").start();
-    }
-
-    /**
-     * First setup's dialog for a reading, naming the problem when there is one - or, with no reading, the problem
-     * alone. On the EDT.
-     *
-     * @param problem the text to show the user, already worded; {@code null} when nothing went wrong
-     */
-    private void showFirstSetup(FirstSetup setup, FirstSetup.Reading reading, String problem,
-                                Map<String, String> names) {
-        // WHY: decided on the reading, not the message. An exception can carry no message, and keyed on that, a
-        // failed read would open the dialog with nothing to show.
-        if (setup == null || reading == null) {
-            HudConfirmDialog.info(this, getText("bindings.aliasDesigner.firstSetup.title"), problem,
-                    getText("bindings.aliasDesigner.firstSetup.close"));
-            return;
-        }
-        new FirstSetupDialog(this, setup, reading, problem, names, this::initData).showDialog();
-    }
-
-    /** SET UP until BindForge is activated - and not while activation runs, which may open first setup itself. */
-    private void refreshSetUp() {
-        setUpButton.setEnabled(!activated && !activationRunning);
-    }
-
-    /**
-     * Activation, the first time the BindForge tab is shown in a run (Alan, 2026-10-13, A1b): a "before BindForge"
-     * backup, then the master filled with no prompt when the installations are identical, or first setup opened when
-     * they are not. Called by the tab, on the EDT; does nothing once tried in this run.
-     */
-    public void activateOnFirstShowing() {
-        if (!activationTried.compareAndSet(false, true)) return;
-        onboardingWanted.set(true);
-        activationRunning = true;
-        refreshSetUp();
-        new Thread(() -> {
-            Activation.Result result = null;
-            Map<String, String> names = Map.of();
-            try {
-                // WHY: asked first, so every run after activation - nearly all of them - pays for no detection and
-                // starts none to race the refresh's (review, 2026-10-13).
-                if (!BindForgeActivationManager.getInstance().isActivated()) {
-                    // WHY: a detection of its own, not currentWithStartupScan(). Activation reads the stored list, and
-                    // on a fresh database nothing is stored until detection has run; the startup scan may still be
-                    // running on the refresh thread, and the call that loses that race returns the list as it was -
-                    // so the user would activate with an empty master. rescan() waits for a detection in progress.
-                    List<InstallationRow> rows = registry.rescan();
-                    names = labelsFor(rows);
-                    result = Activation.stored().run();
-                    reportActivationFailure(result.outcome(), result.reason());
-                }
-            } catch (RuntimeException e) {
-                // WHY: broad on purpose - a thread boundary. Not activated, so SET UP stays offered.
-                log.warn("BindForge could not be activated", e);
-                reportActivationFailure(Activation.Outcome.FAILED, messageOf(e));
-            }
-            Activation.Result loadedResult = result;
-            Map<String, String> loadedNames = names;
-            SwingUtilities.invokeLater(() -> {
-                activationRunning = false;
-                refreshSetUp();
-                if (loadedResult != null && loadedResult.outcome() == Activation.Outcome.FIRST_SETUP) {
-                    showFirstSetup(loadedResult.setup(), loadedResult.reading(), problemOf(loadedResult), loadedNames);
-                }
-                initData();
-            });
-        }, "BindForge-Activation").start();
-    }
-
-    /** What first setup should name, for activation that opens it: a file it could not read, if any. */
-    private static String problemOf(Activation.Result result) {
-        if (result.reason() == null) return null;
-        return result.reading() == null
-                ? getText("bindings.aliasDesigner.firstSetup.readFailed", result.reason())
-                : getText("bindings.aliasDesigner.firstSetup.unreadableFile", result.reason());
-    }
-
-    /**
-     * A failed activation is said in the application log, as a successful one's backup is - otherwise the user sees
-     * SET UP and nothing saying why (review, 2026-10-13).
-     */
-    private static void reportActivationFailure(Activation.Outcome outcome, String reason) {
-        String what = switch (outcome) {
-            case BACKUP_FAILED -> "the backup before BindForge could not be taken";
-            case FAILED -> "it could not be set up";
-            default -> null;
-        };
-        if (what == null) return;
-        UiBus.publish(new AppLogEvent("BindForge was not activated: " + what + " - " + reason
-                + ". SET UP on Alias Designer tries again."));
-    }
-
-    /** An exception's message, or its kind when it carries none - never the word "null" on screen. */
-    private static String messageOf(Exception e) {
-        return e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
-    }
-
-    /**
-     * Records what each installation's device files hold right now.
-     * <p>
-     * A write on a refresh, which is deliberate: these rows are BindForge's only record of what is actually
-     * on disk, and they are worth nothing if they are older than the disk. The installation list is already
-     * refreshed the same way, on the same trigger.
-     * <p>
-     * The Installations markers do not read these rows: they need labels and a severity. Their colour and the
-     * differences come from the check against the master; which names an installation gives the hardware comes from
-     * this refresh's own read of its file (Alan, 2026-10-08). The rows stay the stored record of reality, for
-     * whatever must notice a change between refreshes.
-     */
-    private void recordWhatEachInstallationHolds(List<InstallationRow> rows) {
-        for (InstallationRow row : rows) {
-            // WHY: a missing installation is skipped rather than scanned and found empty. Its folder is not
-            // there, so reading it would record no devices - which is indistinguishable from a game patch
-            // having wiped the file, and would raise exactly the alarm these rows exist to raise.
-            if (row.missing()) continue;
-            deviceScanner.scan(row.id(), GameInstallation.controlSchemesUnder(Path.of(row.rootPath())));
-        }
-    }
-
-    /**
-     * The controllers attached right now, read once per refresh for both device views.
-     * <p>
-     * {@code DeviceService} runs as one of the application's services, so with those stopped it reports no
-     * controllers at all. The lists still build - the file half needs no hardware - but My Devices is then only
-     * half a list and no built-in can read attached, and both views say so on screen rather than leaving an
-     * absence to be mistaken for "nothing is plugged in".
-     */
-    private Attached readAttached() {
-        DeviceService service = DeviceService.getInstance();
-        // WHY: read before the list, so "listed" vouches for a list taken after the first enumeration finished.
-        boolean listed = service.hasEnumerated();
-        boolean running = service.isAvailable();
-        if (!running) {
-            log.info("Device service is not running, so no controllers can be read - the list will show only "
-                    + "what the installations' files name");
-        }
-        return new Attached(running ? service.getConnectedDevices() : List.of(), running, running && listed);
-    }
-
-    /**
-     * The controllers one refresh read, and what that read can vouch for.
-     *
-     * @param running whether the Device Service was running, which the device views show
-     * @param listed  whether it had finished its first look at the hardware, so an absent controller is really absent
-     *                - it is running a moment before that (review, 2026-10-11)
-     */
-    private record Attached(List<Device> devices, boolean running, boolean listed) {
-    }
-
-    /**
-     * Gathers the four things My Devices is built from: the attached controllers, every installation's device
-     * entries, the master's records, and Frontier's shipped list.
-     */
-    private List<MyDevice> readMyDevices(List<Device> attached, Map<String, List<DeviceEntry>> entriesByInstall) {
-        return MyDeviceList.build(
-                attached,
-                MyDeviceList.entriesAcross(entriesByInstall.values()),
-                BindForgeDeviceMasterManager.getInstance().findAll(),
-                FrontierStockDevices.getInstance());
-    }
-
-    /**
-     * Each present installation's device entries.
-     * <p>
-     * An installation whose file cannot be read is left out rather than counted as holding nothing. The device
-     * list is a union, so a missing contribution only makes it shorter - but silently treating an unreadable
-     * file as an empty one would hide a real problem behind a shorter list.
-     */
-    private Map<String, List<DeviceEntry>> entriesByInstall(List<InstallationRow> rows) {
-        Map<String, List<DeviceEntry>> byInstall = new LinkedHashMap<>();
-        controlSchemesByInstall(rows).forEach((install, controlSchemes) -> {
-            try {
-                byInstall.put(install,
-                        DeviceMappingsParser.parseIfPresent(GameInstallation.deviceMappingsIn(controlSchemes)));
-            } catch (IOException e) {
-                log.warn("Could not read device entries for {}: {}", install, e.getMessage());
-            }
-        });
-        return byInstall;
-    }
-
-    /**
-     * Only installations whose folder is there: a missing one cannot be read, and reporting its entries as
-     * absent would fill the list with red caused by an unplugged drive.
-     * <p>
-     * Keyed by row id. <strong>Not by storefront</strong>, which is a label rather than a key - a machine can
-     * hold two Frontier copies, several hand-added installations, or three Steams on Linux, and keying by
-     * storefront would drop all but the last of them from the comparison without saying so.
-     */
-    private Map<String, Path> controlSchemesByInstall(List<InstallationRow> rows) {
-        Map<String, Path> byInstall = new LinkedHashMap<>();
-        for (InstallationRow row : rows) {
-            if (row.missing()) continue;
-            byInstall.put(keyOf(row), GameInstallation.controlSchemesUnder(Path.of(row.rootPath())));
-        }
-        return byInstall;
-    }
-
-    /**
-     * The identity a finding carries. Unique by construction, and never shown to the user. The same key findings
-     * against the master carry, so they find their names too.
-     */
-    static String keyOf(InstallationRow row) {
-        return DeviceDivergence.installKey(row.id());
-    }
-
-    /**
-     * What each installation is called on screen.
-     * <p>
-     * The storefront alone where it identifies one installation, and the storefront with its folder where it
-     * does not - so two Frontier copies read as two different things rather than twice as "FRONTIER". Verbose
-     * only when being brief would be ambiguous.
-     */
-    static Map<String, String> labelsFor(List<InstallationRow> rows) {
-        Map<String, Long> countByStorefront = rows.stream()
-                .collect(Collectors.groupingBy(InstallationRow::storefront, Collectors.counting()));
-
-        Map<String, String> labels = new LinkedHashMap<>();
-        for (InstallationRow row : rows) {
-            boolean storefrontIsEnough = countByStorefront.getOrDefault(row.storefront(), 0L) == 1;
-            labels.put(keyOf(row), storefrontIsEnough
-                    ? row.storefront()
-                    : row.storefront() + " (" + row.rootPath() + ")");
-        }
-        return labels;
     }
 
     /** The columns describing the device, then one per installation once the master exists. */
@@ -1136,7 +364,7 @@ public class AliasDesignerPanel extends JPanel {
         return names.toArray(String[]::new);
     }
 
-    private void showMyDevices(List<MyDevice> devices, Markers markers) {
+    private void showMyDevices(List<MyDevice> devices, AliasDesignerReader.Markers markers) {
         currentMarkers = markers;
         currentMyDevices = devices;
         myDevicesModel.setRowCount(0);
@@ -1173,136 +401,16 @@ public class AliasDesignerPanel extends JPanel {
         gear.setMaxWidth(HUD_TABLE_ROW_HEIGHT + 10);
     }
 
-    /**
-     * Opens the Device Editor for one My Devices row. Before activation there is no master for its edits to be saved
-     * against - first setup throws any draft away - so it says SET UP comes first, and offers it (Alan, 2026-10-10).
-     */
+    /** The gear: the row's device and its install strip, for the controller to open the Device Editor with. */
     private void openDeviceEditor(int row) {
         if (row < 0 || row >= currentMyDevices.size()) return;
-        // WHY: the stored fact, not the report - a refresh that failed also leaves no report, and once activated that is
-        // no reason to send the user to first setup (review, 2026-10-11). Activated, not "the master has rows": a
-        // user who owns nothing is activated with an empty master (Alan, 2026-10-13).
-        if (!activated) {
-            if (HudConfirmDialog.confirm(this, getText("bindings.aliasDesigner.editor.heading"),
-                    getText("bindings.aliasDesigner.editor.beforeSetUp.message"),
-                    getText("bindings.aliasDesigner.firstSetup.button"),
-                    getText("button.back"))) {
-                openFirstSetup();
-            }
-            return;
-        }
-        MyDevice device = currentMyDevices.get(row);
         Map<String, InstallationMarkers.Marker> markers =
                 row < currentMarkers.perDevice().size() ? currentMarkers.perDevice().get(row) : Map.of();
         List<DeviceEditorDialog.StripLine> strip = currentMarkers.installs().stream()
                 .map(install -> new DeviceEditorDialog.StripLine(installLabels.getOrDefault(install, install),
                         markers.get(install), installPaths.getOrDefault(install, "")))
                 .toList();
-        new Thread(() -> {
-            DeviceEditorDialog.Opening opening = null;
-            String failure = null;
-            try {
-                opening = openingFor(device, strip);
-            } catch (RuntimeException e) {
-                // WHY: broad on purpose - a thread boundary, and the user pressed the gear and must be told.
-                log.warn("The Device Editor could not read {}", device.label(), e);
-                failure = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
-            }
-            DeviceEditorDialog.Opening loaded = opening;
-            String loadedFailure = failure;
-            SwingUtilities.invokeLater(() -> {
-                if (loaded == null) {
-                    HudConfirmDialog.info(this, getText("bindings.aliasDesigner.editor.heading"),
-                            getText("bindings.aliasDesigner.editor.loadFailed", loadedFailure),
-                            getText("bindings.aliasDesigner.firstSetup.close"));
-                    return;
-                }
-                new DeviceEditorDialog(this, loaded, this::initData, () -> openOnboarding(device)).showDialog();
-            });
-        }, "BindForge-DeviceEditorRead").start();
-    }
-
-    /**
-     * What the Device Editor opens with. The name is the master's, or Frontier's for a built-in the master does not
-     * hold; with neither, the device has no name yet. The labels are the draft's when it holds the device - SAVE
-     * writes there - and the master's otherwise. The inputs are the controller's when it is attached, read by which
-     * axis they are, and the ones its labels name when it is not.
-     */
-    private static DeviceEditorDialog.Opening openingFor(MyDevice device, List<DeviceEditorDialog.StripLine> strip) {
-        FrontierStockDevices stock = FrontierStockDevices.getInstance();
-        String name = device.alias() != null
-                ? device.alias()
-                : device.builtIn() ? stock.covering(device.vid(), device.pid()).map(DeviceEntry::name).orElse(null)
-                : nameWaitingForApply(device);
-        Map<String, String> saved = name == null ? Map.of() : storedLabels(name);
-
-        Device live = device.attached() ? attachedController(device.hardware()) : null;
-        DeviceDescription description = live == null
-                ? null
-                : DeviceService.getInstance().description(live.id()).orElse(DeviceDescription.axesUnknown(0));
-        DeviceEditorInputs inputs = live == null
-                ? DeviceEditorInputs.ofSavedLabels(saved)
-                : DeviceEditorInputs.ofController(live.buttonCount(), live.axisCount(), description);
-        return new DeviceEditorDialog.Opening(device, name, live == null ? null : live.id(), description, inputs,
-                saved, name != null && stock.gameDrawsIt(name), strip, middleFor(device, name, stock));
-    }
-
-    /**
-     * What the editor's middle button is: read from the master, the draft and {@code .binds} as it opens. A
-     * {@code .binds} that cannot be read - a folder that is not there included - refuses CLEAR rather than offering it
-     * on a device it might name, since the game would reject the whole preset. Labels can still be edited.
-     */
-    private static DeviceEditorMiddle middleFor(MyDevice device, String name, FrontierStockDevices stock) {
-        boolean builtIn = name == null ? device.builtIn() : stock.ships(name);
-        if (name == null) return DeviceEditorMiddle.of(null, builtIn, false, false, false, 0);
-        BindForgeDeviceDraftManager draft = BindForgeDeviceDraftManager.getInstance();
-        boolean started = draft.isStarted();
-        OptionalInt bindings;
-        try {
-            bindings = OptionalInt.of(DeviceEditorMiddle.bindingsNaming(name,
-                    BindsDeviceReferences.referenceCounts(PlayerSession.getInstance().getBindingsDir())));
-        } catch (IOException e) {
-            log.warn("Could not read which devices the bindings name, so Clear is refused for {}: {}", name,
-                    e.getMessage());
-            bindings = OptionalInt.empty();
-        }
-        return DeviceEditorMiddle.of(name, builtIn,
-                BindForgeDeviceMasterManager.getInstance().findByName(name) != null,
-                started, started && draft.findByName(name) != null, bindings);
-    }
-
-    /**
-     * The name the draft holds for a controller named in onboarding and waiting for APPLY - so its gear opens it under
-     * that name rather than offering to name it again (Alan, 2026-10-14, A6b). {@code null} when the draft has none.
-     */
-    private static String nameWaitingForApply(MyDevice device) {
-        for (DraftRow row : BindForgeDeviceDraftManager.getInstance().findAll()) {
-            if (new HardwareId(row.vid(), row.pid()).equals(device.hardware())) return row.deviceName();
-        }
-        return null;
-    }
-
-    private static Map<String, String> storedLabels(String name) {
-        BindForgeDeviceDraftManager draft = BindForgeDeviceDraftManager.getInstance();
-        if (draft.isStarted()) {
-            DraftRow row = draft.findByName(name);
-            if (row != null) return draft.labelsOf(row.id());
-        }
-        BindForgeDeviceMasterManager master = BindForgeDeviceMasterManager.getInstance();
-        DeviceRow row = master.findByName(name);
-        return row == null ? Map.of() : master.labelsOf(row.id());
-    }
-
-    /** The attached controller with this VID/PID - the first, since two identical units are out of scope. */
-    private static Device attachedController(HardwareId hardware) {
-        for (Device device : DeviceService.getInstance().getConnectedDevices()) {
-            Optional<DeviceIdentity> identity = DeviceIdentities.of(device);
-            if (identity.isPresent() && identity.get().vid().equals(hardware.vid())
-                    && identity.get().pid().equals(hardware.pid())) {
-                return device;
-            }
-        }
-        return null;
+        controller.openDeviceEditor(currentMyDevices.get(row), strip);
     }
 
     /**

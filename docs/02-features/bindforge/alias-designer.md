@@ -253,7 +253,7 @@ withdrawn.
 
 #### Built — 2026-10-13 (Alan, A1b)
 
-Built as `bindforge.devicefiles.Activation`, run by `AliasDesignerPanel.activateOnFirstShowing()`, which the
+Built as `bindforge.devicefiles.Activation`, run by `AliasDesignerController.activateOnFirstShowing()` (through the panel's), which the
 outer BindForge tab (`BindingsTabPanel`) calls the first time it is shown. The fact is the `bindforge_activation`
 table (migration `12005`, `BindForgeActivationManager`).
 
@@ -271,9 +271,7 @@ table (migration `12005`, `BindForgeActivationManager`).
   (`BindForgeDeviceDraftManager.establish`), which now refuses once activated as well as when the master has rows.
   The migration marks a master that already has rows as activated.
 - **The backup is taken once ever**, its folder recorded in `bindforge_activation.backup_folder`, as
-  `<time>_before-bindforge` in the default player backups folder: each installation's device files, and the
-  bindings folder's `.binds` and `StartPreset` files under `bindings\`. Only one bindings folder is known today —
-  there is no Linux installation provider yet.
+  `<time>_before-bindforge` in the default player backups folder: each installation's device files, and the bindings folder's `.binds` and `StartPreset` files under `bindings\`. Only the configured bindings folder is backed up today. Linux detection (2026-10-14) finds each installation's own Proton bindings folder, but the installation list does not store it, so the backup does not yet cover one per installation.
 - **Told when the backup is taken** — that is the one time — spoken (`speech.bindforgeBackedUp`) and logged with
   the folder.
 - **Every "empty master means not set up" test reads the fact now:** the gear, APPLY and **SET UP** on the screen,
@@ -918,14 +916,17 @@ Onboarding says so rather than leaving a surprise: *"131 bindings will move to L
 
 - **Onboarding runs only once BindForge is [activated](#activation--2026-10-13-alan).** There is no "before first
   setup" case, so a controller `.binds` names by hex is offered from the first visit and waits for Apply.
-- **Two ways in.** Automatically, once per run, on the first showing of the BindForge tab right after activation,
+- **Three ways in.** Automatically, once per run, on the first showing of the BindForge tab right after activation,
   when any attached controller needs a name — those attached at that moment; one plugged in later is
-  [hot-plug's](#first-run-and-hot-plug). And from the gear: an unnamed device's editor offers **NAME**, which opens
-  onboarding for that one controller.
+  [hot-plug's](#first-run-and-hot-plug). From the gear: an unnamed device's editor offers
+  **NAME**, which opens onboarding for that one controller. And from **CHECK
+  AGAIN**, which offers it again for every attached controller still needing a name, and says nothing when none does *(
+  changed 2026-10-14, Krondor: with only the first two, a user who backed out found CHECK AGAIN doing nothing visible —
+  a support ticket each time)*.
 - **Everything is written at the end.** Skip and Next only move between pages; **FINISH** writes every name in one
   pass and reports per installation, listing each controller that waits for Apply and how many bindings will move.
-  BACK, the close glyph or Esc leave having written nothing, without asking — only typed names are lost — and the
-  controllers stay unnamed until the next run or the gear.
+  BACK, the close glyph or Esc leave having written nothing, without asking — only typed names are lost — and the controllers stay unnamed until
+  **CHECK AGAIN**, the gear, or the next run.
 - **A partial Apply does not hold the `.binds` rewrite back.** The installations that took the entry have it, and
   `.binds` moves to the name; one that missed it is named in the report and
   [caught up when it comes back](#actions-and-what-each-one-reaches). Only when **no** installation took the entry is
@@ -993,6 +994,10 @@ prompt, because there is nothing to decide. That covers Frontier's built-ins, wh
 
 It runs at Elite-Intel startup rather than when BindForge opens, so the labels are already there the first time
 the capture dialog is used. **Startup never names anything:** a controller with no name waits for onboarding.
+
+**Only once BindForge is activated — 2026-10-14 (
+Krondor).** Before activation it writes nothing into a game folder. Run on every start, it put generated files into every installation before the
+["before BindForge" backup](#activation--2026-10-13-alan) was taken, so that backup did not show the files as they were before BindForge — and it wrote into the game folders of users who had never opened BindForge. Activation is the first opening of the tab, before any capture dialog, so the labels are still there in time: when activation happens (`BindForgeActivatedEvent`, published by `Activation.establish` for silent activation and first setup alike), the controllers connected then are handled.
 
 **Settled while building it — 2026-10-06 (Alan).** Built as `bindforge.devicefiles.ButtonMapGeneration`
 (`ButtonMapLabels` for the labels), run by `bindforge.devices.ButtonMapStartup`.
@@ -1606,8 +1611,7 @@ once-per-run version.
 
 #### Built — 2026-10-11 (Alan, A13)
 
-Built as `bindforge.devices.MissingControllers` (who is named — pure) and `MissingControllerWarning` (the one
-warning, spoken and logged), triggered by `AliasDesignerPanel`. Alan answered three questions, one at a time:
+Built as `bindforge.devices.MissingControllers` (who is named — pure) and `MissingControllerWarning` (the one warning, spoken and logged), triggered by the Alias Designer screen (`AliasDesignerController.onShown`). Alan answered three questions, one at a time:
 
 - **Only controllers `.binds` names.** A named controller that is not attached is mentioned only when a binding
   names it (`BindsDeviceReferences.referenceCounts`, ignoring case) — the reason to warn at all is bindings that will

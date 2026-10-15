@@ -385,10 +385,12 @@ Consequences of that limit, so they are chosen rather than discovered:
 
 ### Open
 
-- **Detection itself is not built.** `AppPaths` resolves Elite-Intel's own folders only and has no notion
-  of where Elite Dangerous is installed, let alone per storefront. This screen specifies what detection has
-  to produce; it does not provide it. **Windows storefront detection is BindForge's to build; Linux/Proton
-  resolution is Krondor's** — see below.
+- ~~**Detection itself is not built.**~~
+  *Built:* `WindowsGameInstallationProvider` (Steam, Epic, Frontier and Oculus defaults) and, 2026-10-14 at Krondor's request, `LinuxGameInstallationProvider`, chosen by
+  `GameInstallationProvider.forThisPlatform`. Linux reads every place a Steam client can live — `~/.steam/steam`,
+  `~/.local/share/Steam`, Snap's `~/snap/steam/common/.local/share/Steam` and Flatpak's
+  `~/.var/app/com.valvesoftware.Steam/.local/share/Steam` — since several can be installed at once, and each one's
+  `libraryfolders.vdf` (`SteamLibraries`, shared with Windows). A client or game reached twice through a link is reported once. Each installation carries its own bindings folder, in the Proton prefix of the library holding it (`steamapps/compatdata/359320/pfx/...`). Epic and Frontier copies under Lutris, Heroic or a hand-made Wine prefix record nothing reliable and come in through the manual add.
 
 ## What a `.binds` File Might Not Be
 

@@ -1,7 +1,9 @@
 package elite.intel.bindforge.devicefiles;
 
 import elite.intel.bindforge.install.GameInstallation;
+import elite.intel.db.managers.BindForgeSettingsManager;
 import elite.intel.io.TimestampedBackups;
+import elite.intel.util.AppPaths;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -26,6 +28,16 @@ final class EditHistory {
     private final TimestampedBackups backups;
     private final Path historyRoot;
     private final IntSupplier retention;
+
+    /**
+     * Edit History in Elite-Intel's own data folder, with the user's retention - the one place that folder is named.
+     *
+     * @throws IOException if Elite-Intel's data folder cannot be created
+     */
+    static EditHistory stored() throws IOException {
+        return new EditHistory(new TimestampedBackups(), AppPaths.getBindingsWorkingDir().resolve("history"),
+                BindForgeSettingsManager.getInstance()::getEditHistoryRetention);
+    }
 
     EditHistory(TimestampedBackups backups, Path historyRoot, IntSupplier retention) {
         this.backups = backups;

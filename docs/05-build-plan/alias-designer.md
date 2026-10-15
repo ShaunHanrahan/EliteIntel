@@ -17,7 +17,7 @@ data; most of what the spec describes is still ahead.
 
 | What | Where |
 |---|---|
-| The tab | `ui.screen.bindings.AliasDesignerPanel` — the device list (My Devices and Built-in Devices tabs) above the divergence list, in `BindingsTabPanel` |
+| The tab | `ui.screen.bindings.AliasDesignerPanel` — the view: the device list (My Devices and Built-in Devices tabs) above the divergence list, in `BindingsTabPanel`. Split 2026-10-14 (Krondor): `AliasDesignerController` runs every flow (refresh, activation, first setup, APPLY, DISCARD, the ways out, onboarding, opening the Device Editor) and its threads; `AliasDesignerReader` does every read (the refresh's `Snapshot`, onboarding's reading, the editor's `Opening`); `AliasDesignerReports` words the results |
 | My Devices — all five columns | `bindforge.devices.MyDeviceList` (the union, a pure function), `MyDevice`. Built-ins show `BUILT-IN` in the Alias column |
 | Installations markers (A4) | `bindforge.devices.InstallationMarkers` (pure: one marker per installation, coloured from the divergence findings); one column per installation in `AliasDesignerPanel`, shown once the master exists |
 | Built-in Devices (A5) | `bindforge.devices.BuiltInDeviceList` (pure: Frontier's elements in file order, primary pair, alternatives, attached), `BuiltInDevice`; the second `COMPACT` tab of the device list in `AliasDesignerPanel`, with the capture date `FrontierStockDevices.CAPTURED` beneath it |
@@ -29,9 +29,9 @@ data; most of what the spec describes is still ahead.
 | Startup `.buttonMap` (A8) | `bindforge.devicefiles.ButtonMapGeneration` (per installation, create-only), `ButtonMapLabels` (the generated labels: buttons, the axes the controller has — all eight when unknown — and four per hat); `bindforge.devices.ButtonMapStartup` runs it on every connect, started as `BUTTON_MAP_STARTUP` in `AppController` |
 | Device Editor (A9) | `ui.screen.bindings.DeviceEditorDialog`, opened by the gear column on My Devices in `AliasDesignerPanel` (`GearCell`, copied from `CommanderTabPanel`); `bindforge.devices.DeviceEditorInputs` (boxes, defaults, what SAVE writes) and `DeviceEditorLights` (highlighting), both pure; `BindForgeDeviceDraftManager.saveLabels`; `FrontierStockDevices.gameDrawsIt`; `devices.events.DeviceHatEvent`, polled in `DeviceService`; the footer's middle place and unsaved hint in `HudModalSpec` |
 | Actions (A10) | `bindforge.devices.DeviceEditorMiddle` (CLEAR / RESET LABELS / their undo, and when refused — pure), wired in `DeviceEditorDialog`; `BindForgeDeviceDraftManager.removeByName`, `restoreFromMaster`, `stored`; APPLY and DISCARD in `AliasDesignerPanel`'s footer, calling `DeviceApply` (removals held back while `.binds` names them; cleared once every installation took them); `DeviceFilesPush.push(Set)` and `DeviceMappingsMerge.remove`; `FrontierStockButtonMaps.shippedContent`; `BindsDeviceReferences.referenceCounts`; `bindforge.devicefiles.DraftChanges` (does the draft change anything — pure) |
-| Onboarding (A6b) | `bindforge.devices.Onboarding` (the pages and the name check, pure); `ui.screen.bindings.OnboardingDialog`, opened once per run after activation once the hardware is listed, and by **NAME** in `DeviceEditorDialog` for an attached, unnamed controller; `bindforge.devicefiles.DeviceOnboarding` (store first, then each installation all or nothing: `DeviceMappingsMerge.insert`, Edit History, create-only `.buttonMap`); `EditHistory` (shared with `DeviceFilesPush`); `BindForgeDeviceDraftManager.onboard` (master and a started draft, or the draft only for Apply); the hex move at Apply in `DeviceApply.moveHardwareIds` through `BindsHardwareIdRewrite`; `BindsDeviceReferences.hardwareIdCounts` / `hardwareIdsFor`; `bindings.aliasDesigner.onboarding.*` in the nine bundles |
+| Onboarding (A6b) | `bindforge.devices.Onboarding` (the pages and the name check, pure); `ui.screen.bindings.OnboardingDialog`, opened once per run after activation once the hardware is listed, again by **CHECK AGAIN** (Krondor, 2026-10-14), and by **NAME** in `DeviceEditorDialog` for an attached, unnamed controller; `bindforge.devicefiles.DeviceOnboarding` (store first, then each installation all or nothing: `DeviceMappingsMerge.insert`, Edit History, create-only `.buttonMap`); `EditHistory` (shared with `DeviceFilesPush`); `BindForgeDeviceDraftManager.onboard` (master and a started draft, or the draft only for Apply); the hex move at Apply in `DeviceApply.moveHardwareIds` through `BindsHardwareIdRewrite`; `BindsDeviceReferences.hardwareIdCounts` / `hardwareIdsFor`; `bindings.aliasDesigner.onboarding.*` in the nine bundles |
 | Activation (A1b) | `bindforge.devicefiles.Activation` (backup once, then identical → master filled with no prompt, otherwise first setup; `identical` is the push's own test); `DeviceFilesSnapshot.take(label, targets, bindingsFolders)`; migration `12005__bindforge_activation.sql`, `BindForgeActivationDao`, `BindForgeActivationManager`; `establish` activates in its transaction; `BeforeBindForgeBackup` (taken once, by activation or SET UP); `AliasDesignerPanel.activateOnFirstShowing()`, called by `BindingsTabPanel`'s first showing; `speech.bindforgeBackedUp` in the nine bundles |
-| Missing-controller warning (A13) | `bindforge.devices.MissingControllers` (who is named, pure), `MissingControllerWarning` (once per process, spoken and logged); triggered by `AliasDesignerPanel`'s first showing, which starts its own refresh (`missingWarningWanted`); `speech.missingController(s)` in the nine `gui*.properties` |
+| Missing-controller warning (A13) | `bindforge.devices.MissingControllers` (who is named, pure), `MissingControllerWarning` (once per process, spoken and logged); triggered by the panel's first showing (`AliasDesignerController.onShown`), which starts its own refresh (`missingWarningWanted`); `speech.missingController(s)` in the nine `gui*.properties` |
 | Which axes and hats (A8b) | `elite.intel.devices.model.DeviceDescription` (axes by game slot, `axesWithoutSlot`, SDL's numbering via `axisAt`, hat count) and `GameAxis`; `devices.hid.DeviceDescriber` reads it at connect — `WindowsHidUsages` (`hid.dll`), `LinuxHidUsages` + `HidReportDescriptor` (`/sys`), `AxisSlots` (pure rules); `DeviceService.description(deviceId)` |
 | Divergence list (A3) | `DeviceDivergence.againstMaster` (pure; each installation against the master, from `DeviceFilesCheck`), `DeviceDivergenceScanner.scanAgainstMaster` (adds orphans and `.binds`), `BindsDeviceReferences`, `ButtonMapAudit`. Before first setup, `DeviceDivergence.rank` still compares installations with each other |
 | Ways out per row (A3b) | `bindforge.devicefiles.DivergenceWaysOut` (which ways a row gets, pure), `DeviceFilesAdopt.adopt(installId, deviceName)` (one device) and `adoptLabels` (the re-merge), `LabelReMerge` (master plus installations as `LabelMerge` sides); buttons beneath the list in `AliasDesignerPanel`, each confirmed. Revert is `DeviceFilesPush.push(installId)` |
@@ -88,7 +88,8 @@ installations with each other before then. Once the master exists, each row offe
 
 ## Boundaries
 
-- **Owns** `bindforge.devices`, `bindforge.devicefiles`, `bindforge.install` and `ui.screen.bindings.AliasDesignerPanel`.
+-
+**Owns** `bindforge.devices`, `bindforge.devicefiles`, `bindforge.install` and the screen in `ui.screen.bindings`: `AliasDesignerPanel`, `AliasDesignerController`, `AliasDesignerReader`, `AliasDesignerReports`.
 - **Writes through Core, never around it.** No slice here writes a game file itself.
 - **The Game Install Locations screen belongs to File Manager** — fix bugs in it here if a slice needs to, but its
   move into File Manager is that section's work.
@@ -131,13 +132,22 @@ game's `.binds` **last**; a hex reference rewritten **from the value `BindsDevic
 *Newest first. Two or three lines each: what was decided and where it is recorded, what was found, what the
 next slice needs.*
 
+- **2026-10-14 — branch review
+  fixes** (Krondor, `code-integrity-review.md` against `master`). CHECK AGAIN offers onboarding again (spec A6b, now three ways in). APPLY with no installation says so, and with one asks about "your installation". A device name that cannot be a filename fails one installation instead of the push or the check. Startup `.buttonMap` generation waits for activation (`BindForgeActivatedEvent`; spec,
+  *At Elite-Intel startup*). **Linux detection
+  built** (`LinuxGameInstallationProvider`, `SteamLibraries`; file-manager.md). The installation list is cached in its manager.
+  **`AliasDesignerPanel`
+  split** into view, controller, reader and reports — the pre-existing "wants a per-flow controller" note is done. **A7
+  needs:** `openOnboarding(device)` is now on
+  `AliasDesignerController`.
+
 - **2026-10-14 — A6b review fixes** (`code-integrity-review.md`; Alan: findings 2–8, 10, 11, 13 and the docs
   note fixed, 9 and 12 left). Recorded under *After review* in [A6b, built](../02-features/bindforge/alias-designer.md#built--2026-10-14-alan-a6b).
   Finding 1, two hex moves in one Apply racing the bindings monitor: **accepted** (option 1) — one rewrite per
   device, a failure reported and retried by the next Apply, tested. **Left:** 9 (the five-argument `DeviceApply`
   constructor kept for the removal tests) and 12 (reports borrowing other features' keys — fix for the whole screen
-  at once). The review's pre-existing notes stand: `.binds` read twice per Apply; `AliasDesignerPanel` wants a
-  per-flow controller.
+  at once). The review's pre-existing notes stand: `.binds` read twice per Apply; `AliasDesignerPanel` wants a per-flow controller
+  *(done 2026-10-14 — `AliasDesignerController`)*.
 
 - **2026-10-14 — A6b built** (Alan: Q1 option 1 both, Q2 write at Finish, Q3 a partial Apply does not hold the
   `.binds` move back — missed installations are caught up later, now slice **A14**). Recorded in the spec under

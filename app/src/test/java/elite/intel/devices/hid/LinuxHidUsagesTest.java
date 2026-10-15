@@ -36,6 +36,7 @@ class LinuxHidUsagesTest {
     void aPathThatIsNotAnEvdevNodeIsNothingKnown() {
         assertEquals(Optional.empty(), LinuxHidUsages.read(sys, "/dev/input/js0"));
         assertEquals(Optional.empty(), LinuxHidUsages.read(sys, ""));
+        assertEquals(Optional.empty(), LinuxHidUsages.read(sys, null));
     }
 
     @Test

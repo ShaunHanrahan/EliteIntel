@@ -5,10 +5,8 @@ import elite.intel.bindforge.install.GameInstallation;
 import elite.intel.db.dao.BindForgeDeviceMasterDao.DeviceRow;
 import elite.intel.db.managers.BindForgeDeviceMasterManager;
 import elite.intel.db.managers.BindForgeInstallationsManager;
-import elite.intel.db.managers.BindForgeSettingsManager;
 import elite.intel.io.AtomicFiles;
 import elite.intel.io.TimestampedBackups;
-import elite.intel.util.AppPaths;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -17,15 +15,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.IntSupplier;
 import java.util.function.Supplier;
@@ -142,22 +132,22 @@ public final class DeviceFilesPush {
      * @throws IOException if Elite-Intel's data folder cannot be created
      */
     public DeviceFilesPush() throws IOException {
-        this(DeviceFilesPush::storedInstallations,
-                DeviceFilesPush::storedMaster,
-                FrontierStockDevices.getInstance(),
-                new TimestampedBackups(),
-                AppPaths.getBindingsWorkingDir().resolve("history"),
-                BindForgeSettingsManager.getInstance()::getEditHistoryRetention,
-                rescanWith(new InstallationDeviceScanner()));
+        this(DeviceFilesPush::storedInstallations, DeviceFilesPush::storedMaster, FrontierStockDevices.getInstance(),
+                EditHistory.stored(), rescanWith(new InstallationDeviceScanner()));
     }
 
     DeviceFilesPush(Supplier<List<Target>> targets, Supplier<List<MasterDevice>> master,
                     FrontierStockDevices stock, TimestampedBackups backups, Path historyRoot,
                     IntSupplier retention, Consumer<Target> afterWrite) {
+        this(targets, master, stock, new EditHistory(backups, historyRoot, retention), afterWrite);
+    }
+
+    private DeviceFilesPush(Supplier<List<Target>> targets, Supplier<List<MasterDevice>> master,
+                            FrontierStockDevices stock, EditHistory history, Consumer<Target> afterWrite) {
         this.targets = targets;
         this.master = master;
         this.stock = stock;
-        this.history = new EditHistory(backups, historyRoot, retention);
+        this.history = history;
         this.afterWrite = afterWrite;
     }
 
@@ -273,7 +263,7 @@ public final class DeviceFilesPush {
 
         for (MasterDevice device : devices) {
             if (device.labels().isEmpty()) continue;
-            Path buttonMap = GameInstallation.buttonMapIn(target.controlSchemes(), device.name());
+            Path buttonMap = buttonMapOf(target, device.name());
             byte[] content = ButtonMapWriter.write(device.labels());
             byte[] previous = readIfPresent(buttonMap);
             if (!Arrays.equals(previous, content)) writes.add(new FileWrite(buttonMap, previous, content));
@@ -283,6 +273,21 @@ public final class DeviceFilesPush {
             if (write != null) writes.add(write);
         }
         return new Plan(writes, seeded);
+    }
+
+    /**
+     * The {@code .buttonMap} the master writes for a device.
+     *
+     * @throws IOException when the name cannot be a filename inside {@code DeviceButtonMaps} - an XML tag may hold a
+     *                     colon, which Windows refuses. Checked, so the push reports that installation as failed and
+     *                     goes on to the next, and the startup check reports it unreadable, rather than either stopping
+     */
+    private static Path buttonMapOf(Target target, String name) throws IOException {
+        try {
+            return GameInstallation.buttonMapIn(target.controlSchemes(), name);
+        } catch (InvalidPathException e) {
+            throw new IOException("\"" + name + "\" cannot be a filename for its .buttonMap", e);
+        }
     }
 
     /**
@@ -353,7 +358,13 @@ public final class DeviceFilesPush {
         return null;
     }
 
-    private static String restore(List<FileWrite> done) {
+    /**
+     * Puts back, newest first, writes that already landed - each file restored to what it held, or removed when it
+     * did not exist.
+     *
+     * @return what could not be put back, worded for a report; empty when everything was
+     */
+    static String restore(List<FileWrite> done) {
         StringBuilder notRestored = new StringBuilder();
         for (FileWrite write : done.reversed()) {
             try {
@@ -363,7 +374,7 @@ public final class DeviceFilesPush {
                     AtomicFiles.write(write.path(), write.previous());
                 }
             } catch (IOException e) {
-                log.error("Could not put {} back after a failed push", write.path(), e);
+                log.error("Could not put {} back after a failed write", write.path(), e);
                 notRestored.append("; and could not put back ").append(write.path().getFileName())
                         .append(": ").append(e.getMessage());
             }
@@ -375,7 +386,10 @@ public final class DeviceFilesPush {
         return new InstallationResult(target, outcome, reason, seeded, List.of());
     }
 
-    private static byte[] readIfPresent(Path file) throws IOException {
+    /**
+     * A file's bytes, or {@code null} when there is no such file.
+     */
+    static byte[] readIfPresent(Path file) throws IOException {
         return Files.isRegularFile(file) ? Files.readAllBytes(file) : null;
     }
 

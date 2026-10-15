@@ -449,4 +449,11 @@ public class StringUtls {
     public static String affirmative() {
         return localizedSpeech("speech.affirmative");
     }
+
+    /**
+     * An exception's message for the user to read, or its kind when it carries none - never the word "null".
+     */
+    public static String messageOf(Throwable e) {
+        return e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
+    }
 }

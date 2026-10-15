@@ -7,11 +7,7 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
+import java.util.*;
 
 /**
  * Merges the user's device elements into one installation's {@code DeviceMappings.xml}.
@@ -66,11 +62,7 @@ public final class DeviceMappingsMerge {
      */
     public static Result merge(byte[] existing, List<UserEntry> entries) throws IOException {
         Document document = DeviceFileXml.parse(existing);
-        Element root = document.getDocumentElement();
-        if (root == null || !ROOT.equals(root.getTagName())) {
-            throw new IOException("Not a DeviceMappings.xml: its root element is <"
-                    + (root == null ? "" : root.getTagName()) + ">, not <" + ROOT + ">");
-        }
+        Element root = rootOf(document);
 
         boolean changed = false;
         List<Element> leading = new ArrayList<>();
@@ -113,11 +105,7 @@ public final class DeviceMappingsMerge {
     public static Result insert(byte[] existing, List<UserEntry> entries, List<String> masterOrder)
             throws IOException {
         Document document = DeviceFileXml.parse(existing);
-        Element root = document.getDocumentElement();
-        if (root == null || !ROOT.equals(root.getTagName())) {
-            throw new IOException("Not a DeviceMappings.xml: its root element is <"
-                    + (root == null ? "" : root.getTagName()) + ">, not <" + ROOT + ">");
-        }
+        Element root = rootOf(document);
 
         boolean changed = false;
         for (UserEntry entry : entries) {
@@ -168,11 +156,7 @@ public final class DeviceMappingsMerge {
      */
     public static Result remove(byte[] existing, Collection<String> names) throws IOException {
         Document document = DeviceFileXml.parse(existing);
-        Element root = document.getDocumentElement();
-        if (root == null || !ROOT.equals(root.getTagName())) {
-            throw new IOException("Not a DeviceMappings.xml: its root element is <"
-                    + (root == null ? "" : root.getTagName()) + ">, not <" + ROOT + ">");
-        }
+        Element root = rootOf(document);
 
         List<Node> gone = new ArrayList<>();
         NodeList children = root.getChildNodes();
@@ -184,6 +168,18 @@ public final class DeviceMappingsMerge {
         if (gone.isEmpty()) return new Result(existing, false);
         gone.forEach(root::removeChild);
         return new Result(DeviceFileXml.write(document), true);
+    }
+
+    /**
+     * @throws IOException if the document is not a {@code DeviceMappings.xml} - its root is not {@code <Root>}
+     */
+    private static Element rootOf(Document document) throws IOException {
+        Element root = document.getDocumentElement();
+        if (root == null || !ROOT.equals(root.getTagName())) {
+            throw new IOException("Not a DeviceMappings.xml: its root element is <"
+                    + (root == null ? "" : root.getTagName()) + ">, not <" + ROOT + ">");
+        }
+        return root;
     }
 
     private static Element newEntry(Document document, UserEntry entry) throws IOException {

@@ -1,12 +1,7 @@
 package elite.intel.ui.screen.bindings;
 
 import com.google.common.eventbus.Subscribe;
-import elite.intel.bindforge.devices.DeviceEditorInputs;
-import elite.intel.bindforge.devices.DeviceEditorMiddle;
-import elite.intel.bindforge.devices.DeviceEditorLights;
-import elite.intel.bindforge.devices.DeviceNames;
-import elite.intel.bindforge.devices.InstallationMarkers;
-import elite.intel.bindforge.devices.MyDevice;
+import elite.intel.bindforge.devices.*;
 import elite.intel.db.managers.BindForgeDeviceDraftManager;
 import elite.intel.devices.events.DeviceAxisEvent;
 import elite.intel.devices.events.DeviceButtonEvent;
@@ -20,6 +15,7 @@ import elite.intel.ui.theme.HudPalette;
 import elite.intel.ui.widget.HudModalSpec;
 import elite.intel.ui.widget.HudTextField;
 import elite.intel.ui.widget.HudUnsavedHint;
+import elite.intel.util.StringUtls;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -41,9 +37,7 @@ import java.util.Set;
 import java.util.function.BooleanSupplier;
 
 import static elite.intel.ui.i18n.MultiLingualTextProvider.getText;
-import static elite.intel.ui.theme.AppTheme.makeButton;
-import static elite.intel.ui.theme.AppTheme.makeButtonSubtle;
-import static elite.intel.ui.theme.AppTheme.transparentPanel;
+import static elite.intel.ui.theme.AppTheme.*;
 
 /**
  * The Device Editor: one device's record, opened from the gear on its My Devices row (alias-designer.md, <em>the
@@ -527,7 +521,7 @@ final class DeviceEditorDialog extends JDialog {
             } catch (RuntimeException e) {
                 // WHY: broad on purpose - a thread boundary, and the user pressed the button and must be told.
                 log.warn("The Device Editor could not change {}", opening.deviceName(), e);
-                message = getText(failedKey, e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage());
+                message = getText(failedKey, StringUtls.messageOf(e));
             }
             String loadedMessage = message;
             SwingUtilities.invokeLater(() -> {

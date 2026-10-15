@@ -5,6 +5,7 @@ import elite.intel.devices.events.DeviceConnectedEvent;
 import elite.intel.devices.model.Device;
 import elite.intel.devices.model.DeviceDescription;
 import elite.intel.devices.model.GameAxis;
+import elite.intel.ui.event.BindForgeActivatedEvent;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -13,11 +14,12 @@ import java.util.Optional;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.IntFunction;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * The startup service: controllers already connected are handled, nothing runs after stop, one failure is
@@ -36,6 +38,8 @@ class ButtonMapStartupTest {
     private static final IntFunction<Optional<DeviceDescription>> DESCRIBED =
             id -> Optional.of(id == LVWAP.id() ? LVWAP_DESCRIPTION : DeviceDescription.axesUnknown(0));
 
+    private static final BooleanSupplier ACTIVATED = () -> true;
+
     private ButtonMapStartup startup;
 
     @AfterEach
@@ -47,7 +51,7 @@ class ButtonMapStartupTest {
     void controllersAlreadyConnectedAtStartAreHandled() throws InterruptedException {
         List<Controller> seen = new CopyOnWriteArrayList<>();
         CountDownLatch done = new CountDownLatch(1);
-        startup = new ButtonMapStartup(recording(seen, done), () -> List.of(LVWAP), DESCRIBED);
+        startup = new ButtonMapStartup(recording(seen, done), () -> List.of(LVWAP), DESCRIBED, ACTIVATED);
 
         startup.start();
 
@@ -63,7 +67,7 @@ class ButtonMapStartupTest {
         IntFunction<Optional<DeviceDescription>> onlyLvwap =
                 id -> id == LVWAP.id() ? Optional.of(LVWAP_DESCRIPTION) : Optional.empty();
         Device gone = new Device(9, "Gone", 1, 12, "", "03002cec44330000f583000000000000");
-        startup = new ButtonMapStartup(recording(seen, done), () -> List.of(gone, LVWAP), onlyLvwap);
+        startup = new ButtonMapStartup(recording(seen, done), () -> List.of(gone, LVWAP), onlyLvwap, ACTIVATED);
 
         startup.start();
 
@@ -74,7 +78,7 @@ class ButtonMapStartupTest {
     @Test
     void aConnectAfterStopDoesNothing() {
         List<Controller> seen = new CopyOnWriteArrayList<>();
-        startup = new ButtonMapStartup(recording(seen, new CountDownLatch(1)), List::of, DESCRIBED);
+        startup = new ButtonMapStartup(recording(seen, new CountDownLatch(1)), List::of, DESCRIBED, ACTIVATED);
         startup.start();
         startup.stop();
 
@@ -99,7 +103,7 @@ class ButtonMapStartupTest {
             }
         };
         Device other = new Device(9, "Other", 1, 12, "", "03002cec44330000f583000000000000");
-        startup = new ButtonMapStartup(generation, () -> List.of(LVWAP, other), DESCRIBED);
+        startup = new ButtonMapStartup(generation, () -> List.of(LVWAP, other), DESCRIBED, ACTIVATED);
         startup.start();
         assertTrue(busy.await(5, TimeUnit.SECONDS));
 
@@ -118,7 +122,7 @@ class ButtonMapStartupTest {
             second.countDown();
         };
         Device other = new Device(9, "Other", 1, 12, "", "03002cec44330000f583000000000000");
-        startup = new ButtonMapStartup(generation, () -> List.of(LVWAP, other), DESCRIBED);
+        startup = new ButtonMapStartup(generation, () -> List.of(LVWAP, other), DESCRIBED, ACTIVATED);
 
         startup.start();
 
@@ -130,12 +134,47 @@ class ButtonMapStartupTest {
     void aControllerWithNoGuidIsSkipped() throws InterruptedException {
         List<Controller> seen = new CopyOnWriteArrayList<>();
         CountDownLatch done = new CountDownLatch(1);
-        startup = new ButtonMapStartup(recording(seen, done), () -> List.of(NO_GUID, LVWAP), DESCRIBED);
+        startup = new ButtonMapStartup(recording(seen, done), () -> List.of(NO_GUID, LVWAP), DESCRIBED, ACTIVATED);
 
         startup.start();
 
         assertTrue(done.await(5, TimeUnit.SECONDS));
         assertEquals(1, seen.size());
+    }
+
+    /**
+     * Before BindForge is activated nothing is written into a game folder - the backup at activation must be first.
+     */
+    @Test
+    void nothingIsGeneratedBeforeActivation() throws InterruptedException {
+        List<Controller> seen = new CopyOnWriteArrayList<>();
+        AtomicBoolean activated = new AtomicBoolean(false);
+        CountDownLatch done = new CountDownLatch(1);
+        startup = new ButtonMapStartup(recording(seen, done), () -> List.of(LVWAP), DESCRIBED, activated::get);
+
+        startup.start();
+        startup.onDeviceConnected(new DeviceConnectedEvent(LVWAP));
+
+        assertFalse(done.await(300, TimeUnit.MILLISECONDS), "generation ran before activation");
+        assertTrue(seen.isEmpty());
+    }
+
+    /**
+     * Activation hands the controllers connected at that moment what startup held back from them.
+     */
+    @Test
+    void activationHandlesTheControllersAlreadyConnected() throws InterruptedException {
+        List<Controller> seen = new CopyOnWriteArrayList<>();
+        AtomicBoolean activated = new AtomicBoolean(false);
+        CountDownLatch done = new CountDownLatch(1);
+        startup = new ButtonMapStartup(recording(seen, done), () -> List.of(LVWAP), DESCRIBED, activated::get);
+        startup.start();
+
+        activated.set(true);
+        startup.onActivated(new BindForgeActivatedEvent());
+
+        assertTrue(done.await(5, TimeUnit.SECONDS));
+        assertEquals(List.of(new Controller("3344", "83F4", 30, 3, LVWAP_DESCRIPTION)), seen);
     }
 
     private static Consumer<Controller> recording(List<Controller> seen, CountDownLatch done) {

@@ -1,5 +1,6 @@
 package elite.intel.bindforge.devicefiles;
 
+import elite.intel.bindforge.devicefiles.DeviceFilesPush.FileWrite;
 import elite.intel.bindforge.devicefiles.DeviceFilesPush.Target;
 import elite.intel.bindforge.devicefiles.DeviceMappingsMerge.UserEntry;
 import elite.intel.bindforge.install.GameInstallation;
@@ -7,22 +8,14 @@ import elite.intel.db.dao.BindForgeDeviceMasterDao.DeviceRow;
 import elite.intel.db.managers.BindForgeDeviceDraftManager;
 import elite.intel.db.managers.BindForgeDeviceDraftManager.StoredDevice;
 import elite.intel.db.managers.BindForgeDeviceMasterManager;
-import elite.intel.db.managers.BindForgeSettingsManager;
 import elite.intel.io.AtomicFiles;
-import elite.intel.io.TimestampedBackups;
-import elite.intel.util.AppPaths;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
-import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -141,8 +134,7 @@ public final class DeviceOnboarding {
         };
         InstallationDeviceScanner scanner = new InstallationDeviceScanner();
         return new DeviceOnboarding(DeviceFilesPush::storedInstallations, store,
-                new EditHistory(new TimestampedBackups(), AppPaths.getBindingsWorkingDir().resolve("history"),
-                        BindForgeSettingsManager.getInstance()::getEditHistoryRetention),
+                EditHistory.stored(),
                 target -> scanner.scan(target.installId(), target.controlSchemes()));
     }
 
@@ -189,7 +181,7 @@ public final class DeviceOnboarding {
         byte[] current;
         DeviceMappingsMerge.Result inserted;
         try {
-            current = Files.isRegularFile(deviceMappings) ? Files.readAllBytes(deviceMappings) : null;
+            current = DeviceFilesPush.readIfPresent(deviceMappings);
             // WHY: seeded from Frontier's, as the push seeds it - without the file the game loads no bindings.
             inserted = DeviceMappingsMerge.insert(current == null ? DeviceFilesPush.stockFile() : current, entries,
                     masterOrder);
@@ -205,63 +197,39 @@ public final class DeviceOnboarding {
             return failed(target, "could not keep an Edit History copy: " + e.getMessage());
         }
 
-        List<Path> created = new ArrayList<>();
+        // WHY: every write that lands is recorded as the push records its own, so a failure puts this installation
+        // back the same way (DeviceFilesPush.restore): new .buttonMap files removed, DeviceMappings.xml restored.
+        List<FileWrite> done = new ArrayList<>();
         List<String> kept = new ArrayList<>();
         try {
-            if (mappingsWrite) AtomicFiles.write(deviceMappings, inserted.content());
+            if (mappingsWrite) {
+                AtomicFiles.write(deviceMappings, inserted.content());
+                done.add(new FileWrite(deviceMappings, current, inserted.content()));
+            }
             for (Naming naming : now) {
                 if (naming.labels().isEmpty()) continue;
                 Path buttonMap = GameInstallation.buttonMapIn(target.controlSchemes(), naming.name());
+                byte[] content = ButtonMapWriter.write(naming.labels());
                 // WHY: create-only, as startup generation is. A map already under the name - one the user made by hand,
                 // or one left by a device cleared outside BindForge - is theirs, and the divergence list shows it.
-                if (CreateOnlyFiles.createNew(buttonMap, ButtonMapWriter.write(naming.labels()))) {
-                    created.add(buttonMap);
+                if (CreateOnlyFiles.createNew(buttonMap, content)) {
+                    done.add(new FileWrite(buttonMap, null, content));
                 } else {
                     kept.add(naming.name());
                 }
             }
-        } catch (IOException | RuntimeException e) {
-            String putBack = putBack(deviceMappings, current, mappingsWrite, created);
-            return failed(target, "could not write: " + e.getMessage() + putBack);
+        } catch (IOException | InvalidPathException e) {
+            // WHY: InvalidPathException beside the IOException - a name the push could not turn into a .buttonMap
+            // filename fails this installation, reported, as any write that cannot land does. Anything else is a bug
+            // and is not caught here.
+            return failed(target, "could not write: " + e.getMessage() + DeviceFilesPush.restore(done));
         }
 
-        if (!mappingsWrite && created.isEmpty()) {
+        if (done.isEmpty()) {
             return new InstallationResult(target, Outcome.UNCHANGED, null, kept);
         }
         afterWrite.accept(target);
         return new InstallationResult(target, Outcome.WRITTEN, null, kept);
-    }
-
-    /**
-     * Puts one installation back as it was: the new {@code .buttonMap} files removed and {@code DeviceMappings.xml}
-     * restored, or removed when onboarding created it.
-     *
-     * @return what could not be put back, worded for the report; empty when everything was
-     */
-    private static String putBack(Path deviceMappings, byte[] previous, boolean mappingsWritten, List<Path> created) {
-        StringBuilder notRestored = new StringBuilder();
-        for (Path file : created) {
-            try {
-                Files.deleteIfExists(file);
-            } catch (IOException e) {
-                log.error("Could not remove {} after a failed onboarding write", file, e);
-                notRestored.append("; and could not remove ").append(file.getFileName()).append(": ")
-                        .append(e.getMessage());
-            }
-        }
-        if (!mappingsWritten) return notRestored.toString();
-        try {
-            if (previous == null) {
-                Files.deleteIfExists(deviceMappings);
-            } else {
-                AtomicFiles.write(deviceMappings, previous);
-            }
-        } catch (IOException e) {
-            log.error("Could not put {} back after a failed onboarding write", deviceMappings, e);
-            notRestored.append("; and could not put back ").append(deviceMappings.getFileName()).append(": ")
-                    .append(e.getMessage());
-        }
-        return notRestored.toString();
     }
 
     private static InstallationResult failed(Target target, String reason) {

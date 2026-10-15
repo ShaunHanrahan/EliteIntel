@@ -4,8 +4,8 @@ import elite.intel.bindforge.devicefiles.ButtonMapAudit;
 import elite.intel.bindforge.devicefiles.DeviceEntry;
 import elite.intel.bindforge.devicefiles.DeviceMappingsParser;
 import elite.intel.bindforge.install.GameInstallation;
+import elite.intel.bindforge.install.GameInstallationProvider;
 import elite.intel.bindforge.install.InstallationRegistry;
-import elite.intel.bindforge.install.WindowsGameInstallationProvider;
 import elite.intel.db.dao.BindForgeInstallationsDao.InstallationRow;
 import elite.intel.session.PlayerSession;
 import elite.intel.ui.dialog.HudConfirmDialog;
@@ -64,7 +64,7 @@ public class GameInstallLocationsPanel extends JPanel {
 
     public GameInstallLocationsPanel() {
         this(new InstallationRegistry(
-                new WindowsGameInstallationProvider(PlayerSession.getInstance().getBindingsDir())));
+                GameInstallationProvider.forThisPlatform(PlayerSession.getInstance().getBindingsDir())));
     }
 
     GameInstallLocationsPanel(InstallationRegistry registry) {

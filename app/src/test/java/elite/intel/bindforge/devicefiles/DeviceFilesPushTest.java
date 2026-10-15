@@ -1,13 +1,11 @@
 package elite.intel.bindforge.devicefiles;
 
-import elite.intel.bindforge.devicefiles.DeviceFilesPush.InstallationResult;
-import elite.intel.bindforge.devicefiles.DeviceFilesPush.MasterDevice;
-import elite.intel.bindforge.devicefiles.DeviceFilesPush.Outcome;
-import elite.intel.bindforge.devicefiles.DeviceFilesPush.Report;
-import elite.intel.bindforge.devicefiles.DeviceFilesPush.Target;
+import elite.intel.bindforge.devicefiles.DeviceFilesPush.*;
 import elite.intel.io.TimestampedBackups;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.EnabledOnOs;
+import org.junit.jupiter.api.condition.OS;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
@@ -20,10 +18,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Stream;
 
-import static org.junit.jupiter.api.Assertions.assertArrayEquals;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Apply for the device files: every installation brought to the master, each one reported, none left half
@@ -295,6 +290,28 @@ class DeviceFilesPushTest {
 
         assertTrue(read(steam.controlSchemes().resolve("DeviceMappings.xml")).contains("<RVWAP>"));
         assertTrue(Files.exists(buttonMap(steam, "RVWAP")));
+    }
+
+    /**
+     * An XML tag may hold a colon, which no Windows filename can. A labelled master device under such a name fails
+     * each installation with a reason, writes nothing there, and does not stop the push reaching the others.
+     */
+    @Test
+    @EnabledOnOs(OS.WINDOWS)
+    void aNameThatCannotBeAFilenameFailsEachInstallationWithoutStoppingThePush() throws IOException {
+        Target steam = installation(1, "STEAM");
+        Target epic = installation(2, "EPIC");
+        MasterDevice colon = new MasterDevice("a:b", "3344", "43F4", Map.of("Joy_1", "Trigger"));
+
+        Report report = push(List.of(steam, epic), List.of(colon));
+
+        assertEquals(2, report.installations().size());
+        for (Target target : List.of(steam, epic)) {
+            InstallationResult result = resultFor(report, target);
+            assertEquals(Outcome.FAILED, result.outcome());
+            assertTrue(result.reason().contains("cannot be a filename"), result.reason());
+            assertEquals(DEVICE_MAPPINGS, read(target.controlSchemes().resolve("DeviceMappings.xml")));
+        }
     }
 
     private Report push(List<Target> targets, List<MasterDevice> master) {
