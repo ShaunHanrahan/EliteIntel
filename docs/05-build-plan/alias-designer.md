@@ -152,6 +152,10 @@ next slice needs.*
   are never taken for itself; the element is renamed in place; a case-only `.buttonMap` rename on Windows deletes
   nothing. Onboarding's taken names now include old names still waiting. **A14 needs:** a rename an installation
   missed is caught up by any push to it - `DeviceFilesPush` renames wherever `previous_name` is still found.
+  **Review fixes** (`code-integrity-review.md`, Alan: all but #8 and the triple `.binds` read): CLEAR refused while a
+  rename is under way, and a device leaving the master mid-rename keeps its old name pending; one shared count,
+  `BindsDeviceReferences.bindingsNaming`; the old element matched ignoring case; the dead `rename` methods on the
+  draft manager, master manager and master DAO removed. Recorded in the spec, *Renaming a Device → After review*.
 
 - **2026-10-14 — A11 planning, part 1** (Alan; no code). **Option 3 ruled:** a rename follows onboarding's
   partial rule, not all or nothing — `.binds` moves once at least one installation took it, a missed one is caught

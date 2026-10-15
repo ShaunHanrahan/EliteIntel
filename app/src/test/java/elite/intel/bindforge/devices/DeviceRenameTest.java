@@ -36,6 +36,16 @@ class DeviceRenameTest {
         assertEquals(Allowed.PENDING, DeviceRename.allowed("LeftStick", false, false, "LeftStick", "LVWAP"));
     }
 
+    /**
+     * A rename only in the draft can be renamed again - the draft keeps the installations' name, whatever comes after
+     * - while one the master still carries cannot.
+     */
+    @Test
+    void aDraftOnlyRenameMayBeRenamedAgainButAMasterPendingOneMayNot() {
+        assertEquals(Allowed.YES, DeviceRename.allowed("LeftStick", false, false, "LVWAP", null));
+        assertEquals(Allowed.PENDING, DeviceRename.allowed("LeftStick", false, false, "LeftStick", "LVWAP"));
+    }
+
     /** No chains: an old name still waiting is taken, so no other device can move into it. */
     @Test
     void anOldNameStillWaitingIsTaken() {

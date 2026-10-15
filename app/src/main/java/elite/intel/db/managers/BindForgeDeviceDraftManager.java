@@ -99,14 +99,6 @@ public class BindForgeDeviceDraftManager {
         update(daos -> daos.draft().setAliasConfirmed(id, confirmed));
     }
 
-    /**
-     * Renames a draft device. The name the installations still hold is kept, so that whatever applies the rename
-     * can find the old {@code .buttonMap} in each of them.
-     */
-    public void rename(long id, String deviceName) {
-        update(daos -> daos.draft().rename(id, deviceName));
-    }
-
     /** Points a draft device at different hardware, keeping its name - the repair for a firmware update. */
     public void retarget(long id, String vid, String pid) {
         update(daos -> daos.draft().retarget(id, vid, pid));
@@ -348,6 +340,14 @@ public class BindForgeDeviceDraftManager {
             List<String> removed = draft.masterNamesNotInDraft().stream()
                     .filter(name -> !draftNames.contains(name))
                     .toList();
+            // WHY: a device that leaves the master mid-rename leaves its old name in the installations that missed the
+            // rename, and perhaps in .binds. Kept pending, that name is removed - or held back while .binds names it -
+            // like any other, rather than forgotten with the row (review, 2026-10-15, A11).
+            List<String> oldNames = master.findAll().stream()
+                    .filter(row -> removed.contains(row.deviceName()))
+                    .map(DeviceRow::previousName)
+                    .filter(old -> old != null && !removed.contains(old) && !draftNames.contains(old))
+                    .toList();
 
             // WHY: the draft is emptied before the master. Its rows point at master rows, and emptying the master
             // first would work only because master_id happens to be ON DELETE SET NULL.
@@ -363,6 +363,7 @@ public class BindForgeDeviceDraftManager {
                 master.clearPendingRemoval(row.deviceName());
             }
             removed.forEach(master::addPendingRemoval);
+            oldNames.forEach(master::addPendingRemoval);
             return removed;
         });
     }

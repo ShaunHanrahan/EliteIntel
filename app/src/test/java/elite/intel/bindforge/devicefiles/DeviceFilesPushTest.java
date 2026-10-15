@@ -374,6 +374,33 @@ class DeviceFilesPushTest {
         assertTrue(read(buttonMap(steam, "Rvwap")).contains("<Joy_1>RV Main Trigger</Joy_1>"));
     }
 
+    /** On a file system that keeps case apart, a case-only rename is a real rename: old file gone, new one written. */
+    @Test
+    @EnabledOnOs({OS.LINUX, OS.MAC})
+    void aCaseOnlyRenameRenamesTheButtonMapWhereCaseMatters() throws IOException {
+        Target steam = installation(1, "STEAM");
+        push(List.of(steam), List.of(RVWAP));
+
+        push(List.of(steam), List.of(renamed("Rvwap", RVWAP.labels())));
+
+        assertTrue(read(buttonMap(steam, "Rvwap")).contains("<Joy_1>RV Main Trigger</Joy_1>"));
+        assertFalse(Files.exists(buttonMap(steam, "RVWAP")));
+    }
+
+    /** An installation with no DeviceMappings.xml is seeded from Frontier's: nothing to rename, the new name added. */
+    @Test
+    void aRenameInAnInstallationWithNoDeviceMappingsAddsTheNewName() throws IOException {
+        Target steam = installation(1, "STEAM");
+        Files.delete(steam.controlSchemes().resolve("DeviceMappings.xml"));
+
+        Report report = push(List.of(steam), List.of(renamed("RightStick", RVWAP.labels())));
+
+        assertEquals(Outcome.WRITTEN, resultFor(report, steam).outcome());
+        String mappings = read(steam.controlSchemes().resolve("DeviceMappings.xml"));
+        assertTrue(mappings.contains("<RightStick>"), mappings);
+        assertFalse(mappings.contains("<RVWAP>"), mappings);
+    }
+
     private static MasterDevice renamed(String name, Map<String, String> labels) {
         return new MasterDevice(name, RVWAP.vid(), RVWAP.pid(), labels, RVWAP.name());
     }

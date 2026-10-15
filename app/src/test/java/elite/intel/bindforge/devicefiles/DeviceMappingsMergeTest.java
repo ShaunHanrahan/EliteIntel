@@ -266,6 +266,30 @@ class DeviceMappingsMergeTest {
         assertEquals(List.of("MyRudder", "GamePad", "SaitekX52"), names(result));
     }
 
+    /**
+     * Review, 2026-10-15: the game finds an element ignoring case, so an installation holding {@code <t-rudder>} still
+     * holds the device renamed from {@code T-Rudder} - left alone, it would keep leading the file for that VID/PID.
+     */
+    @Test
+    void aRenameFindsTheOldNameInAnyCase() throws IOException {
+        String lower = SPECIMEN.replace("<T-Rudder>", "<t-rudder>").replace("</T-Rudder>", "</t-rudder>");
+
+        Result result = DeviceMappingsMerge.rename(bytes(lower), "T-Rudder", "MyRudder");
+
+        assertEquals(List.of("GamePad", "SaitekX52", "MyRudder"), names(result));
+    }
+
+    /** A case-only rename already taken: the element spelled as the new name is never an old copy of itself. */
+    @Test
+    void aCaseOnlyRenameAlreadyTakenChangesNothing() throws IOException {
+        byte[] file = bytes(SPECIMEN);
+
+        Result result = DeviceMappingsMerge.rename(file, "T-RUDDER", "T-Rudder");
+
+        assertFalse(result.changed());
+        assertArrayEquals(file, result.content());
+    }
+
     @Test
     void aRenameOfANameTheFileDoesNotHoldChangesNothing() throws IOException {
         byte[] file = bytes(SPECIMEN);

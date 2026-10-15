@@ -150,18 +150,26 @@ public final class DeviceMappingsMerge {
      * <p>
      * When the new tag is already in the file - a rename carried out by hand, or one this installation half-took
      * before - every old copy is removed instead, and the element already under the new name is kept.
+     * <p>
+     * <strong>The old tag is matched ignoring case</strong>, as the game finds an element (format §4.3, measured
+     * 2026-10-14): an installation adopted or hand-edited as {@code <lvwap>} is still the device whose old name is
+     * {@code LVWAP}, and left alone it would keep leading the file for that VID/PID (review, 2026-10-15). The element
+     * already spelled exactly as the new name is never an old copy - that is a case-only rename already taken.
      *
      * @param existing the installation's current file
-     * @param oldName  the tag to rename, matched exactly as the game matches it
-     * @param newName  the tag it becomes
+     * @param oldName  the tag to rename, matched ignoring case
+     * @param newName  the tag it becomes, matched exactly
      * @throws IOException if {@code existing} is not a {@code DeviceMappings.xml}, or {@code newName} cannot be an
      *                     element tag
      */
     public static Result rename(byte[] existing, String oldName, String newName) throws IOException {
         Document document = DeviceFileXml.parse(existing);
         Element root = rootOf(document);
-        List<Element> old = childrenNamed(root, oldName);
-        if (old.isEmpty() || oldName.equals(newName)) return new Result(existing, false);
+        if (oldName.equals(newName)) return new Result(existing, false);
+        List<Element> old = childrenNamedIgnoringCase(root, oldName).stream()
+                .filter(element -> !element.getNodeName().equals(newName))
+                .toList();
+        if (old.isEmpty()) return new Result(existing, false);
 
         boolean newAlreadyThere = firstChildNamed(root, newName) != null;
         for (Element element : old) {
@@ -183,12 +191,14 @@ public final class DeviceMappingsMerge {
         return new Result(DeviceFileXml.write(document), true);
     }
 
-    private static List<Element> childrenNamed(Element parent, String tag) {
+    private static List<Element> childrenNamedIgnoringCase(Element parent, String tag) {
         List<Element> found = new ArrayList<>();
         NodeList children = parent.getChildNodes();
         for (int i = 0; i < children.getLength(); i++) {
             Node child = children.item(i);
-            if (child.getNodeType() == Node.ELEMENT_NODE && tag.equals(child.getNodeName())) found.add((Element) child);
+            if (child.getNodeType() == Node.ELEMENT_NODE && tag.equalsIgnoreCase(child.getNodeName())) {
+                found.add((Element) child);
+            }
         }
         return found;
     }

@@ -340,11 +340,7 @@ final class DeviceEditorDialog extends JDialog {
         nameBox.setText(titleName());
         nameBox.setEditable(renamable());
         sized(nameBox, FIELD_COLUMNS * 2);
-        nameBox.getDocument().addDocumentListener(new DocumentListener() {
-            @Override public void insertUpdate(DocumentEvent e) { refreshDirty(); }
-            @Override public void removeUpdate(DocumentEvent e) { refreshDirty(); }
-            @Override public void changedUpdate(DocumentEvent e) { refreshDirty(); }
-        });
+        refreshOnEdit(nameBox);
         GridBagConstraints c = cell(1, row);
         c.gridwidth = 2;
         c.fill = GridBagConstraints.HORIZONTAL;
@@ -448,11 +444,7 @@ final class DeviceEditorDialog extends JDialog {
         ((AbstractDocument) box.getDocument()).setDocumentFilter(new LengthLimit());
         box.setText(starting.get(token));
         box.setEditable(editable());
-        box.getDocument().addDocumentListener(new DocumentListener() {
-            @Override public void insertUpdate(DocumentEvent e) { refreshDirty(); }
-            @Override public void removeUpdate(DocumentEvent e) { refreshDirty(); }
-            @Override public void changedUpdate(DocumentEvent e) { refreshDirty(); }
-        });
+        refreshOnEdit(box);
         box.addFocusListener(new FocusAdapter() {
             @Override
             public void focusLost(FocusEvent e) {
@@ -467,6 +459,26 @@ final class DeviceEditorDialog extends JDialog {
         grid.add(box, c);
         boxes.put(token, box);
         restingColours.put(token, new Color[]{box.getBackground(), box.getForeground()});
+    }
+
+    /** Every edit to {@code field} - the name or a label - re-reads whether there is anything to SAVE. */
+    private void refreshOnEdit(HudTextField field) {
+        field.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) {
+                refreshDirty();
+            }
+
+            @Override
+            public void removeUpdate(DocumentEvent e) {
+                refreshDirty();
+            }
+
+            @Override
+            public void changedUpdate(DocumentEvent e) {
+                refreshDirty();
+            }
+        });
     }
 
     private Map<String, String> boxValues() {
@@ -555,6 +567,7 @@ final class DeviceEditorDialog extends JDialog {
             case NAMED_IN_BINDS -> getText("bindings.aliasDesigner.editor.namedInBinds", rule.bindings(),
                     opening.deviceName());
             case BINDS_UNREAD -> getText("bindings.aliasDesigner.editor.why.bindsUnread");
+            case RENAME_PENDING -> getText("bindings.aliasDesigner.editor.why.renamePending");
         };
     }
 

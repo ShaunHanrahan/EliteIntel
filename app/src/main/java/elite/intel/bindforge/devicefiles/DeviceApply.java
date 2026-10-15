@@ -127,14 +127,15 @@ public final class DeviceApply {
      * @param heldBack      pending removals left in the installations because {@code .binds} names them, or could
      *                      not be read
      * @param bindsUnread   whether {@code .binds} could not be read and an entry of the user's was held back for it
-     * @param moves         the bindings that named a master device by hardware id, and what became of them
-     * @param renames       the bindings that named a renamed device by its old name, and what became of them
-     * @param movesUnread   whether {@code .binds} could not be read to find bindings to move, so none was moved
-     * @param renamed       renames every installation and {@code .binds} have now taken - finished
+     * @param moves           the bindings that named a master device by hardware id, and what became of them
+     * @param renameMoves     the bindings that named a renamed device by its old name, and what became of them
+     * @param movesUnread     whether {@code .binds} could not be read to find bindings to move, so none was moved
+     * @param renamesFinished the devices whose rename every installation and {@code .binds} have now taken, by new
+     *                        name - their old name is forgotten
      */
     public record Result(List<String> removed, Report report, List<String> cleanedUp, List<String> notEverywhere,
-                         List<String> heldBack, boolean bindsUnread, List<Move> moves, List<RenameMove> renames,
-                         boolean movesUnread, List<String> renamed) {
+                         List<String> heldBack, boolean bindsUnread, List<Move> moves, List<RenameMove> renameMoves,
+                         boolean movesUnread, List<String> renamesFinished) {
         public Result {
             removed = List.copyOf(removed);
             Objects.requireNonNull(report, "report");
@@ -142,8 +143,8 @@ public final class DeviceApply {
             notEverywhere = List.copyOf(notEverywhere);
             heldBack = List.copyOf(heldBack);
             moves = List.copyOf(moves);
-            renames = List.copyOf(renames);
-            renamed = List.copyOf(renamed);
+            renameMoves = List.copyOf(renameMoves);
+            renamesFinished = List.copyOf(renamesFinished);
         }
     }
 
@@ -264,24 +265,16 @@ public final class DeviceApply {
             String from = row.previousName();
             String to = row.deviceName();
             boolean caseOnly = from.equalsIgnoreCase(to);
-            int bindings = caseOnly ? 0 : countIgnoringCase(counts, from);
+            int bindings = caseOnly ? 0 : BindsDeviceReferences.bindingsNaming(List.of(from), counts);
             boolean bindsSettled = bindings == 0;
             if (bindings > 0) {
                 if (!applied) {
                     moves.add(new RenameMove(from, to, bindings, MoveOutcome.NOT_APPLIED, null));
                 } else {
                     Rewritten result = binds.rewrite(DeviceReferenceRewrite.rename(from, to));
-                    RenameMove move = switch (result.status()) {
-                        case REWRITTEN -> new RenameMove(from, to, result.bindings(), MoveOutcome.MOVED,
-                                result.status());
-                        case NO_REFERENCES -> new RenameMove(from, to, bindings, MoveOutcome.NOT_FOUND, result.status());
-                        default -> {
-                            log.warn("Could not move the bindings naming {} to {}: {}", from, to, result.status());
-                            yield new RenameMove(from, to, bindings, MoveOutcome.FAILED, result.status());
-                        }
-                    };
-                    moves.add(move);
-                    bindsSettled = move.outcome() == MoveOutcome.MOVED || move.outcome() == MoveOutcome.NOT_FOUND;
+                    MoveOutcome outcome = outcomeOf(result, from + " to " + to);
+                    moves.add(new RenameMove(from, to, reported(result, bindings), outcome, result.status()));
+                    bindsSettled = outcome != MoveOutcome.FAILED;
                 }
             }
             if (everywhere && bindsSettled) {
@@ -296,11 +289,26 @@ public final class DeviceApply {
     private record Renames(List<RenameMove> moves, boolean unread, List<String> finished) {
     }
 
-    private static int countIgnoringCase(Map<String, Integer> counts, String name) {
-        return counts.entrySet().stream()
-                .filter(entry -> entry.getKey().equalsIgnoreCase(name))
-                .mapToInt(Map.Entry::getValue)
-                .sum();
+    /**
+     * What became of a rewrite that ran: moved, found nothing to move - the game saved {@code .binds} in between - or
+     * stopped and put everything back, which is logged.
+     *
+     * @param what the move, for the log - {@code "LVWAP to LeftStick"}
+     */
+    private static MoveOutcome outcomeOf(Rewritten result, String what) {
+        return switch (result.status()) {
+            case REWRITTEN -> MoveOutcome.MOVED;
+            case NO_REFERENCES -> MoveOutcome.NOT_FOUND;
+            default -> {
+                log.warn("Could not move the bindings {}: {}", what, result.status());
+                yield MoveOutcome.FAILED;
+            }
+        };
+    }
+
+    /** How many bindings a move reports: those it moved, when it did; otherwise those found before it ran. */
+    private static int reported(Rewritten result, int found) {
+        return result.status() == DeviceRewriteResult.Status.REWRITTEN ? result.bindings() : found;
     }
 
     /**
@@ -340,15 +348,8 @@ public final class DeviceApply {
                 continue;
             }
             Rewritten result = binds.rewrite(new DeviceReferenceRewrite(found.keySet(), row.deviceName()));
-            moves.add(switch (result.status()) {
-                case REWRITTEN -> new Move(row.deviceName(), result.bindings(), MoveOutcome.MOVED, result.status());
-                case NO_REFERENCES -> new Move(row.deviceName(), bindings, MoveOutcome.NOT_FOUND, result.status());
-                default -> {
-                    log.warn("Could not move the bindings naming {} by hardware id {} to it: {}", row.deviceName(),
-                            found.keySet(), result.status());
-                    yield new Move(row.deviceName(), bindings, MoveOutcome.FAILED, result.status());
-                }
-            });
+            MoveOutcome outcome = outcomeOf(result, "naming " + row.deviceName() + " by hardware id " + found.keySet());
+            moves.add(new Move(row.deviceName(), reported(result, bindings), outcome, result.status()));
         }
         return new Moves(moves, false);
     }

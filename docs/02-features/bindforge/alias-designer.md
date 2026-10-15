@@ -1634,7 +1634,25 @@ same breakage in the other direction.
   the game finds the file under either spelling ([format §2.2](domain-knowledge/EliteDangerous-DeviceMappings-ButtonMap.md)).
 - **Renaming is in the Device Editor's name box**, checked as it is typed by onboarding's rule and words. SAVE writes
   the name and the labels in one transaction; a name another device took meanwhile writes nothing and says the device
-  changed. A device renamed in the draft opens under its new name, and CLEAR counts the bindings on both names.
+  changed. A device renamed in the draft opens under its new name, and CLEAR counts the bindings on every name it
+  has — draft, master and old.
+
+#### After review — 2026-10-15 (Alan, A11)
+
+- **CLEAR is refused while a rename is still under way.** Its old name may still be in `.binds` or in an
+  installation that missed the rename, and clearing would drop the old name the next Apply needs to finish it —
+  leaving bindings on a device with no entry, which the game rejects. The tooltip says so; Apply finishes the
+  rename, and CLEAR is offered again.
+- **A device that leaves the master mid-rename keeps its old name pending**, by any route. The old name is then
+  removed from the installations that still hold it — or held back while `.binds` names it — like any other
+  pending removal, rather than forgotten with the row.
+- **The editor's CLEAR count and Apply's rename move use one count**
+  (`BindsDeviceReferences.bindingsNaming`), so they cannot disagree about how many bindings name a device.
+- **The rename finds the old element ignoring case**, as the game does: an installation holding `<lvwap>` is still
+  the device whose old name is `LVWAP`. The element already spelled exactly as the new name is never taken for an
+  old copy.
+- **The Linux note on Apply's confirm speaks of every bindings move**, onboarding's hex move as well as a rename,
+  since both are made in the one bindings folder Elite-Intel uses.
 
 **Why the alias-confirm gate matters more than it looks.** Requiring the alias to be settled before button and
 axis naming unlocks means a `.buttonMap` is only ever created under a name the player has already looked at.

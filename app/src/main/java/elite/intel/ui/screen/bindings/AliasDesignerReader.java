@@ -271,7 +271,10 @@ final class AliasDesignerReader {
      * {@code .binds} that cannot be read - a folder that is not there included - refuses CLEAR rather than offering it
      * on a device it might name, since the game would reject the whole preset. Labels can still be edited.
      * <p>
-     * A device renamed in the draft is named in {@code .binds} by its master name until APPLY, so both are counted.
+     * Every name the device has is counted - its draft name, its master name, and the old name of a rename still
+     * under way - since {@code .binds} may name it by any of them until Apply moves the bindings. <strong>A rename
+     * still under way refuses CLEAR</strong> (review, 2026-10-15, A11): clearing would drop the old name the next
+     * Apply needs to finish it.
      */
     private static DeviceEditorMiddle middleFor(MyDevice device, String name, DeviceRow masterRow,
                                                 FrontierStockDevices stock) {
@@ -284,18 +287,20 @@ final class AliasDesignerReader {
         try {
             Map<String, Integer> counts =
                     BindsDeviceReferences.referenceCounts(PlayerSession.getInstance().getBindingsDir());
-            int naming = DeviceEditorMiddle.bindingsNaming(name, counts);
-            if (masterRow != null && !masterRow.deviceName().equalsIgnoreCase(name)) {
-                naming += DeviceEditorMiddle.bindingsNaming(masterRow.deviceName(), counts);
-            }
-            bindings = OptionalInt.of(naming);
+            List<String> names = masterRow == null
+                    ? List.of(name)
+                    : Arrays.asList(name, masterRow.deviceName(), masterRow.previousName());
+            bindings = OptionalInt.of(BindsDeviceReferences.bindingsNaming(names, counts));
         } catch (IOException e) {
             log.warn("Could not read which devices the bindings name, so Clear is refused for {}: {}", name,
                     e.getMessage());
             bindings = OptionalInt.empty();
         }
-        return DeviceEditorMiddle.of(name, builtIn, inMaster, started, started && draft.findByName(name) != null,
-                bindings);
+        DeviceEditorMiddle middle = DeviceEditorMiddle.of(name, builtIn, inMaster, started,
+                started && draft.findByName(name) != null, bindings);
+        boolean renamePending = masterRow != null && masterRow.previousName() != null
+                && !masterRow.previousName().equals(masterRow.deviceName());
+        return renamePending ? middle.whileRenamePending() : middle;
     }
 
     private static Map<String, String> storedLabels(String name) {

@@ -93,7 +93,7 @@ final class AliasDesignerReports {
                         moveReason(move.status()));
             });
         }
-        for (DeviceApply.RenameMove move : result.renames()) {
+        for (DeviceApply.RenameMove move : result.renameMoves()) {
             text.append('\n').append(switch (move.outcome()) {
                 case MOVED -> getText("bindings.aliasDesigner.apply.renameMoved", move.bindings(), move.from(),
                         move.to());
@@ -103,9 +103,9 @@ final class AliasDesignerReports {
                         moveReason(move.status()));
             });
         }
-        if (!result.renamed().isEmpty()) {
+        if (!result.renamesFinished().isEmpty()) {
             text.append('\n').append(getText("bindings.aliasDesigner.apply.renamed",
-                    String.join(", ", result.renamed())));
+                    String.join(", ", result.renamesFinished())));
         }
         return text.toString();
     }
