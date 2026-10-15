@@ -31,7 +31,7 @@ class AppControllerServicesTest {
         // Cloud main mouth, Latin-script language: radio is voiced by a dedicated always-on Kokoro engine.
         assertTrue(AppController.buildServices(TtsProvider.GOOGLE, TtsProvider.KOKORO)
                 .containsKey(ServiceType.RADIO_MOUTH));
-        // Kokoro main mouth, Cyrillic client: Kokoro cannot pronounce it, so Supertonic runs alongside for radio.
+        // Kokoro main mouth, Russian client: Kokoro cannot pronounce Cyrillic, so Supertonic runs alongside for radio.
         assertTrue(AppController.buildServices(TtsProvider.KOKORO, TtsProvider.SUPERTONIC)
                 .containsKey(ServiceType.RADIO_MOUTH));
         // The main mouth IS the radio engine: it voices radio through its own queue, no extra engine. A second
