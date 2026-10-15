@@ -2,6 +2,7 @@ package elite.intel.junit.gameapi.journal.subscribers;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import elite.intel.db.managers.LocationFixtures;
 import elite.intel.db.managers.LocationManager;
 import elite.intel.gameapi.journal.events.FSSBodySignalsEvent;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
@@ -34,7 +35,7 @@ class PreScanFssBodySignalsTest {
         carrier.setStarName(SYSTEM);
         carrier.setStationName("GHY-L8X");
         carrier.setLocationType(LocationDto.LocationType.FLEET_CARRIER);
-        locationManager.save(carrier);
+        LocationFixtures.store(carrier);
 
         subscriber.onFSSBodySignals(bioSignals("76 Leonis 6 g", 31L, 7));
 
@@ -51,7 +52,7 @@ class PreScanFssBodySignalsTest {
         carrier.setStarName(SYSTEM);
         carrier.setStationName("GHY-L8X");
         carrier.setLocationType(LocationDto.LocationType.FLEET_CARRIER);
-        locationManager.save(carrier);
+        LocationFixtures.store(carrier);
 
         subscriber.onFSSBodySignals(bioSignals("76 Leonis 6 f", 30L, 7));
         subscriber.onFSSBodySignals(bioSignals("76 Leonis 6 f", 30L, 7));

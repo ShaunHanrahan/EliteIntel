@@ -125,6 +125,26 @@ where one caller wants a summary and another wants the truth per slot.
 **So the build order for this screen is:** read all four lines, then the draft model, then the write path
 (which is new code, guarded by the same backup-before-write as every other Apply).
 
+### How the four lines are read — settled 2026-10-12 (Alan, Foundation F1)
+
+`BindingsLoader.readStartPresetSections(Path)` returns a `StartPresetSections` (General, Ship, SRV, On Foot),
+built on the [foundation branch](../../05-build-plan/foundation.md) because `BindingsLoader` is a file V1.1 ships.
+
+- **Which file:** the highest-numbered `StartPreset.N.start`, else `StartPreset.start`, through a new
+  `findLiveStartPresetFile`. Only the Live game is supported, and it reads `.4.start`; the unnumbered file is
+  the leftover pre-Odyssey form. `findStartPresetFile` keeps its listing-order answer for its existing callers.
+- **One line** is the pre-Odyssey form: one preset for all four, flagged `singleLine`. *Exactly* one non-blank
+  line, with at most a line ending after it (tightened 2026-10-12, Alan, from the F1 code review): a name
+  followed by blank lines is the four-line form with sections missing, so a file that lost three lines reads as
+  General only, and Destructive Change Detection can see it, rather than as a valid uniform preset. The record
+  refuses `singleLine` with differing names. How a write treats the single-line form is this screen's decision.
+- **By position, not by skipping blanks.** Each line is trimmed, and a blank line is an empty value for its
+  section wherever it is, so nothing moves up a section. That is the one place this read differs from
+  `getActivePresetName()`.
+- **Short or long files:** a missing section is empty and lines past the fourth are ignored. Whether that
+  looks like a destructive reset is this screen's call, not the reader's.
+- **No file** is an empty `Optional`; **a read failure** is an `IOException`, not an empty answer.
+
 ## Deferred
 
 **Preset Rename and Duplicate** — renaming `.binds` files, or duplicating a preset under a new name — is explicitly out of scope, tracked as Preset Editor's own future item rather than the project-wide roadmap.

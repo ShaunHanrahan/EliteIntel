@@ -565,7 +565,7 @@ public abstract class SherpaOnnxTTS implements MouthInterface {
                 // setting back up to nearly full loudness.
                 TransmissionAudio.processVoice(pcm, task.isRadio(), task.effects());
                 // The radio has a level of its own: this engine is the only one that voices a transmission
-                // (Google and Edge drop them), so the fork between the two sliders lives here alone.
+                // (Google drops them), so the fork between the two sliders lives here alone.
                 int volume = task.isRadio() ? systemSession.getRadioVolume() : systemSession.getVoiceVolume();
                 AudioDeClicker.applyVolume(pcm, volume / 100f);
                 int supertonicBoost = provider() == TtsProvider.SUPERTONIC

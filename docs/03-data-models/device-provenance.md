@@ -68,6 +68,10 @@ So: **the master records intent, these rows record reality, and drift is the dif
 Collapsing the rows would remove the only copy of reality. *Do not "simplify" this to one row per device on
 the grounds that installations now match — knowing they match is exactly what the rows are for.*
 
+*Built 2026-10-08 (Alan): the **M** markers on screen read the startup check against the master, not these rows.*
+The check reads the files and judges labels and severity, which these rows do not carry. The rows remain the stored record of reality — see
+[the Installations markers](../02-features/bindforge/alias-designer.md#the-installations-markers--2026-10-08-alan).
+
 | Field | Purpose |
 |---|---|
 | `install_id` | which installation this row describes |
@@ -96,9 +100,13 @@ that may legitimately carry different names, which is the divergence the design 
 Frontier's, and Frontier's entries live in the shipped reference file rather than in this table. This table
 records what BindForge knows about entries it might *touch*, and a player-added entry carries one pair.
 
-**Settled 2026-09-13 for Frontier's entries: BindForge never edits one.** A built-in's name and VID/PID pairs
-are Frontier's definition and stay locked; only a `.buttonMap` under its name can be created — see
-[Built-in controllers in My Devices](../02-features/bindforge/alias-designer.md#built-in-controllers-in-my-devices--settled-2026-09-13).
+~~**Settled 2026-09-13 for Frontier's entries: BindForge never edits one.**~~ **Reversed 2026-10-04:** a
+user with the controller attached may rename a Frontier entry or shadow it with one of their own, and from then
+on it is the user's element like any other. Measured safe, and recoverable because BindForge carries Frontier's
+shipped list — see [Built-in controllers in My Devices](../02-features/bindforge/alias-designer.md#built-in-controllers-in-my-devices--settled-2026-09-13)
+and [the first match wins](../02-features/bindforge/domain-knowledge/EliteDangerous-DeviceMappings-ButtonMap.md#12d-two-entries-for-one-vidpid-the-first-in-the-file-wins--measured-2026-10-03).
+**Provenance still governs what BindForge does unasked:** an entry it has not been told is the user's stays
+`FRONTIER` or `UNKNOWN`, and is never touched without the user choosing to.
 
 **Still open, and cheap to defer:** what happens if a player adds `<Alternative>` pairs by hand. Not observed;
 recorded so the single-pair assumption is a decision rather than an oversight.
@@ -202,6 +210,13 @@ than provenance because one file carries all three tables: `bindforge_device_mas
 `bindforge_device_labels` (its `.buttonMap` content) and `bindforge_device_installs` (this table). They are
 one change — the master is meaningless without something to compare it against — and splitting them across
 three migrations would only mean three numbers for one schema.
+
+**The device draft followed on 2026-10-04 as `12003__bindforge_device_draft.sql`** — `bindforge_device_draft`
+and `bindforge_device_draft_labels`, the same shape as the master's two tables, plus a one-row marker saying a
+draft exists. Saved edits live there until Apply copies them into the master. **`12004` adds
+`bindforge_device_pending_removal`**: devices an Apply took out of the master whose entries are still in the
+installations, kept until whatever removes the files clears them. See
+[Alias Designer — where the draft lives](../02-features/bindforge/alias-designer.md#actions-and-what-each-one-reaches).
 
 *Deliberately not a specific number.* Krondor's §4 named 12000 as the example; `12000__bindforge_settings.sql`
 took it on 2026-09-28, and `12001__bindforge_installations.sql` took the renumbered one the same day. A

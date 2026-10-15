@@ -20,7 +20,6 @@ public class FSSBodySignalsSubscriber {
 
     private static final Logger log = LogManager.getLogger(FSSBodySignalsSubscriber.class);
     private final PlayerSession playerSession = PlayerSession.getInstance();
-    private final LocationManager locationManager = LocationManager.getInstance();
 
     /**
      * What a signal report said about a body, for the announcement.
@@ -31,43 +30,47 @@ public class FSSBodySignalsSubscriber {
     @Subscribe
     public void onFssBodySignal(FSSBodySignalsEvent event) {
         Thread.ofVirtual().start(() -> {
-            LocationDto primaryStarLocation = locationManager.findBySystemAddress(event.getSystemAddress());
-            LocationDto location = locationManager.findBySystemAddress(event.getSystemAddress(), event.getBodyID());
-            location.setX(primaryStarLocation.getX());
-            location.setY(primaryStarLocation.getY());
-            location.setZ(primaryStarLocation.getZ());
-
-            // Not the primary star's name: that record exists only for a system we jumped into, and a record
-            // with no system name is not saved at all - so in a system entered by carrier every FSS signal
-            // report used to be written to nothing.
-            SignalCounts counts = file(location, event, locationManager.findStarName(event.getSystemAddress()));
-            if (counts == null) return;
-            locationManager.save(location);
-
-            if (playerSession.isDiscoveryAnnouncementOn()) {
-                if (counts.bio() > 0)
-                    VegaRuntime.narrator().announce(localizedEventPlural(counts.bio(), "event.fss.body.bioSignals"), false);
-                if (counts.geo() > 0)
-                    VegaRuntime.narrator().announce(localizedEventPlural(counts.geo(), "event.fss.body.geoSignals"), false);
-            }
+            SignalCounts counts = record(event);
+            if (counts == null || !playerSession.isDiscoveryAnnouncementOn()) return;
+            if (counts.bio() > 0)
+                VegaRuntime.narrator().announce(localizedEventPlural(counts.bio(), "event.fss.body.bioSignals"), false);
+            if (counts.geo() > 0)
+                VegaRuntime.narrator().announce(localizedEventPlural(counts.geo(), "event.fss.body.geoSignals"), false);
         });
     }
 
     /**
-     * Writes the report onto the body's record: name, kind, the signal list and the bio and geo counts.
-     * Shared with the pre-scan so a replayed report and a live one file the same thing, and the one place
-     * that decides whether a report can be filed at all.
+     * Files the report onto the body's record in one locked write. Shared with the pre-scan so a replayed report
+     * and a live one file the same thing, and the one place that decides whether a report can be filed at all.
      *
-     * @return the counts the report carried, or null when there is nothing to save: no signals, no body name
-     * or ID to file them under, or no system name (which {@link LocationManager#save} would refuse
-     * silently - six moons' bio signals once went missing that way, so it is said here).
+     * @return the counts the report carried, or null when there is nothing to file: no signals, no body name or ID
+     * to file them under, or no system name - the last said here, because six moons' bio signals once went
+     * missing to it without a word.
      */
-    static SignalCounts file(LocationDto location, FSSBodySignalsEvent event, String starName) {
+    static SignalCounts record(FSSBodySignalsEvent event) {
         if (event.getBodyName() == null || event.getBodyID() == null) return null;
+        if (event.getSignals() == null || event.getSignals().isEmpty()) return null;
+        LocationManager locations = LocationManager.getInstance();
+        // Not the primary star's name: that record exists only for a system we jumped into, so in a system entered
+        // by carrier every FSS signal report used to be written to nothing.
+        String starName = locations.findStarName(event.getSystemAddress());
         if (starName == null || starName.isBlank()) {
             log.debug("FSS body signals for {} not filed: nothing names system {}", event.getBodyName(), event.getSystemAddress());
             return null;
         }
+        LocationDto system = locations.findSystemRecord(event.getSystemAddress());
+        LocationDto body = locations.updateNamedBody(event.getSystemAddress(), event.getBodyID(), event.getBodyName(),
+                location -> file(location, event, starName, system));
+        return new SignalCounts(body.getBioSignals(), body.getGeoSignals());
+    }
+
+    /**
+     * Writes the report onto the body's record: name, kind, coordinates, the signal list and the bio and geo counts.
+     */
+    private static void file(LocationDto location, FSSBodySignalsEvent event, String starName, LocationDto system) {
+        location.setX(system.getX());
+        location.setY(system.getY());
+        location.setZ(system.getZ());
         location.setStarName(starName);
         location.setPlanetName(event.getBodyName());
         location.setSystemAddress(event.getSystemAddress());
@@ -78,8 +81,6 @@ public class FSSBodySignalsSubscriber {
         location.setLocationType(ScanBodyClassifier.resolve(location));
 
         List<FSSBodySignalsEvent.Signal> signals = event.getSignals();
-        if (signals == null || signals.isEmpty()) return null;
-
         location.setFssSignals(signals);
         int bioSignals = 0;
         int geoSignals = 0;
@@ -99,6 +100,5 @@ public class FSSBodySignalsSubscriber {
 
         location.setBioSignals(bioSignals);
         location.setGeoSignals(geoSignals);
-        return new SignalCounts(bioSignals, geoSignals);
     }
 }

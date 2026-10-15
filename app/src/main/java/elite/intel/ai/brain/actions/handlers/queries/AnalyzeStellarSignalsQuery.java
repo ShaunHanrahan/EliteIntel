@@ -87,7 +87,7 @@ public class AnalyzeStellarSignalsQuery extends BaseQueryAnalyzer implements Int
                 """;
 
         Collection<LocationDto> locations = locationManager.findAllBySystemAddress(
-                playerSession.getLocationData().getSystemAddress());
+                playerSession.currentSystemAddress());
 
         return process(
                 new AiDataStruct(

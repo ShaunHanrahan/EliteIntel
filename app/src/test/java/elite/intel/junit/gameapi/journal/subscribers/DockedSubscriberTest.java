@@ -2,11 +2,13 @@ package elite.intel.junit.gameapi.journal.subscribers;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
+import elite.intel.db.managers.LocationFixtures;
 import elite.intel.db.managers.LocationManager;
 import elite.intel.gameapi.journal.events.DockedEvent;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
 import elite.intel.gameapi.journal.subscribers.DockedSubscriber;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -33,7 +35,7 @@ class DockedSubscriberTest {
         int run = RUN.incrementAndGet();
         long sysAddr = 444_111_222L + run;
         long marketId = 128_016_640L + run;
-        session.setCurrentLocationId(3L, sysAddr);
+        session.moveTo(new Position(sysAddr, "Test System", 3L));
 
         subscriber.onDockedEvent(dockedEvent("Jameson Memorial " + run, "Orbis", "Shinrarta Dezhra", sysAddr, marketId));
 
@@ -62,9 +64,9 @@ class DockedSubscriberTest {
         body.setPlanetName(planet);
         body.setLocationType(LocationDto.LocationType.MOON);
         body.setGravity(0.08);
-        locationManager.save(body);
+        LocationFixtures.store(body);
 
-        session.setCurrentLocationId(bodyId, sysAddr);
+        session.moveTo(new Position(sysAddr, "Test System", bodyId));
 
         // A carrier parked at that moon: the case that used to store the moon as a FLEET_CARRIER.
         subscriber.onDockedEvent(dockedEvent("GHY-L8X " + run, "FleetCarrier", star, sysAddr, marketId));
@@ -87,12 +89,12 @@ class DockedSubscriberTest {
         int run = RUN.incrementAndGet();
         long sysAddr = 444_666_999L + run;
         long marketId = 55_000L + run;
-        session.setCurrentLocationId(2L, sysAddr);
+        session.moveTo(new Position(sysAddr, "Test System", 2L));
 
         subscriber.onDockedEvent(dockedEvent("Hutton Orbital " + run, "Coriolis", "Alpha Centauri", sysAddr, marketId));
         awaitTrue(() -> locationManager.findByMarketId(marketId).getStationName() != null);
 
-        session.setCurrentLocationId(99L, sysAddr); // a different drop body: it must make no difference
+        session.moveTo(new Position(sysAddr, "Test System", 99L)); // a different drop body: it must make no difference
         subscriber.onDockedEvent(dockedEvent("Hutton Orbital " + run, "Coriolis", "Alpha Centauri", sysAddr, marketId));
         Thread.sleep(300);
 

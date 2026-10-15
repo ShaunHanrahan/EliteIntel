@@ -7,8 +7,8 @@ import elite.intel.gameapi.journal.events.ApproachBodyEvent;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
 import elite.intel.gameapi.journal.events.dto.TargetLocation;
 import elite.intel.gameapi.journal.subscribers.ApproachBodySubscriber;
-import elite.intel.session.LocationData;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -115,14 +115,14 @@ class ApproachBodySubscriberTest {
     void nullBodyIdDoesNotUpdateLocationId() throws InterruptedException {
         long uniqueSystem = 77777777L;
         long knownBodyId = 99L;
-        PlayerSession.getInstance().setCurrentLocationId(knownBodyId, uniqueSystem);
+        PlayerSession.getInstance().moveTo(new Position(uniqueSystem, "Test System", knownBodyId));
 
         subscriber.onApproachBodyEvent(approachBodyEventNullBodyId(STAR_SYSTEM, uniqueSystem, "Deciat 9"));
 
         Thread.sleep(300); // virtual thread has no DB change to poll; just wait
 
-        LocationData<Long, Long> loc = PlayerSession.getInstance().getLocationData();
-        assertEquals(knownBodyId, loc.getInGameId(), "null BodyID must not overwrite current_location_id");
+        Position loc = PlayerSession.getInstance().position().orElseThrow();
+        assertEquals(knownBodyId, loc.bodyId(), "null BodyID must not overwrite current_location_id");
     }
 
     @Test

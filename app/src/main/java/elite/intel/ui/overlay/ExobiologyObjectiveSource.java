@@ -2,11 +2,12 @@ package elite.intel.ui.overlay;
 
 import elite.intel.db.managers.BioSamplesManager;
 import elite.intel.db.managers.LocationManager;
+import elite.intel.gameapi.data.BioForms;
 import elite.intel.gameapi.journal.events.dto.BioSampleDto;
 import elite.intel.gameapi.journal.events.dto.GenusDto;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
-import elite.intel.session.LocationData;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import elite.intel.util.ExoBio;
 
 import java.util.*;
@@ -72,9 +73,9 @@ public class ExobiologyObjectiveSource implements HudObjectiveSource {
     public Optional<HudObjective> currentObjective() {
         if (!Boolean.TRUE.equals(playerSession.isDiscoveryAnnouncementOn())) return Optional.empty();
 
-        LocationData<Long, Long> here = playerSession.getLocationData();
-        Long systemAddress = here == null ? null : here.getSystemAddress();
-        if (systemAddress == null || systemAddress == 0) return Optional.empty();
+        Optional<Position> here = playerSession.position();
+        if (here.isEmpty()) return Optional.empty();
+        long systemAddress = here.get().systemAddress();
 
         // Scoped to the current system, which is also what clears the card: bodies
         // in the system just left are not read at all.
@@ -82,7 +83,7 @@ public class ExobiologyObjectiveSource implements HudObjectiveSource {
         if (bioBodies == null || bioBodies.isEmpty()) return Optional.empty();
 
         return bioBodies.stream()
-                .sorted(byRelevance(here.getInGameId()))
+                .sorted(byRelevance(here.get().bodyId()))
                 .map(body -> card(body, completedSamplesOn(body), "exobiology:" + systemAddress + ":" + body.getBodyId()))
                 .flatMap(Optional::stream)
                 .findFirst();
@@ -106,13 +107,21 @@ public class ExobiologyObjectiveSource implements HudObjectiveSource {
     }
 
     /**
+     * Every finished sample the commander carries. Selling to Vista Genomics or dying clears them, so this is
+     * the unsold haul, not a career's worth.
+     */
+    List<BioSampleDto> carriedSamples() {
+        return bioSamplesManager.listAll();
+    }
+
+    /**
      * Finished samples recorded on this body. Scoped to the body rather than
      * reading every sample the commander has ever taken, which is a career-long
      * list and would be deserialised in full on each poll.
      */
-    private List<BioSampleDto> completedSamplesOn(LocationDto body) {
+    List<BioSampleDto> completedSamplesOn(LocationDto body) {
         String primaryStar = body.getStarName() == null || body.getStarName().isBlank()
-                ? playerSession.getPrimaryStarName()
+                ? playerSession.currentStarSystem()
                 : body.getStarName();
         if (primaryStar == null || primaryStar.isBlank()) return List.of();
         return bioSamplesManager.findByPlanetName(primaryStar, body.getPlanetName());
@@ -135,12 +144,15 @@ public class ExobiologyObjectiveSource implements HudObjectiveSource {
         List<GenusDto> detected = body.getGenus();
         if (detected == null || detected.isEmpty()) return Optional.empty();
 
-        List<ExoBio.DataDto> completed = ExoBio.completedScansForPlanet(
-                completedSamples == null ? List.of() : completedSamples, body.getPlanetName());
-        List<GenusDto> remaining = ExoBio.calculateGenusNotYetScanned(completed, detected);
+        List<GenusDto> remaining = remainingGenus(body, completedSamples);
         if (remaining.isEmpty()) return Optional.empty();
 
         Map<String, Integer> partials = partialsByGenus(body.getPartialBioSamples());
+        // The genus being sampled leads the list, so it cannot be one of those folded into the
+        // overflow row on a body with more genuses than the card has rows. The sort is stable,
+        // so the rest keep their order.
+        remaining = new ArrayList<>(remaining);
+        remaining.sort(Comparator.comparing((GenusDto genus) -> !isInProgress(sampledStage(partials, genus))));
 
         List<HudRow> rows = new ArrayList<>();
         rows.add(HudRow.progress(HudText.get("overlay.card.row.genus"),
@@ -150,7 +162,7 @@ public class ExobiologyObjectiveSource implements HudObjectiveSource {
         for (GenusDto genus : remaining.subList(0, shown)) {
             String label = displayName(genus);
             Integer sampled = sampledStage(partials, genus);
-            if (sampled != null && sampled > 0 && sampled < SAMPLES_PER_GENUS) {
+            if (isInProgress(sampled)) {
                 // The one being worked on right now: the bar says how many more
                 // colonies to walk to, which is the only number that matters then.
                 rows.add(HudRow.progress(label, sampled, SAMPLES_PER_GENUS, HudRow.State.WARN));
@@ -168,6 +180,25 @@ public class ExobiologyObjectiveSource implements HudObjectiveSource {
                 bodyLabel(body),
                 rows,
                 HudObjective.PRIORITY_AMBIENT));
+    }
+
+    /**
+     * Whether this card would be about this body: a surveyed body with a genus still to sample. The
+     * discovery card stands aside for it when the commander is at that body.
+     */
+    boolean hasWorkOn(LocationDto body) {
+        return card(body, completedSamplesOn(body), "").isPresent();
+    }
+
+    /**
+     * The genuses a DSS found on the body that no completed sample covers yet.
+     */
+    static List<GenusDto> remainingGenus(LocationDto body, List<BioSampleDto> completedSamples) {
+        List<GenusDto> detected = body.getGenus();
+        if (detected == null || detected.isEmpty()) return List.of();
+        List<ExoBio.DataDto> completed = ExoBio.completedScansForPlanet(
+                completedSamples == null ? List.of() : completedSamples, body.getPlanetName());
+        return ExoBio.calculateGenusNotYetScanned(completed, detected);
     }
 
     /**
@@ -190,6 +221,13 @@ public class ExobiologyObjectiveSource implements HudObjectiveSource {
             }
         }
         return result;
+    }
+
+    /**
+     * Started but not finished: at least one sample taken, the last one still to go.
+     */
+    private static boolean isInProgress(Integer sampled) {
+        return sampled != null && sampled > 0 && sampled < SAMPLES_PER_GENUS;
     }
 
     /**
@@ -216,10 +254,19 @@ public class ExobiologyObjectiveSource implements HudObjectiveSource {
         return keys;
     }
 
+    /**
+     * The genus name followed by the distance its colonies must be apart, e.g. {@code CONCHA (150m)}: the
+     * one number the commander needs while walking between samples. The range is looked up by the FDev
+     * symbol, so it holds on any game client language; a genus the table does not know shows the name alone.
+     */
     private static String displayName(GenusDto genus) {
         String name = genus.getGenusLocalised();
         if (name == null || name.isBlank()) name = genus.getGenusSymbol();
-        return name == null ? HudText.get("overlay.card.row.unknownGenus") : name.toUpperCase(Locale.ROOT);
+        if (name == null) return HudText.get("overlay.card.row.unknownGenus");
+        Integer range = BioForms.colonyRangeOrNull(
+                genus.getGenusSymbol() == null || genus.getGenusSymbol().isBlank() ? name : genus.getGenusSymbol());
+        String label = name.toUpperCase(Locale.ROOT);
+        return range == null ? label : label + " (" + range + "m)";
     }
 
     /**

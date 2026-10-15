@@ -28,7 +28,6 @@ class RadioVoicingTest {
             TtsProvider radio = RadioVoicing.engineFor(language);
             assertTrue(radio.isLocal(), "radio is chatter, not narration: " + language);
             assertNotEquals(TtsProvider.GOOGLE, radio);
-            assertNotEquals(TtsProvider.EDGE, radio);
         }
     }
 

@@ -385,10 +385,12 @@ Consequences of that limit, so they are chosen rather than discovered:
 
 ### Open
 
-- **Detection itself is not built.** `AppPaths` resolves Elite-Intel's own folders only and has no notion
-  of where Elite Dangerous is installed, let alone per storefront. This screen specifies what detection has
-  to produce; it does not provide it. **Windows storefront detection is BindForge's to build; Linux/Proton
-  resolution is Krondor's** — see below.
+- ~~**Detection itself is not built.**~~
+  *Built:* `WindowsGameInstallationProvider` (Steam, Epic, Frontier and Oculus defaults) and, 2026-10-14 at Krondor's request, `LinuxGameInstallationProvider`, chosen by
+  `GameInstallationProvider.forThisPlatform`. Linux reads every place a Steam client can live — `~/.steam/steam`,
+  `~/.local/share/Steam`, Snap's `~/snap/steam/common/.local/share/Steam` and Flatpak's
+  `~/.var/app/com.valvesoftware.Steam/.local/share/Steam` — since several can be installed at once, and each one's
+  `libraryfolders.vdf` (`SteamLibraries`, shared with Windows). A client or game reached twice through a link is reported once. Each installation carries its own bindings folder, in the Proton prefix of the library holding it (`steamapps/compatdata/359320/pfx/...`). Epic and Frontier copies under Lutris, Heroic or a hand-made Wine prefix record nothing reliable and come in through the manual add.
 
 ## What a `.binds` File Might Not Be
 
@@ -430,6 +432,12 @@ afterwards — is for.
 **Where the folder is: under Elite-Intel's own data folder — settled 2026-10-03 (Alan).**
 `%LOCALAPPDATA%\elite-intel` on Windows, and whatever `AppPaths.getAppDataBase()` resolves to elsewhere —
 the same root already holding the database, the working copies and the player backups.
+
+**The path, for device files — built 2026-10-04:** `elite-intel\bindings\history\<installation id>\`, with
+`.buttonMap` copies in a `DeviceButtonMaps\` folder beneath it. Keyed by installation id rather than storefront,
+because two installations' files share a name and the id survives a relocate. Each copy is named
+`<file>.<yyyyMMdd-HHmmss>.bak` by `elite.intel.io.TimestampedBackups`, so the listing sorts as the history.
+`AppPaths.getBindingsWorkingDir()` supplies the root, which kept `AppPaths` — shared with V1.1 — unchanged.
 
 *This replaces "that file's own History folder", which read as **beside the file**. For `DeviceMappings.xml`
 and `.buttonMap` that would be inside the game installation, which the patcher replaces wholesale on every
@@ -503,7 +511,7 @@ here, and what is not:
 | [Retention](#retention) | **does not exist.** Nothing prunes anything; backups accumulate until deleted by hand |
 | [Backup status values](#backup-status-values) | **not reachable yet** — Full / Partial / Custom needs the installation list that [detection](#open) would supply |
 | [Game Install Locations](#game-install-locations) | **not built** — see the section's own [Open](#open) note |
-| [Edit History](#edit-history) | **nothing at all** — no class, no table, no migration |
+| [Edit History](#edit-history) | **writing built for device files** (2026-10-04, `bindforge.devicefiles.DeviceFilesPush` — see [the path](#edit-history)); `.binds` and `StartPreset` not yet, and no browsing or restore |
 
 **Auto-backup and retention are one change, not two.** Today nothing prunes, and that is harmless because
 every backup is a deliberate button press. Add the launch trigger on its own and the folder grows every
@@ -516,8 +524,9 @@ see [Storage](#edit-history). The band rule that paragraph described still stand
 everything else BindForge stores: **BindForge owns `12000–12499`**, commander and galaxy work `12500–12999`, per Krondor's <!-- terminology-ok: names the real db-migration/commander/ tree and Krondor's per-commander work -->
 [proposal §4](../../multi-install-proposal.md#4-migrations-one-tree-per-file), accepted 2026-09-24, in the
 shared top-level `db-migration/` tree and never `db-migration/commander/`, which is Krondor's alone. <!-- terminology-ok: names the real db-migration/commander/ tree and Krondor's per-commander work -->
-The range held one file when this was written and now holds three — `12000__bindforge_settings.sql`,
-`12001__bindforge_installations.sql` and `12002__bindforge_devices.sql`. [An applied migration is never edited](../../../CLAUDE.md).
+The range held one file when this was written and now holds five — `12000__bindforge_settings.sql`,
+`12001__bindforge_installations.sql`, `12002__bindforge_devices.sql`, `12003__bindforge_device_draft.sql` and
+`12004__bindforge_device_pending_removal.sql`. [An applied migration is never edited](../../../CLAUDE.md).
 
 ## Export / Import — Considered, Then Cut
 

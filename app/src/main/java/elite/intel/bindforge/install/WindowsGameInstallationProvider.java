@@ -18,8 +18,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
 /**
@@ -41,16 +39,9 @@ public class WindowsGameInstallationProvider implements GameInstallationProvider
 
     private static final Logger log = LogManager.getLogger(WindowsGameInstallationProvider.class);
 
-    /** Elite Dangerous on Steam. The same id appears in {@code libraryfolders.vdf}'s apps map. */
-    private static final String STEAM_APP_ID = "359320";
     private static final String STEAM_REGISTRY_VALUE = "InstallPath";
     private static final Path EPIC_MANIFESTS =
             Path.of("C:\\ProgramData\\Epic\\EpicGamesLauncher\\Data\\Manifests");
-
-    // WHY: "path" always precedes its library's "apps" block in the VDF, so a single forward pass can
-    // attribute an app id to the library it was listed under. Values escape backslashes and nothing else.
-    private static final Pattern VDF_PATH = Pattern.compile("\"path\"\\s+\"(.+?)\"");
-    private static final Pattern VDF_APP_ID = Pattern.compile("\"(\\d+)\"\\s+\"\\d+\"");
 
     private final Path bindingsFolder;
     private final List<Path> steamRoots;
@@ -112,58 +103,14 @@ public class WindowsGameInstallationProvider implements GameInstallationProvider
     private List<GameInstallation> steamInstallations() {
         List<GameInstallation> installations = new ArrayList<>();
         for (Path steamRoot : steamRoots) {
-            for (Path library : steamLibrariesHoldingTheGame(steamRoot)) {
-                Path root = library.resolve("steamapps").resolve("common").resolve("Elite Dangerous");
+            for (Path library : SteamLibraries.holdingTheGame(steamRoot)) {
+                Path root = SteamLibraries.gameRootIn(library);
                 if (GameInstallation.looksLikeAnInstall(root)) {
                     installations.add(installationAt(Storefront.STEAM, root));
                 }
             }
         }
         return installations;
-    }
-
-    /**
-     * The library folders whose {@code apps} map lists Elite Dangerous.
-     * <p>
-     * Steam keeps two copies of {@code libraryfolders.vdf} and reconciles them at launch, so both are read and
-     * whichever names the game is believed.
-     */
-    private List<Path> steamLibrariesHoldingTheGame(Path steamRoot) {
-        List<Path> libraries = new ArrayList<>();
-        for (Path vdf : List.of(steamRoot.resolve("config").resolve("libraryfolders.vdf"),
-                steamRoot.resolve("steamapps").resolve("libraryfolders.vdf"))) {
-            libraries.addAll(parseLibrariesHoldingTheGame(vdf));
-        }
-        return libraries;
-    }
-
-    private List<Path> parseLibrariesHoldingTheGame(Path vdf) {
-        if (!Files.isRegularFile(vdf)) return List.of();
-        try {
-            return librariesListingTheGame(Files.readString(vdf));
-        } catch (IOException e) {
-            log.warn("Could not read Steam library index {}: {}", vdf, e.getMessage());
-            return List.of();
-        }
-    }
-
-    /**
-     * Walks the file once, remembering the library path currently in scope and keeping it when the game's app
-     * id turns up before the next one.
-     */
-    private List<Path> librariesListingTheGame(String vdfText) {
-        List<Path> libraries = new ArrayList<>();
-        Matcher token = Pattern.compile(VDF_PATH.pattern() + "|" + VDF_APP_ID.pattern()).matcher(vdfText);
-        String currentLibrary = null;
-        while (token.find()) {
-            if (token.group(1) != null) {
-                currentLibrary = token.group(1).replace("\\\\", "\\");
-            } else if (STEAM_APP_ID.equals(token.group(2)) && currentLibrary != null) {
-                addPathIfUsable(libraries, currentLibrary);
-                currentLibrary = null;
-            }
-        }
-        return libraries;
     }
 
     private List<GameInstallation> epicInstallations() {
@@ -197,14 +144,6 @@ public class WindowsGameInstallationProvider implements GameInstallationProvider
 
     private GameInstallation installationAt(Storefront storefront, Path root) {
         return new GameInstallation(storefront, root, GameInstallation.controlSchemesUnder(root), bindingsFolder);
-    }
-
-    private void addPathIfUsable(List<Path> libraries, String library) {
-        try {
-            libraries.add(Path.of(library));
-        } catch (InvalidPathException e) {
-            log.warn("Steam library index names a path this platform cannot use: {}", library);
-        }
     }
 
     /**

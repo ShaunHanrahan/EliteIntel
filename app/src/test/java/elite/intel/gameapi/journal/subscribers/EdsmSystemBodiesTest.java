@@ -5,8 +5,7 @@ import elite.intel.gameapi.search.edsm.dto.data.BodyData;
 import elite.intel.util.json.GsonFactory;
 import org.junit.jupiter.api.Test;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * EDSM body payloads trimmed to the fields that decide where a body's class is recorded. EDSM puts a
@@ -107,6 +106,43 @@ class EdsmSystemBodiesTest {
                 {"bodyId":9,"name":"Sawait 9","type":"Planet","distanceToArrival":100.0}
                 """));
     }
+
+    /**
+     * The journal is the record of what the game said; EDSM is what commanders chose to upload. A body the journal
+     * already described keeps that description on every later jump into the system.
+     */
+    @Test
+    void aBodyTheJournalDescribedKeepsItsDescription() {
+        LocationDto scanned = new LocationDto(4L, 1L);
+        scanned.setPlanetName("Sawait 4");
+        scanned.setRadius(2_000_000);
+        scanned.setLandable(false);
+        scanned.setLocationType(LocationDto.LocationType.MOON);
+
+        EdsmSystemBodies.file(scanned, bodyData(EDSM_SAWAIT_4), 1L, null, "Sawait");
+
+        assertEquals(2_000_000, scanned.getRadius());
+        assertFalse(scanned.isLandable(), "EDSM must not overwrite the journal's landable flag");
+        assertEquals(LocationDto.LocationType.MOON, scanned.getLocationType(), "EDSM must not reclassify a scanned body");
+    }
+
+    @Test
+    void aBodyNothingDescribedYetIsFilledFromEdsm() {
+        LocationDto unseen = new LocationDto(4L, 1L);
+
+        EdsmSystemBodies.file(unseen, bodyData(EDSM_SAWAIT_4), 1L, new double[]{1, 2, 3}, "Sawait");
+
+        assertEquals(3_000_000, unseen.getRadius());
+        assertTrue(unseen.isLandable());
+        assertEquals(LocationDto.LocationType.PLANET, unseen.getLocationType());
+        assertEquals("Sawait 4", unseen.getPlanetName());
+        assertEquals(1, unseen.getX());
+    }
+
+    private static final String EDSM_SAWAIT_4 = """
+            {"bodyId":4,"name":"Sawait 4","type":"Planet","subType":"High metal content world","radius":3000,
+             "isLandable":true,"distanceToArrival":419.35,"parents":[{"Star":1},{"Null":0}]}
+            """;
 
     private static LocationDto.LocationType classify(String edsmBodyJson) {
         return EdsmSystemBodies.classifyEdsmBody(bodyData(edsmBodyJson));

@@ -24,7 +24,7 @@ class AiSetupReportTest {
 
     @Test
     void saysSoWhenNoCloudProviderIsSelected() {
-        String report = AiSetupReport.describe(false, false, null, null, null, TtsProvider.EDGE);
+        String report = AiSetupReport.describe(false, false, null, null, null, TtsProvider.GOOGLE);
 
         assertTrue(report.contains("LLM: cloud - no provider selected"), report);
     }

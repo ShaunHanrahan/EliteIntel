@@ -35,7 +35,7 @@ public class DistanceFromShipTracker {
 
         if (playerSession.isShipAutoDeparted()) return;
 
-        LocationDto currentLocation = locationManager.findByLocationData(playerSession.getLocationData());
+        LocationDto currentLocation = locationManager.currentBody();
         if (currentLocation == null) {
             log.debug("Current location is null, skipping distance check.");
             return;

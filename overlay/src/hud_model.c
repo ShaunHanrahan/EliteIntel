@@ -9,7 +9,9 @@
 #include <sys/time.h>
 
 Model model = {
-    .alpha = 0.25, .scale = 1.0, .width = 760, .want_x = HUD_POS_UNSET, .want_y = HUD_POS_UNSET,
+    .alpha = 0.25, .scale = 1.0, .width = 760,
+    .place_start = {.kind = HUD_PLACE_NONE, .section = HUD_SEC_FREE, .x = HUD_POS_UNSET, .y = HUD_POS_UNSET},
+    .place_move = {.kind = HUD_PLACE_NONE, .section = HUD_SEC_FREE, .x = HUD_POS_UNSET, .y = HUD_POS_UNSET},
     // Below centre: the placement the VR overlay had before it was settable, so
     // a commander who never opens the setting sees no change.
     .vr_position = HUD_VR_BOTTOM,
@@ -177,7 +179,29 @@ static void apply_color(const char *role, const char *value) {
     }
 }
 
+/// Turns the placement keys of one CFG line into a request. Decided once the
+/// whole line is read, because the keys arrive in any order and `x`/`y` mean an
+/// anchor point next to `move` or `restore` but a top-left corner on their own.
+/// Both coordinates or neither: one axis of a position is not a position.
+static void apply_placement(HudPlaceKind kind, HudSection section, int x, int y) {
+    int has_point = x != HUD_POS_UNSET && y != HUD_POS_UNSET;
+    if (kind == HUD_PLACE_NONE) {
+        if (!has_point) return;
+        kind = HUD_PLACE_SETTLE;
+    } else if (section == HUD_SEC_FREE) {
+        return;                     // an unknown section name moves nothing
+    }
+    HudPlaceRequest *slot = kind == HUD_PLACE_MOVE ? &model.place_move : &model.place_start;
+    slot->kind = kind;
+    slot->section = section;
+    slot->x = has_point ? x : HUD_POS_UNSET;
+    slot->y = has_point ? y : HUD_POS_UNSET;
+}
+
 static void apply_cfg(char *fields[], int n) {
+    HudPlaceKind place_kind = HUD_PLACE_NONE;
+    HudSection place_section = HUD_SEC_FREE;
+    int place_x = HUD_POS_UNSET, place_y = HUD_POS_UNSET;
     for (int i = 1; i < n; i++) {
         char *eq = strchr(fields[i], '=');
         if (!eq) continue;
@@ -186,8 +210,10 @@ static void apply_cfg(char *fields[], int n) {
         if      (!strcmp(k, "alpha")) model.alpha = atof(v);
         else if (!strcmp(k, "scale")) model.scale = atof(v);
         else if (!strcmp(k, "width")) model.width = atoi(v);
-        else if (!strcmp(k, "x"))     model.want_x = atoi(v);
-        else if (!strcmp(k, "y"))     model.want_y = atoi(v);
+        else if (!strcmp(k, "x"))     place_x = atoi(v);
+        else if (!strcmp(k, "y"))     place_y = atoi(v);
+        else if (!strcmp(k, "move"))    { place_kind = HUD_PLACE_MOVE;    place_section = hud_section_parse(v); }
+        else if (!strcmp(k, "restore")) { place_kind = HUD_PLACE_RESTORE; place_section = hud_section_parse(v); }
         else if (!strcmp(k, "vrpos")) model.vr_position = parse_vr_position(v, model.vr_position);
         // Settable so an angle can be tried without a rebuild, which is the whole
         // job while this is still an experiment. tilt=0 restores the flat card.
@@ -195,6 +221,7 @@ static void apply_cfg(char *fields[], int n) {
         else if (!strcmp(k, "tiltwidth")) model.tilt_width = atoi(v);
         else if (!strncmp(k, "col_", 4))  apply_color(k + 4, v);
     }
+    apply_placement(place_kind, place_section, place_x, place_y);
 }
 
 /// Returns 1 when the command changed what is on screen.
@@ -257,13 +284,19 @@ int hud_handle_command(char *line, int *quit) {
 }
 
 
-/// Reports the window's position to the app, the one thing sent back up the
-/// pipe. The window is dragged with the mouse, so the app cannot know where it
-/// ended up unless it is told; without this the position is the one setting a
-/// restart cannot restore. Flushed immediately because the app reads by line.
-void hud_report_position(int x, int y) {
-    printf("POS\t%d\t%d\n", x, y);
+/// Reports where the card is pinned, the one piece of state the overlay owns and
+/// the app cannot derive: the commander drags the card with the mouse, and only
+/// the overlay knows the monitor a section is measured against. Flushed
+/// immediately because the app reads by line.
+void hud_report_placement(const HudPlacement *p) {
+    const char *name = hud_section_name(p->anchor);
+    if (!name) return;
+    printf("PLACE\t%s\t%d\t%d\n", name, p->ax, p->ay);
     fflush(stdout);
+}
+
+int hud_place_pending(void) {
+    return model.place_start.kind != HUD_PLACE_NONE || model.place_move.kind != HUD_PLACE_NONE;
 }
 
 void hud_report_mode(const char *mode, const char *detail) {

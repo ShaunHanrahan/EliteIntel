@@ -54,7 +54,9 @@ public final class NavigateToTradeStopCommand implements IntelCommand {
     @Override
     public String execute(JsonObject params, String responseText) {
         final RoutePlotter routePlotter = new RoutePlotter();
-        final LocationDto location = locationManager.findByLocationData(playerSession.getLocationData());
+        // WHY the station's record: it answers both "which system" and "at which station" - the body's never names a
+        // station.
+        final LocationDto location = locationManager.findCurrentStation();
         if (!tradeRouteManager.hasRoute()) {
             return StringUtls.localizedResponse("handler.tradeRoute.notFound");
         }

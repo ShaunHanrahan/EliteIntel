@@ -20,7 +20,6 @@ body{margin:0;background:#151B22;padding:24px;font-family:'Segoe UI',system-ui,-
 .ei-field{background:#101721;border:1px solid #2D3A44;border-radius:3px;color:#C2C2C2;font-size:13px;padding:6px 8px;width:100%;box-sizing:border-box;font-family:inherit}
 .ei-field[readonly]{color:#8FA0AD;border-color:#24313A}
 .ei-label{font-size:11px;color:#8FA0AD;letter-spacing:.5px;text-transform:uppercase;margin-bottom:5px;display:block}
-.ei-editbanner{color:#D39207;font-size:12px;font-weight:700;letter-spacing:.5px;padding:8px 0;border-top:1px solid #1F1808;margin-top:16px}
 .ei-editactions{display:flex;gap:10px;justify-content:flex-end;padding-top:10px}
 .ei-note{font-size:11px;color:#6F7D89;margin-top:10px}
 .ei-subsubbar{display:flex;gap:22px;margin-bottom:14px}
@@ -28,13 +27,7 @@ body{margin:0;background:#151B22;padding:24px;font-family:'Segoe UI',system-ui,-
 .ei-subsubtab.active{color:#FF822E;border-bottom-color:#FF822E}
 .ei-io-cell{display:flex;align-items:center;gap:6px}
 .ei-io-label{color:#8FA0AD;font-size:12px;white-space:nowrap;flex-shrink:0}
-#io-axis .ei-io-label{width:76px}
-#io-buttons .ei-io-label{width:52px}
 .ei-field-narrow{width:150px;background:#101721;border:1px solid #2D3A44;border-radius:3px;color:#C2C2C2;font-size:12px;padding:3px 7px;font-family:inherit;box-sizing:border-box}
-#io-buttons .ei-field-narrow{padding:2px 6px}
-#io-buttons .ei-btn-grid{gap:6px 16px}
-.ei-axis-grid{display:grid;grid-template-columns:repeat(2,auto);grid-template-rows:repeat(3,auto);grid-auto-flow:column;column-gap:24px;row-gap:10px;justify-content:start}
-.ei-btn-grid{display:grid;grid-template-columns:repeat(4,auto);gap:8px 16px;justify-content:start}
 .ei-btn-grid-wrap{max-height:300px;overflow-y:auto;padding-right:6px}
 .ei-btn-grid-wrap::-webkit-scrollbar{width:8px}
 .ei-btn-grid-wrap::-webkit-scrollbar-thumb{background:#2D3A44;border-radius:4px}
@@ -275,7 +268,6 @@ body{margin:0;background:#151B22;padding:24px;font-family:'Segoe UI',system-ui,-
 .ob-more{color:#6F7D89;margin-right:6px}
 .ob-sum h6{margin:14px 0 6px;color:#6F7D89;font-size:10px;letter-spacing:.8px;text-transform:uppercase;font-weight:700}
 .ob-sumrow{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:6px 0;border-bottom:1px solid #131A22;font-size:12.5px;color:#EFD3A6}
-.ei-rowtab-alias.builtin{color:#33D7E8}
 .ob-sumrow small{display:block;color:#6F7D89;font-size:11px;margin-top:1px}
 .im-layout{display:grid;grid-template-columns:200px 1fr;border:1px solid #24313A}
 #im-list .ge-bindval{width:110px}
@@ -292,47 +284,43 @@ html.embedded,html.embedded body{background:#090D12}
 html.embedded body{padding:0}
 html.embedded .ei-frame{border-radius:0;padding:14px}
 
-#alias-editor-body.disabled{opacity:.35;pointer-events:none}
-
-/* --- Alias Designer: naming locked until the alias is confirmed --- */
-#alias-io-section.locked{opacity:.35;pointer-events:none}
+/* --- Alias Designer: a device with no name yet - its input tabs wait for onboarding --- */
 .ei-lock-note{display:none;margin:4px 0 12px;padding:9px 11px;background:#1A1206;border-left:3px solid #D39207;color:#D39207;font-size:12px;line-height:1.5}
 .ei-lock-note.on{display:block}
+/* --- Alias Designer: the Device Editor dialog (2026-10-10) --- */
+.ad-dialog{width:900px}
+.ad-tabbody{padding:12px 4px 4px 0;min-height:260px;max-height:460px;overflow-y:auto}
+.ad-grid{display:grid;grid-template-columns:repeat(4,auto);gap:6px 16px;justify-content:start}
+.ad-grid.axes{grid-template-rows:repeat(6,auto);grid-auto-flow:column;grid-template-columns:none;grid-auto-columns:max-content}
+.ad-grid .ei-io-label{min-width:84px;font-size:11.5px;color:#8FA0AD}
+.ad-grid .ei-io-cell.live .ei-field-narrow{background:#FF7100;color:#090D12;border-color:#FF7100}
+.ad-fields{display:grid;grid-template-columns:2fr 1fr 1fr;gap:14px}
+.ad-sub{color:#8FA0AD;font-size:11.5px;margin-top:7px}
+.ad-mkcell{min-width:64px}
+.ad-dialog .ei-instlbl{min-width:84px}
+.ad-mk{font-size:11.5px;font-weight:700;letter-spacing:.3px;white-space:nowrap}
+.ad-mk.ok{color:#4FC56B}.ad-mk.warn{color:#D39207}.ad-mk.bad{color:#D94F4F}.ad-mk.dim{color:#4A5560;font-style:italic;font-weight:400}
+.ad-danger{border-color:#D94F4F;color:#D94F4F}
+.ad-gear{background:none;border:0;color:#FF7100;font-size:17px;line-height:1;cursor:pointer;padding:2px 4px}
+.ad-gear:hover{color:#FF9330}
+.ad-ask{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:2100;display:flex;align-items:center;justify-content:center}
+.ad-ask[hidden]{display:none}
+#ad-save:disabled{opacity:.4;cursor:not-allowed}
 
 /* --- My Devices: the device grid --- */
 /* WHY: the three hardware columns size to their own content rather than to fixed fractions, so a
    long device name does not leave a gulf before the next column, and every pixel left over goes
    to INSTALLATIONS - which is the column that grows when another installation is detected. */
-.ei-devgrid{display:grid;grid-template-columns:22px auto auto auto auto minmax(0,1fr);
+.ei-devgrid{display:grid;grid-template-columns:auto auto auto auto minmax(0,1fr) 28px;
             column-gap:26px;align-items:center}
-.ei-devgrid .hdr:first-child,.ei-devcell.first{margin-right:-14px}
-.ei-devcell.rowtabs{display:flex;gap:6px;flex-wrap:wrap;padding:6px 4px}
-.ei-rowtab{display:flex;align-items:center;gap:7px;font-family:inherit;font-size:9.5px;font-weight:700;
-           letter-spacing:.8px;padding:5px 9px;background:#101721;border:1px solid #24313A;
-           color:#8FA0AD;cursor:pointer;white-space:nowrap}
-.ei-rowtab:hover{border-color:#33D7E8;color:#33D7E8}
-.ei-rowtab.active{background:#1A1206;border-color:#FF7100;color:#FF9330}
-.ei-rowtab.empty{color:#5A6368}
+.ei-devcell.first{margin-right:-14px}
 .ei-rowtab-alias{font-weight:400;letter-spacing:0;font-size:10.5px;color:#C2C2C2}
-.ei-rowtab.empty .ei-rowtab-alias,.ei-rowtab-alias.dim{color:#4A5560;font-style:italic}
-/* WHY: the marker was a mirror FLAG (a setting). It is now a match STATE (a fact), so it carries
-   the divergence list's severities instead of on/off - green matches, yellow differs harmlessly,
-   red will stop bindings working. Colour is the text's colour, never a fill: the HUD canon's rule. */
-.ei-rowtab-mir{font-size:8px;letter-spacing:0;padding:1px 4px;border:1px solid #4FC56B;color:#4FC56B}
-.ei-rowtab-mir.warn{border-color:#D39207;color:#D39207}
-.ei-rowtab-mir.bad{border-color:#D94F4F;color:#D94F4F}
-.ei-insthead{margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid #B85A14}
+.ei-rowtab-alias.dim{color:#4A5560;font-style:italic}
 .ei-instline{display:flex;align-items:center;gap:12px;margin-bottom:5px}
 .ei-instlbl{font-size:11px;letter-spacing:1px;font-weight:700;color:#FF9330;flex:none}
 .ei-instpath{flex:1;background:#090D12;border:1px solid #24313A;color:#8FA0AD;
              font-family:Consolas,"Courier New",monospace;font-size:11.5px;padding:5px 9px;
              cursor:default}
-.ei-insthead .sub{display:block;margin-top:7px;font-weight:400;letter-spacing:.3px;
-                  color:#8FA0AD;font-size:11.5px}
-.ei-devexpand{grid-column:1/-1;padding:16px 18px 14px;margin:0 0 4px;background:#0C1117;
-              border:1px solid #B85A14;border-top:2px solid #FF7100}
-.ei-chev{color:#FF7100;font-size:10px;transition:transform .12s ease;display:inline-block}
-.ei-chev.open{transform:rotate(90deg)}
 .ei-attached{color:#4FC56B;font-size:11.5px}
 .ei-missing{color:#5A6368;font-size:11.5px}
 .ei-bigrid{display:grid;grid-template-columns:auto auto minmax(0,1fr);column-gap:26px;align-items:center}
@@ -345,9 +333,6 @@ html.embedded .ei-frame{border-radius:0;padding:14px}
                  border-bottom:1px solid #B85A14;text-align:center}
 .ei-devgrid .hdr.l{text-align:left}
 .ei-devcell{padding:9px 4px;border-bottom:1px solid #151B22;font-size:13px;cursor:pointer}
-.ei-devcell.c{text-align:center}
-.ei-devcell.sel{background:#101721}
-.ei-devcell.sel.first{box-shadow:inset 3px 0 0 #FF7100}
 </style>
 <script>try{if(window.self!==window.top){document.documentElement.className+=" embedded";}}catch(e){document.documentElement.className+=" embedded";}</script>
 </head>
@@ -382,96 +367,44 @@ html.embedded .ei-frame{border-radius:0;padding:14px}
       </div>
       <div class="ei-devgrid" id="mydevice-grid"></div>
       <div class="ei-note" style="margin-top:10px">
-        Every device Windows reports is listed, attached or not &mdash; an entry can outlive the hardware. <b>Open a device to edit it.</b> There is one record per device &mdash; the master &mdash; and every installation gets the same one, so there is no per-installation editing and nothing to choose between. The markers under <b>INSTALLATIONS</b> are a readout, not a switch: <b style="color:#4FC56B">M</b> means that installation already matches the master, <b style="color:#D39207">differs</b> means its labels have drifted but nothing is broken, and <b style="color:#D94F4F">no entry</b> means a <code>.binds</code> naming this device would be rejected there &mdash; the whole preset, falling back to keyboard and mouse. <b>APPLY TO GAME INSTALLS</b> is what repairs that, and it reports per installation. <b>CLEAR</b> removes the entry and its <code>.buttonMap</code> from every installation, so it asks first; the device stays listed because the hardware is still attached. <b style="color:#33D7E8">BUILT-IN</b> marks Frontier&#39;s own entry: its name and VID/PID are locked, its button labels are not, and <b>RESET LABELS</b> takes the place of CLEAR.</div>
+        Every device Windows reports is listed, attached or not &mdash; an entry can outlive the hardware. <b>The gear at the end of a row opens the device&rsquo;s editor.</b> There is one record per device &mdash; the master &mdash; and every installation gets the same one, so there is no per-installation editing and nothing to choose between. Each installation has a column, and its marker is a readout, not a switch: <b style="color:#4FC56B">M</b> means that installation already matches the master, <b style="color:#D39207">differs</b> means its labels have drifted but nothing is broken, and <b style="color:#D94F4F">not added</b> in red means a <code>.binds</code> naming this device would be rejected there &mdash; the whole preset, falling back to keyboard and mouse. <b>APPLY</b> is what repairs that: it carries the master to every installation and reports per installation. A built-in is Frontier&rsquo;s own entry: its labels can be edited, and in its editor <b>RESET LABELS</b> takes the place of CLEAR.
+      </div>
       <div class="ei-editactions" style="margin-top:16px">
         <span class="ei-note" style="margin:0 auto 0 0;max-width:640px">SAVE keeps changes in BindForge's draft. Nothing reaches a game installation until you apply.</span>
-        <button class="ei-btn primary" id="alias-apply-installs" onclick="eiApplyToInstalls()">APPLY TO GAME INSTALLS</button>
+        <button class="ei-btn primary" id="alias-apply-installs" onclick="eiApplyToInstalls()">APPLY</button>
       </div>
     </div>
 
-    <div id="alias-editor-parking" style="display:none"></div>
-    <div id="alias-editor-host">
-      <div class="ei-insthead" id="alias-insthead"></div>
-      <div id="alias-editor-body">
-      <div style="display:flex;gap:14px;align-items:flex-end;margin-bottom:16px">
-        <div style="flex:2">
-          <span class="ei-label">Device name (alias)</span>
-          <div style="display:flex;gap:8px"><input class="ei-field" id="alias-name" value="RHVCAPDirection" style="margin-bottom:0" oninput="eiAliasEdited()"><button class="ei-btn" id="alias-confirm-btn" style="padding:4px 12px;font-size:11px;white-space:nowrap" onclick="eiConfirmAlias()">CONFIRM</button></div>
+    <!-- WHY (2026-10-10, Alan): the Device Editor is a dialog opened from the row's gear, not an inline
+         expansion - a Swing table row cannot host a panel beneath itself, and a dialog has room for tabs.
+         See Alias Designer, "A dialog, opened from the row". Built by eiOpenDeviceDialog(). -->
+    <div id="ad-scrim" class="cd-scrim" hidden>
+      <div class="cd-dialog ad-dialog" role="dialog" aria-modal="true" aria-labelledby="ad-title">
+        <div class="cd-titlebar"><span id="ad-title" class="cd-title"></span><button type="button" class="cd-x" onclick="adBack()" aria-label="Close">&times;</button></div>
+        <div class="cd-body">
+          <div class="cd-tabs" id="ad-tabs"></div>
+          <div class="cd-subtabs" id="ad-subtabs"></div>
+          <div class="ad-tabbody" id="ad-body"></div>
         </div>
-        <div style="flex:1">
-          <span class="ei-label">VID (read only)</span>
-          <input class="ei-field" id="alias-vid" value="3344" readonly style="margin-bottom:0">
-        </div>
-        <div style="flex:1">
-          <span class="ei-label">PID (read only)</span>
-          <input class="ei-field" id="alias-pid" value="43F4" readonly style="margin-bottom:0">
-        </div>
-      </div>
-
-      <div class="ei-lock-note" id="alias-lock-note">This device auto-registered under the name its hardware reports. Confirm or change the alias above to unlock button and axis naming.</div>
-      <div id="alias-io-section">
-      <span class="ei-label" style="margin-bottom:0">Button &amp; axis names</span>
-      <div class="ei-subsubbar" style="margin-top:8px">
-        <div class="ei-subsubtab active" id="tab-axis" onclick="eiShowIO('axis')">AXIS &nbsp;(<span id="alias-axiscount">6</span>)</div>
-        <div class="ei-subsubtab" id="tab-buttons" onclick="eiShowIO('buttons')">BUTTONS &nbsp;(<span id="alias-btncount">32</span>)</div>
-      </div>
-
-      <div id="io-axis" class="ei-axis-grid">
-        <div class="ei-io-cell"><span class="ei-io-label">Joy_XAxis</span><input class="ei-field-narrow" maxlength="18" value="Roll"></div>
-        <div class="ei-io-cell"><span class="ei-io-label">Joy_YAxis</span><input class="ei-field-narrow" maxlength="18" value="Pitch"></div>
-        <div class="ei-io-cell"><span class="ei-io-label">Joy_ZAxis</span><input class="ei-field-narrow" maxlength="18" value="Twist"></div>
-        <div class="ei-io-cell"><span class="ei-io-label">Joy_RXAxis</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-        <div class="ei-io-cell"><span class="ei-io-label">Joy_RYAxis</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-        <div class="ei-io-cell"><span class="ei-io-label">Joy_RZAxis</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-      </div>
-
-      <div id="io-buttons" class="ei-btn-grid-wrap" style="display:none">
-        <div class="ei-btn-grid">
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_1</span><input class="ei-field-narrow" maxlength="18" value="RH_1stStageTrig"></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_2</span><input class="ei-field-narrow" maxlength="18" value="Thumb Button"></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_3</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_4</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_5</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_6</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_7</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_8</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_9</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_10</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_11</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_12</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_13</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_14</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_15</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_16</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_17</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_18</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_19</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_20</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_21</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_22</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_23</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_24</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_25</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_26</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_27</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_28</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_29</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_30</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_31</span><input class="ei-field-narrow" maxlength="18" value=""></div>
-          <div class="ei-io-cell"><span class="ei-io-label">Joy_32</span><input class="ei-field-narrow" maxlength="18" value=""></div>
+        <div class="cd-footer" id="ad-footer">
+          <button type="button" class="ei-btn" onclick="adBack()">BACK</button>
+          <button type="button" class="ei-btn ad-danger" id="ad-clear" onclick="adClear()">CLEAR</button>
+          <button type="button" class="ei-btn primary" id="ad-save" onclick="adSave()">SAVE</button>
         </div>
       </div>
-
+      <!-- the question BACK asks when there are unsaved edits -->
+      <div id="ad-ask" class="ad-ask" hidden>
+        <div class="cd-dialog" style="width:460px">
+          <div class="cd-titlebar"><span class="cd-title">Unsaved changes</span></div>
+          <div class="cd-body"><p id="ad-ask-text" style="margin:4px 0 12px"></p></div>
+          <div class="cd-footer">
+            <button type="button" class="ei-btn" onclick="adAskKeep()">KEEP EDITING</button>
+            <button type="button" class="ei-btn" onclick="adAskDiscard()">DISCARD</button>
+            <button type="button" class="ei-btn primary" onclick="adAskSave()">SAVE</button>
+          </div>
+        </div>
       </div>
-      <div class="ei-editbanner" id="alias-editbanner">EDIT MODE &mdash; SAVE YOUR CHANGES (saves to the draft only &mdash; Apply to Game Installs, below, is what reaches a real install)</div>
-      <div class="ei-editactions">
-        <button class="ei-btn" id="alias-clear-btn" style="border-color:#D94F4F;color:#D94F4F" onclick="eiClearDevice()">CLEAR</button>
-        <button class="ei-btn" id="alias-reset-btn" style="display:none" onclick="eiResetLabels()" title="Removes the .buttonMap you or BindForge made. Frontier&#39;s entry is never touched.">RESET LABELS</button>
-        <button class="ei-btn" onclick="eiDiscardDevice()">DISCARD</button>
-        <button class="ei-btn primary" id="alias-save-btn" onclick="eiSaveDevice()">SAVE</button>
-      </div>
-      </div>
-      </div>
+    </div>
     </div>
 
         <div id="devicelist-builtin" style="display:none">
@@ -1109,69 +1042,68 @@ function eiShowDeviceList(v){
   document.getElementById('tab-mydevices').classList.toggle('active', v==='my');
   document.getElementById('tab-builtin').classList.toggle('active', v==='builtin');
 }
-function eiShowIO(v){
-  document.getElementById('io-axis').style.display = v==='axis' ? 'grid' : 'none';
-  document.getElementById('io-buttons').style.display = v==='buttons' ? 'grid' : 'none';
-  document.getElementById('tab-axis').classList.toggle('active', v==='axis');
-  document.getElementById('tab-buttons').classList.toggle('active', v==='buttons');
-}
-
 /* ---------- Alias Designer: device selection ---------- */
 // WHY: reworked 2026-09-26. There is ONE record per device - the master, which is what the user
 // edits - and `installs` is no longer a set of editable alternatives but a record of what each
 // installation currently holds on disk. The master is intent; the installs are reality; the
 // difference between them is drift, which is what the M marker reports. See Alias Designer,
 // "One record, and where it lands", and device-provenance.md on why the per-install rows survive.
+// axisIds is which axes the controller has, by name - what A8b reads from the controller (2026-10-10). SDL alone
+// gives only a count, and a count cannot say whether a stick's third axis is Z or RZ. `axes` holds a label per
+// axisIds entry; `buttons` and `hats` are keyed by number and by hat + direction ("1Up").
 var eiDevices = {
   rhvcap: {
     winName:'VIRPIL Controls 20220720', vid:'3344', pid:'43F4', connected:true,
-    axisCount:6, buttonCount:32,
+    axisIds:['X','Y','Z','RX','RY','RZ'], buttonCount:32, hatCount:0,
     master:{added:true, alias:'RHVCAPDirection', aliasConfirmed:true, buttonMap:true,
-            axes:['Roll','Pitch','Twist','','',''], buttons:{1:'RH_1stStageTrig', 2:'Thumb Button'}},
+            axes:['Roll','Pitch','Twist','','',''], buttons:{1:'RH_1stStageTrig', 2:'Thumb Button'}, hats:{}},
     installs:{
       steam:{added:true, alias:'RHVCAPDirection', buttonMap:true,
-             axes:['Roll','Pitch','Twist','','',''], buttons:{1:'RH_1stStageTrig', 2:'Thumb Button'}},
+             axes:['Roll','Pitch','Twist','','',''], buttons:{1:'RH_1stStageTrig', 2:'Thumb Button'}, hats:{}},
       epic: {added:true, alias:'RHVCAPDirection', buttonMap:true,
-             axes:['Roll','Pitch','Twist','','',''], buttons:{1:'RH_1stStageTrig', 2:'Thumb Button'}}
+             axes:['Roll','Pitch','Twist','','',''], buttons:{1:'RH_1stStageTrig', 2:'Thumb Button'}, hats:{}}
     }
   },
+  // WHY: the pedals report X and Y (the toe brakes) and RZ (the rudder) - three axes, and not the first three.
   trudder: {
     winName:'Thrustmaster T-Rudder', vid:'044F', pid:'B679', connected:true,
-    axisCount:3, buttonCount:0,
+    axisIds:['X','Y','RZ'], buttonCount:0, hatCount:0,
     master:{added:true, builtin:true, alias:'T-Rudder', aliasConfirmed:true, buttonMap:false,
-            axes:['','',''], buttons:{}},
+            axes:['','',''], buttons:{}, hats:{}},
     installs:{
-      steam:{added:true, builtin:true, alias:'T-Rudder', buttonMap:false, axes:['','',''], buttons:{}},
-      epic: {added:true, builtin:true, alias:'T-Rudder', buttonMap:false, axes:['','',''], buttons:{}}
+      steam:{added:true, builtin:true, alias:'T-Rudder', buttonMap:false, axes:['','',''], buttons:{}, hats:{}},
+      epic: {added:true, builtin:true, alias:'T-Rudder', buttonMap:false, axes:['','',''], buttons:{}, hats:{}}
     }
   },
   // WHY: drift that BREAKS something - Epic's entry is under a different name, so a shared .binds
   // naming "Throttle" finds nothing there and the whole preset is rejected. Red, per the severity
-  // table in Alias Designer. Apply is what repairs it.
+  // table in Alias Designer. Apply is what repairs it. 72 buttons and a true hat show the button groups
+  // and the HATS tab.
   throttle: {
     winName:'VPC Throttle MongoosT-50CM3', vid:'3344', pid:'83F3', connected:true,
-    axisCount:6, buttonCount:24,
+    axisIds:['X','Y','Z','RX','RY','RZ'], buttonCount:72, hatCount:1,
     master:{added:true, alias:'Throttle', aliasConfirmed:true, buttonMap:false,
-            axes:['','','Throttle','','',''], buttons:{}},
+            axes:['','','Throttle','','',''], buttons:{}, hats:{}},
     installs:{
-      steam:{added:true, alias:'Throttle', buttonMap:false, axes:['','','Throttle','','',''], buttons:{}},
+      steam:{added:true, alias:'Throttle', buttonMap:false, axes:['','','Throttle','','',''], buttons:{}, hats:{}},
       epic: {added:true, alias:'ThrottleQuadrant', buttonMap:true,
              axes:['Thrust L/R','Thrust U/D','Main Throttle','','',''],
-             buttons:{1:'Flaps Toggle', 2:'Boost', 3:'Cargo Scoop'}}
+             buttons:{1:'Flaps Toggle', 2:'Boost', 3:'Cargo Scoop'}, hats:{}}
     }
   },
   // WHY: drift that breaks NOTHING - same entry name everywhere, but Epic carries labels the master
-  // does not. Yellow. Also a built-in whose hardware is unplugged: Frontier's entry is in every
-  // installation, it still has to be listed, and its labels still resettable.
+  // does not. Yellow. Also a built-in whose hardware is unplugged: it cannot report its inputs, so the
+  // dialog shows the ones its saved labels name.
   t16000: {
     winName:'T.16000M', vid:'044F', pid:'B10A', connected:false,
-    axisCount:4, buttonCount:16,
-    master:{added:true, builtin:true, alias:'T16000M', aliasConfirmed:true, buttonMap:false,
-            axes:['','','',''], buttons:{}},
+    axisIds:['X','Y','RZ','U'], buttonCount:16, hatCount:0,
+    master:{added:true, builtin:true, alias:'T16000M', aliasConfirmed:true, buttonMap:true,
+            axes:['Roll','Pitch','',''], buttons:{1:'Trigger', 2:'Thumb'}, hats:{}},
     installs:{
-      steam:{added:true, builtin:true, alias:'T16000M', buttonMap:false, axes:['','','',''], buttons:{}},
+      steam:{added:true, builtin:true, alias:'T16000M', buttonMap:true,
+             axes:['Roll','Pitch','',''], buttons:{1:'Trigger', 2:'Thumb'}, hats:{}},
       epic: {added:true, builtin:true, alias:'T16000M', buttonMap:true,
-             axes:['X','Y','Twist','Throttle'], buttons:{1:'Trigger'}}
+             axes:['X','Y','Twist','Throttle'], buttons:{1:'Trigger'}, hats:{}}
     }
   }
 };
@@ -1201,7 +1133,8 @@ function eiMatchState(d, instId){
   if(r.alias !== m.alias) return 'entry';
   var sameAxes = (r.axes || []).join('') === (m.axes || []).join('');
   var sameBtns = JSON.stringify(r.buttons || {}) === JSON.stringify(m.buttons || {});
-  return (sameAxes && sameBtns) ? 'match' : 'labels';
+  var sameHats = JSON.stringify(r.hats || {}) === JSON.stringify(m.hats || {});
+  return (sameAxes && sameBtns && sameHats) ? 'match' : 'labels';
 }
 function eiAnyAdded(d){
   return EI_INSTALLS.some(function(i){ return d.installs[i.id].added; });
@@ -1218,8 +1151,6 @@ function eiListAlias(d){
   return d.installs[EI_INSTALLS[0].id].alias;
 }
 
-var eiSelectedDevice = null;
-var eiPendingConfirm = false;   // confirmed this session but not yet saved
 
 /* Onboarding - every controller gets a name and a .buttonMap (settled 2026-09-13).
    Asks for a name only; SKIP takes the default; labels are generated. A controller .binds references by hex
@@ -1229,8 +1160,8 @@ var eiPendingConfirm = false;   // confirmed this session but not yet saved
 var OB_BUILTIN = [{"name":"GamePad","pairs":[["045E","028E"],["045E","028F"],["045E","02FF"],["24C6","5D04"],["045E","02A1"],["0738","4716"],["0E6F","0213"],["045E","0291"],["045E","0719"],["044F","0F07"],["044F","B326"],["046D","C21D"],["046D","C21E"],["046D","C21F"],["046D","C242"],["046D","CA84"],["0738","4540"],["0738","4556"],["0738","4718"],["0738","4726"],["0738","4728"],["0738","4738"],["0738","4740"],["0738","6040"],["0738","B726"],["0738","BEEF"],["0738","CB02"],["0738","CB03"],["0738","F738"],["0C12","8802"],["0C12","8809"],["0C12","880A"],["0E6F","0005"],["0E6F","0006"],["0E6F","0105"],["0E6F","0113"],["0E6F","0201"],["0E6F","021F"],["0E6F","0301"],["0E6F","0401"],["0E8F","0201"],["0E8F","3008"],["0F0D","000A"],["0F0D","000D"],["0F0D","0016"],["0F30","0202"],["0F30","8888"],["102C","FF0C"],["12AB","0004"],["12AB","0301"],["12AB","8809"],["1430","4748"],["1430","8888"],["146B","0601"],["1532","0037"],["15E4","3F00"],["15E4","3F0A"],["15E4","3F10"],["162E","BEEF"],["1689","FD00"],["1689","FD01"],["1BAD","0002"],["1BAD","0003"],["1BAD","F016"],["1BAD","F023"],["1BAD","F028"],["1BAD","F038"],["1BAD","F900"],["1BAD","F901"],["1BAD","F903"],["24C6","5000"],["24C6","5300"],["24C6","5303"],["24C6","5500"],["24C6","5501"],["24C6","5506"],["24C6","5B02"],["045E","02EA"],["045E","0B13"],["045E","02D1"]]},{"name":"BlackWidow","pairs":[["07B5","0317"]]},{"name":"SaitekAV8R03","pairs":[["06A3","0C28"],["06A3","0461"]]},{"name":"SaitekX55Joystick","pairs":[["0738","2215"]]},{"name":"SaitekX56Joystick","pairs":[["0738","2221"]]},{"name":"SaitekX55Throttle","pairs":[["0738","A215"]]},{"name":"SaitekX56Throttle","pairs":[["0738","A221"]]},{"name":"SaitekX52Pro","pairs":[["06A3","0762"]]},{"name":"SaitekX52","pairs":[["06A3","075C"],["06A3","0255"]]},{"name":"LogitechG940Pedals","pairs":[["046D","C2AA"]]},{"name":"LogitechG940Joystick","pairs":[["046D","C2A8"]]},{"name":"LogitechG940Throttle","pairs":[["046D","C2A9"]]},{"name":"ThrustMasterWarthogJoystick","pairs":[["044F","0402"]]},{"name":"ThrustMasterWarthogThrottle","pairs":[["044F","0404"]]},{"name":"ThrustMasterWarthogCombined","pairs":[["044F","FFFF"]]},{"name":"SaitekFLY5","pairs":[["0738","1302"]]},{"name":"ThrustMasterTFlightHOTASX","pairs":[["044F","B108"]]},{"name":"ThrustMasterHOTAS4","pairs":[["044F","B67C"],["044F","B67B"]]},{"name":"TFlightHotasOne","pairs":[["044F","B68D"]]},{"name":"T16000M","pairs":[["044F","B10A"]]},{"name":"T16000MTHROTTLE","pairs":[["044F","B687"]]},{"name":"T-Rudder","pairs":[["044F","B679"]]},{"name":"TMwTARGET","pairs":[["044F","FFFF"]]},{"name":"LogitechExtreme3DPro","pairs":[["046D","C215"]]},{"name":"GioteckPS3WiredController","pairs":[["25F0","C121"]]},{"name":"SaitekX45","pairs":[["06A3","053C"]]},{"name":"EDTracker","pairs":[["2341","8037"]]},{"name":"Logitech710WirelessGamepad","pairs":[["046D","C219"]]},{"name":"LogitechWingManStrikeForce3D","pairs":[["046D","C285"]]},{"name":"SaitekP2600RumbleForce","pairs":[["06A3","5F0D"]]},{"name":"SaitekP2500RumbleForce","pairs":[["06A3","FF0C"]]},{"name":"SaitekCyborgEvoWireless","pairs":[["06A3","353E"]]},{"name":"SaitekProFlightCombatRudderPedals","pairs":[["06A3","0764"]]},{"name":"SaitekProFlightRudderPedals","pairs":[["06A3","0763"]]},{"name":"vJoy","pairs":[["1234","BEAD"]]},{"name":"CHProThrottle1","pairs":[["068E","00F1"]]},{"name":"CHProThrottle2","pairs":[["068E","C0F1"]]},{"name":"CHFighterStick","pairs":[["068E","00F3"]]},{"name":"CHProPedals","pairs":[["068E","C0F2"]]},{"name":"CHCombatStick","pairs":[["068E","C0F4"],["068E","00F4"]]},{"name":"TrustPredator","pairs":[["0E8F","0003"]]},{"name":"Playstation3Controller","pairs":[["054C","0268"]]},{"name":"SaitekST290Pro","pairs":[["06A3","0460"]]},{"name":"XterminatorDualControl","pairs":[["047D","3001"]]},{"name":"SideWinderForceFeedback2","pairs":[["045E","001B"]]},{"name":"ArduinoLeonardo","pairs":[["2341","8036"]]},{"name":"SlawFlightControlRudder","pairs":[["04D8","0011"]]},{"name":"OculusTouch","pairs":[["2833","0211"]]},{"name":"DualShock4","pairs":[["054C","0BA0"],["054C","05C4"],["054C","09CC"]]},{"name":"VPCPanel","pairs":[["3344","0259"]]},{"name":"VPCThrottle","pairs":[["3344","0197"]]}];
 var OB_AXIS_NAMES = ['X', 'Y', 'Z', 'RX', 'RY', 'RZ', 'U', 'V'];
 var OB_NEW = {
-  lvwap:      {winName:'VIRPIL Controls 20220720', vid:'3344', pid:'03F5', axisCount:6, buttonCount:32, hatCount:1, hexBindings:131, firstOpen:true},
-  rudder2:    {winName:'T-Rudder', vid:'1DD2', pid:'1001', axisCount:3, buttonCount:2, hatCount:0, hexBindings:0, firstOpen:true},
+  lvwap:      {winName:'VIRPIL Controls 20220720', vid:'3344', pid:'03F5', axisCount:6, axisIds:['X','Y','Z','RX','RY','RZ'], buttonCount:32, hatCount:1, hexBindings:131, firstOpen:true},
+  rudder2:    {winName:'T-Rudder', vid:'1DD2', pid:'1001', axisCount:3, axisIds:['X','Y','RZ'], buttonCount:2, hatCount:0, hexBindings:0, firstOpen:true},
   spacemouse: {winName:'3Dconnexion SpaceMouse Pro', vid:'256F', pid:'C62E', axisCount:6, buttonCount:15, hatCount:0, hexBindings:0, firstOpen:false}
 };
 var obState = null;
@@ -1457,18 +1388,21 @@ function obBack(){
 function obDone(){
   var s = obState;
   s.ids.forEach(function(id){
-    var d = OB_NEW[id], buttons = {}, axes = [], installs = {};
+    var d = OB_NEW[id], buttons = {}, axes = [], hats = {}, installs = {};
+    // WHY: A8b says which axes a controller has; the demo controllers list theirs in OB_NEW.
+    var axisIds = d.axisIds || OB_AXIS_NAMES.slice(0, d.axisCount);
     for (var b = 1; b <= d.buttonCount; b++) buttons[b] = 'Button ' + b;
-    for (var a = 0; a < d.axisCount; a++) axes.push(OB_AXIS_NAMES[a] + ' Axis');
+    axisIds.forEach(function(a){ axes.push(a + ' Axis'); });
+    for (var h = 1; h <= (d.hatCount || 0); h++) ['Up','Right','Down','Left'].forEach(function(dir){ hats[h + dir] = 'Hat ' + h + ' ' + dir; });
     // WHY: onboarding writes the MASTER. The installations start not matching it, because nothing
     // has been applied yet - which is the honest state and what the markers should show.
     var master = {added:true, alias:s.names[id], aliasConfirmed:true, buttonMap:!d.hexBindings,
-                  axes:axes.slice(), buttons:JSON.parse(JSON.stringify(buttons))};
+                  axes:axes.slice(), buttons:JSON.parse(JSON.stringify(buttons)), hats:JSON.parse(JSON.stringify(hats))};
     EI_INSTALLS.forEach(function(i){
-      installs[i.id] = {added:false, alias:'', buttonMap:false, axes:axes.map(function(){ return ''; }), buttons:{}};
+      installs[i.id] = {added:false, alias:'', buttonMap:false, axes:axes.map(function(){ return ''; }), buttons:{}, hats:{}};
     });
-    eiDevices[id] = {winName:d.winName, vid:d.vid, pid:d.pid, connected:true, axisCount:d.axisCount,
-                     buttonCount:d.buttonCount, master:master, installs:installs};
+    eiDevices[id] = {winName:d.winName, vid:d.vid, pid:d.pid, connected:true, axisIds:axisIds,
+                     buttonCount:d.buttonCount, hatCount:d.hatCount || 0, master:master, installs:installs};
     eiDeviceOrder.push(id);
   });
   document.getElementById('tab-mydevices').innerHTML = 'MY DEVICES &nbsp;(' + eiDeviceOrder.length + ')';
@@ -1483,104 +1417,58 @@ function eiRenderDeviceRows(){
   var grid = document.getElementById('mydevice-grid');
   if(!grid) return;
 
-  // WHY: ALIAS is a column now. It could not be one before - each installation could hold a
-  // different name, so a single cell would have been averaging them. There is one name now: the
-  // master's. See Alias Designer, "One record, and where it lands".
-  var html = '<div class="hdr"></div><div class="hdr l">WINDOWS NAME</div>'
-           + '<div class="hdr l">VID&nbsp;&nbsp;PID</div><div class="hdr l">STATUS</div>'
-           + '<div class="hdr l">ALIAS</div>'
-           + '<div class="hdr l">INSTALLATIONS</div>';
+  // WHY (2026-10-10): one column per installation, as the Installations column was built (A4), the marker
+  // in its state's text colour rather than a boxed chip - the HUD canon's rule for state. The gear is last,
+  // on every row: the fleet list opens a ship's settings the same way.
+  var cols = ['auto','auto','auto','auto'];
+  EI_INSTALLS.forEach(function(){ cols.push('auto'); });
+  cols.push('minmax(0,1fr)', '28px');
+  grid.style.gridTemplateColumns = cols.join(' ');
+
+  // WHY: ALIAS is a column. It could not be one when each installation could hold a different name;
+  // there is one name now: the master's. See Alias Designer, "One record, and where it lands".
+  var html = '<div class="hdr l">WINDOWS NAME</div><div class="hdr l">VID&nbsp;&nbsp;PID</div>'
+           + '<div class="hdr l">STATUS</div><div class="hdr l">ALIAS</div>';
+  EI_INSTALLS.forEach(function(i){ html += '<div class="hdr l">' + i.label + '</div>'; });
+  html += '<div class="hdr"></div><div class="hdr"></div>';
 
   eiDeviceOrder.forEach(function(id){
     var d = eiDevices[id];
     if(!d) return;
-    var open = (id === eiSelectedDevice);
-    var sel  = open ? ' sel' : '';
-    var st   = d.connected ? '<span class="ei-attached">ATTACHED</span>'
-                           : '<span class="ei-missing">MISSING</span>';
-    var pick = ' data-pick="' + id + '"';
-
-    // one read-only marker per detected installation. It was a tab that selected an installation
-    // to edit; there is one record now, so it reports whether each installation has caught up.
-    var rowTabs = '';
-    EI_INSTALLS.forEach(function(i){
-      var r = d.installs[i.id];
-      var st  = eiMatchState(d, i.id);
-      var cls = 'ei-rowtab' + (open ? ' active' : '') + (r.added ? '' : ' empty');
-      // WHY: a readout, not a switch. M means this installation matches the master; the warn/bad
-      // variants are the divergence list's yellow and red, narrowed to this one device.
-      var mark = st === 'match'  ? '<span class="ei-rowtab-mir">M</span>'
-               : st === 'labels' ? '<span class="ei-rowtab-mir warn" title="labels differ from the master - nothing breaks">differs</span>'
-               : st === 'entry'  ? '<span class="ei-rowtab-mir bad" title="no matching entry here - a .binds naming the master’s device would be rejected">no entry</span>'
-               :                   '<span class="ei-rowtab-alias dim">not added</span>';
-      if(r.builtin && st === 'match') mark = '<span class="ei-rowtab-alias builtin">built-in</span>';
-      rowTabs += '<button class="' + cls + '" data-rowtab="' + id + '">'
-               + i.label + mark + '</button>';
-    });
-
-    html += '<div class="ei-devcell first c' + sel + '"' + pick + '>'
-          + '<span class="ei-chev' + (open ? ' open' : '') + '">&#9654;</span></div>'
-          + '<div class="ei-devcell' + sel + '"' + pick + '>' + d.winName + '</div>'
-          + '<div class="ei-devcell' + sel + '"' + pick + ' style="color:#8FA0AD">'
-          + d.vid + '&nbsp;&nbsp;' + d.pid + '</div>'
-          + '<div class="ei-devcell' + sel + '"' + pick + '>' + st + '</div>'
-          + '<div class="ei-devcell' + sel + '"' + pick + '>' + (d.master.added
+    var st = d.connected ? '<span class="ei-attached">ATTACHED</span>'
+                         : '<span class="ei-missing">MISSING</span>';
+    html += '<div class="ei-devcell">' + d.winName + '</div>'
+          + '<div class="ei-devcell" style="color:#8FA0AD">' + d.vid + '&nbsp;&nbsp;' + d.pid + '</div>'
+          + '<div class="ei-devcell">' + st + '</div>'
+          + '<div class="ei-devcell">' + (d.master.added
               ? '<span class="ei-rowtab-alias">' + d.master.alias + '</span>'
-              : '<span class="ei-rowtab-alias dim">not added</span>') + '</div>'
-          + '<div class="ei-devcell rowtabs' + sel + '">' + rowTabs + '</div>';
-
-    if(open) html += '<div class="ei-devexpand" id="ei-expand-slot"></div>';
+              : '<span class="ei-rowtab-alias dim">not added</span>') + '</div>';
+    EI_INSTALLS.forEach(function(i){ html += '<div class="ei-devcell">' + eiMarker(d, i.id) + '</div>'; });
+    html += '<div class="ei-devcell"></div>'
+          + '<div class="ei-devcell"><button type="button" class="ad-gear" data-gear="' + id + '" title="Edit '
+          + (d.master.alias || d.winName) + '">&#9881;</button></div>';
   });
-
-  // WHY: one editor DOM block is moved into the open row rather than rebuilt per device - it keeps
-  // every field id unique and lets the editor code stay as it is.
-  var host = document.getElementById('alias-editor-host');
-  var park = document.getElementById('alias-editor-parking');
-  if(host && park) park.appendChild(host);
-
   grid.innerHTML = html;
-
-  var slot = document.getElementById('ei-expand-slot');
-  if(slot && host) slot.appendChild(host);
   eiBindGridEvents(grid);
+}
+
+// WHY: the words and colours of the Installations column (A4) - M green, differs in the finding's colour,
+// not added (red when a .binds names the device), not found. The strip in the dialog uses the same.
+function eiMarker(d, instId){
+  var st = eiMatchState(d, instId);
+  if(st === 'match')  return '<span class="ad-mk ok">M</span>';
+  if(st === 'labels') return '<span class="ad-mk warn" title="labels differ from the master - nothing breaks">differs</span>';
+  if(st === 'entry')  return '<span class="ad-mk bad" title="no matching entry here - a .binds naming the master&rsquo;s device would be rejected">not added</span>';
+  return '<span class="ad-mk dim">not added</span>';
 }
 
 function eiBindGridEvents(grid){
   if(grid._eiBound) return;
   grid._eiBound = true;
   grid.addEventListener('click', function(e){
-    var rt = e.target.closest('[data-rowtab]');
-    if(rt){
-      eiSelectDevice(rt.getAttribute('data-rowtab'));
-      return;
-    }
-    var pick = e.target.closest('[data-pick]');
-    if(pick) eiSelectDevice(pick.getAttribute('data-pick'));
+    var g = e.target.closest('[data-gear]');
+    if(g) eiOpenDeviceDialog(g.getAttribute('data-gear'));
   });
-}
-
-// clicking an installation tab opens that device on that installation; clicking the one already
-// open closes the row, so the accordion still behaves like an accordion
-function eiSelectDevice(id){
-  if(!eiDevices[id]) return;
-  eiSelectedDevice = (eiSelectedDevice === id) ? null : id;
-  eiPendingConfirm = false;
-  eiRenderDeviceRows();
-  eiRenderDeviceEditor();
-}
-
-
-
-function eiConfirmAlias(){
-  if(!eiSelectedDevice) return;
-  eiPendingConfirm = true;
-  eiApplyAliasLock();
-}
-
-function eiAliasEdited(){
-  if(!eiSelectedDevice) return;
-  eiPendingConfirm = true;
-  eiApplyAliasLock();
 }
 
 function eiLabelOf(instId){
@@ -1589,113 +1477,254 @@ function eiLabelOf(instId){
   return found;
 }
 
-function eiPathOf(instId){
-  var found = '';
-  EI_INSTALLS.forEach(function(i){ if(i.id === instId) found = i.path || ''; });
-  return found;
+/* ---------- the Device Editor dialog (2026-10-10) ---------- */
+
+var AD_AXIS_TOKEN = {X:'Joy_XAxis', Y:'Joy_YAxis', Z:'Joy_ZAxis', RX:'Joy_RXAxis', RY:'Joy_RYAxis',
+                     RZ:'Joy_RZAxis', U:'Joy_UAxis', V:'Joy_VAxis'};
+var AD_HAT_DIRS = ['Up', 'Right', 'Down', 'Left'];
+var AD_GROUP = 32;      // buttons per sub-tab
+var AD_MAX = 18;        // the game shows at most 18 characters of a label - measured
+var ad = null;          // the open dialog: {id, tab, group, edits}
+
+// Default labels: what A8's generated .buttonMap writes, so the dialog and the files agree.
+function adDefault(kind, key){
+  if(kind === 'axes')    return key + ' Axis';
+  if(kind === 'buttons') return 'Button ' + key;
+  var m = /^(\d+)(\w+)$/.exec(key);
+  return 'Hat ' + m[1] + ' ' + m[2];
+}
+function adToken(kind, key){
+  if(kind === 'axes')    return AD_AXIS_TOKEN[key];
+  if(kind === 'buttons') return 'Joy_' + key;
+  var m = /^(\d+)(\w+)$/.exec(key);
+  return 'Joy_POV' + m[1] + m[2];
 }
 
-function eiSaveDevice(){
-  if(!eiSelectedDevice) return;
-  var d = eiDevices[eiSelectedDevice];
-  var rec = eiMaster(d);
+// The inputs each tab shows. An attached controller reports them (axis identities and hats come from A8b);
+// an unplugged one cannot, so its tabs show only the inputs its saved labels name.
+function adInputs(d){
+  var m = d.master, inputs = {axes:[], buttons:[], hats:[]};
+  if(d.connected){
+    (d.axisIds || []).forEach(function(a){ inputs.axes.push(a); });
+    for(var b = 1; b <= d.buttonCount; b++) inputs.buttons.push(String(b));
+    for(var h = 1; h <= (d.hatCount || 0); h++)
+      AD_HAT_DIRS.forEach(function(dir){ inputs.hats.push(h + dir); });
+  } else {
+    (d.axisIds || []).forEach(function(a, i){ if(m.axes && m.axes[i]) inputs.axes.push(a); });
+    Object.keys(m.buttons || {}).forEach(function(b){ inputs.buttons.push(String(b)); });
+    Object.keys(m.hats || {}).forEach(function(k){ inputs.hats.push(k); });
+  }
+  return inputs;
+}
 
-  if(!rec.builtin) rec.alias = document.getElementById('alias-name').value;   // a built-in's name is Frontier's
-  rec.aliasConfirmed = true;
-  rec.added = true;
-  eiPendingConfirm = false;
-
-  rec.axes = Array.prototype.map.call(
-    document.querySelectorAll('#io-axis .ei-io-cell input'), function(i){ return i.value; });
-
-  rec.buttons = {};
-  Array.prototype.forEach.call(document.querySelectorAll('#io-buttons .ei-io-cell'), function(cell, i){
-    var inp = cell.querySelector('input');
-    if(inp && inp.value) rec.buttons[i + 1] = inp.value;
+function adSaved(d, kind, key){
+  var m = d.master;
+  if(kind === 'axes')    return (m.axes || [])[(d.axisIds || []).indexOf(key)] || '';
+  if(kind === 'buttons') return (m.buttons || {})[key] || '';
+  return (m.hats || {})[key] || '';
+}
+function adValue(d, kind, key){
+  var k = kind + ':' + key;
+  if(k in ad.edits) return ad.edits[k];
+  return adSaved(d, kind, key) || adDefault(kind, key);
+}
+function adDirty(){
+  var d = eiDevices[ad.id];
+  return Object.keys(ad.edits).some(function(k){
+    var p = k.split(':');
+    return ad.edits[k] !== (adSaved(d, p[0], p[1]) || adDefault(p[0], p[1]));
   });
-  rec.buttonMap = Object.keys(rec.buttons).length > 0 || rec.axes.some(function(v){ return !!v; });
+}
 
-  // WHY: SAVE writes the master and stops. It deliberately does not touch d.installs - those record
-  // what is on disk, and nothing is on disk until Apply. Saving used to propagate into the mirrored
-  // installations right here, which conflated "the user decided" with "the file changed".
-  var behind = EI_INSTALLS.filter(function(i){ return eiMatchState(d, i.id) !== 'match'; }).length;
+function eiOpenDeviceDialog(id){
+  var d = eiDevices[id];
+  if(!d) return;
+  ad = {id:id, tab:'device', group:0, edits:{}};
+  var scrim = document.getElementById('ad-scrim');
+  if(scrim.parentElement !== document.body) document.body.appendChild(scrim);
+  scrim.hidden = false;
+  document.getElementById('ad-ask').hidden = true;
+  adRender();
+}
 
+function adRender(){
+  var d = eiDevices[ad.id], m = d.master, inputs = adInputs(d);
+  var named = m.added;
+  document.getElementById('ad-title').textContent = (m.added ? m.alias : d.winName);
+
+  // WHY: a tab only for a kind of input the controller has - the dialog is built from what it reports.
+  var tabs = [['device', 'DEVICE', null]];
+  if(inputs.axes.length)    tabs.push(['axes', 'AXES', inputs.axes.length]);
+  if(inputs.buttons.length) tabs.push(['buttons', 'BUTTONS', inputs.buttons.length]);
+  if(inputs.hats.length)    tabs.push(['hats', 'HATS', inputs.hats.length / 4]);
+  if(!tabs.some(function(t){ return t[0] === ad.tab; })) ad.tab = 'device';
+  document.getElementById('ad-tabs').innerHTML = tabs.map(function(t){
+    var off = (t[0] !== 'device' && !named) ? ' disabled' : '';
+    return '<button type="button" class="cd-tab' + (t[0] === ad.tab ? ' active' : '') + '"' + off
+         + ' onclick="adTab(\'' + t[0] + '\')">' + t[1]
+         + (t[2] === null ? '' : '<span class="cd-tabsub">' + t[2] + '</span>') + '</button>';
+  }).join('');
+
+  // buttons in groups of 32, numbered as the game numbers them
+  var sub = document.getElementById('ad-subtabs'), groups = Math.ceil(inputs.buttons.length / AD_GROUP);
+  if(ad.tab === 'buttons' && groups > 1){
+    var html = '';
+    for(var g = 0; g < groups; g++){
+      var lo = g * AD_GROUP + 1, hi = Math.min((g + 1) * AD_GROUP, inputs.buttons.length);
+      if(!d.connected){ lo = inputs.buttons[g * AD_GROUP]; hi = inputs.buttons[Math.min((g + 1) * AD_GROUP, inputs.buttons.length) - 1]; }
+      html += '<button type="button" class="cd-subtab' + (g === ad.group ? ' active' : '') + '" onclick="adGroup(' + g + ')">'
+            + lo + '&ndash;' + hi + '</button>';
+    }
+    sub.innerHTML = html;
+  } else {
+    sub.innerHTML = '';
+  }
+
+  var body = document.getElementById('ad-body');
+  body.innerHTML = ad.tab === 'device' ? adDeviceTab(d) : adInputTab(d, ad.tab, inputs);
+
+  // CLEAR in the middle, RESET LABELS in its place on a built-in. Nothing to clear on a device not added.
+  var clear = document.getElementById('ad-clear');
+  clear.textContent = m.builtin ? 'RESET LABELS' : 'CLEAR';
+  clear.style.visibility = m.added ? 'visible' : 'hidden';
+  document.getElementById('ad-save').disabled = !named;
+}
+
+function adDeviceTab(d){
+  var m = d.master;
+  var lines = EI_INSTALLS.map(function(i){
+    return '<div class="ei-instline"><span class="ei-instlbl">' + i.label + '</span>'
+         + '<span class="ad-mkcell">' + eiMarker(d, i.id) + '</span>'
+         + '<input class="ei-instpath" readonly value="' + i.path + '" title="' + i.path + '"></div>';
+  }).join('');
+  var matching = EI_INSTALLS.filter(function(i){ return eiMatchState(d, i.id) === 'match'; }).length;
+  var html = '<div class="cd-section">INSTALLATIONS</div>' + lines
+           + '<div class="ad-sub">' + (m.added
+               ? (matching === EI_INSTALLS.length
+                   ? '<b style="color:#4FC56B">All ' + EI_INSTALLS.length + ' installations match.</b>'
+                   : '<b style="color:#D39207">' + matching + ' of ' + EI_INSTALLS.length + ' installations match.</b> APPLY, beneath the list, is what carries the master out.')
+               : 'No installation holds an entry the master knows.') + '</div>';
+  html += '<div class="cd-section" style="margin-top:14px">DEVICE</div><div class="ad-fields">'
+        + '<label><span class="ei-label">Device name (alias)</span><input class="ei-field" readonly value="' + (m.added ? m.alias : '') + '"></label>'
+        + '<label><span class="ei-label">VID</span><input class="ei-field" readonly value="' + d.vid + '"></label>'
+        + '<label><span class="ei-label">PID</span><input class="ei-field" readonly value="' + d.pid + '"></label></div>'
+        + '<div class="ad-sub">Windows name: ' + d.winName + ' &middot; ' + (d.connected ? 'attached' : 'not attached') + '</div>';
+  if(!m.added){
+    html += '<div class="ei-lock-note on">This device has no name yet. Onboarding names it, and its inputs can be labelled once it has one.</div>';
+  } else if(m.builtin){
+    html += '<div class="ad-sub">Frontier&rsquo;s built-in entry &mdash; its labels are saved to <code>' + m.alias + '.buttonMap</code>.</div>';
+  } else {
+    html += '<div class="ad-sub">Renaming comes with the Rename slice: a name is in every installation and in <code>.binds</code>, so it changes all of them or none.</div>';
+  }
+  return html;
+}
+
+function adInputTab(d, kind, inputs){
+  var keys = inputs[kind];
+  if(kind === 'buttons') keys = keys.slice(ad.group * AD_GROUP, (ad.group + 1) * AD_GROUP);
+  var cls = kind === 'axes' ? 'ad-grid axes' : 'ad-grid';
+  var html = '';
+  if(!d.connected) html += '<div class="ad-sub" style="margin-bottom:10px">Not attached &mdash; showing the inputs its saved labels name. Plug it in to see every input.</div>';
+  html += '<div class="' + cls + '">';
+  keys.forEach(function(key){
+    var token = adToken(kind, key);
+    html += '<div class="ei-io-cell" data-token="' + token + '"><span class="ei-io-label">' + token + '</span>'
+          + '<input class="ei-field-narrow" maxlength="' + AD_MAX + '" value="' + adValue(d, kind, key).replace(/"/g, '&quot;') + '"'
+          + ' oninput="adEdit(\'' + kind + '\',\'' + key + '\',this.value)"'
+          + ' onblur="adSettle(\'' + kind + '\',\'' + key + '\',this)"></div>';
+  });
+  html += '</div>';
+  if(d.connected && keys.length){
+    // WHY: no hardware in a mockup. Holding this lights the first box on screen exactly as long as it is held -
+    // the rule: lit only while the input is active, nothing lingering, and no tab ever changes for an input.
+    html += '<div class="ad-sub" style="margin-top:12px">Live: a box is lit only while its input is active &mdash; a button while held, an axis while more than 5% from rest. '
+          + '<button type="button" class="ei-btn" style="padding:2px 10px;font-size:10px" '
+          + 'onmousedown="adPress(\'' + adToken(kind, keys[0]) + '\',true)" onmouseup="adPress(\'' + adToken(kind, keys[0]) + '\',false)" '
+          + 'onmouseleave="adPress(\'' + adToken(kind, keys[0]) + '\',false)">DEMO &mdash; HOLD TO PRESS ' + adToken(kind, keys[0]) + '</button></div>';
+  }
+  return html;
+}
+
+function adTab(tab){ ad.tab = tab; ad.group = 0; adRender(); }
+function adGroup(g){ ad.group = g; adRender(); }
+function adEdit(kind, key, value){ ad.edits[kind + ':' + key] = value; }
+
+// Spaces at either end are trimmed; a cleared box takes the default back - every input has a label.
+function adSettle(kind, key, input){
+  var v = input.value.trim();
+  if(!v) v = adDefault(kind, key);
+  input.value = v;
+  ad.edits[kind + ':' + key] = v;
+}
+
+function adPress(token, on){
+  var cell = document.querySelector('#ad-body [data-token="' + token + '"]');
+  if(cell) cell.classList.toggle('live', on);
+}
+
+// SAVE writes the draft (the mockup keeps it in d.master) and touches no game installation.
+function adSave(){
+  var d = eiDevices[ad.id], m = d.master;
+  Object.keys(ad.edits).forEach(function(k){
+    var p = k.split(':'), kind = p[0], key = p[1], v = ad.edits[k].trim() || adDefault(kind, key);
+    if(kind === 'axes'){ m.axes = m.axes || []; m.axes[(d.axisIds || []).indexOf(key)] = v; }
+    else if(kind === 'buttons'){ m.buttons = m.buttons || {}; m.buttons[key] = v; }
+    else { m.hats = m.hats || {}; m.hats[key] = v; }
+  });
+  m.buttonMap = true;
+  adClose();
   eiRenderDeviceRows();
-  eiRenderDeviceEditor();
-  eiFlashBanner(behind
-    ? 'SAVED to the draft - ' + behind + ' of ' + EI_INSTALLS.length +
-      ' installations do not match yet. Apply to Game Installs is what carries it out.'
-    : 'SAVED to the draft - nothing reaches a game installation until you apply');
 }
 
-function eiDiscardDevice(){
-  if(!eiSelectedDevice) return;
-  eiPendingConfirm = false;
-  eiRenderDeviceEditor();
-  eiFlashBanner('CHANGES DISCARDED - fields restored from the draft');
+// BACK is DISCARD - and asks first when there is anything to lose.
+function adBack(){
+  if(!ad) return;
+  if(adDirty()){
+    var d = eiDevices[ad.id];
+    document.getElementById('ad-ask-text').textContent =
+      'You have unsaved changes to ' + (d.master.alias || d.winName) + '. Save them to the draft, discard them, or keep editing?';
+    document.getElementById('ad-ask').hidden = false;
+    return;
+  }
+  adClose();
+}
+function adAskKeep(){ document.getElementById('ad-ask').hidden = true; }
+function adAskDiscard(){ adClose(); }
+function adAskSave(){ document.getElementById('ad-ask').hidden = true; adSave(); }
+function adClose(){
+  document.getElementById('ad-scrim').hidden = true;
+  document.getElementById('ad-ask').hidden = true;
+  ad = null;
 }
 
-// WHY: the device is still physically attached, so it cannot leave the list. What CLEAR removes is
-// this installation's DeviceMappings.xml entry and its matching .buttonMap.
-function eiResetLabels(){
-  if(!eiSelectedDevice) return;
-  var d = eiDevices[eiSelectedDevice];
-  var m = eiMaster(d);
-  if(!m.builtin) return;
-  m.axes = m.axes.map(function(){ return ''; });
-  m.buttons = {};
-  if(!m.frontierButtonMap) m.buttonMap = false;   // a .buttonMap Frontier shipped is never removed
-  eiPendingConfirm = false;
-  eiRenderDeviceRows();
-  eiRenderDeviceEditor();
-  eiFlashBanner('LABELS RESET in the draft - ' + m.alias +
-    '.buttonMap removed. Frontier’s entry is untouched, and the next startup generates fresh labels');
-}
-
-// WHY: CLEAR reaches every installation now, which is a wider blast radius than the button used to
-// have - it was scoped to one installation and its mirrors, and a user could clear a single one by
-// turning MIRROR off first. Neither exists any more, so it asks first, and the question names the count.
-function eiClearDevice(){
-  if(!eiSelectedDevice) return;
-  var d = eiDevices[eiSelectedDevice];
-  var m = eiMaster(d);
-  var n = EI_INSTALLS.length;
+// CLEAR reaches every installation on the next Apply, so it asks first and names the count. On a built-in it is
+// RESET LABELS: only the .buttonMap the user or BindForge made, never Frontier's entry.
+function adClear(){
+  var d = eiDevices[ad.id], m = d.master, n = EI_INSTALLS.length;
   var nl2 = String.fromCharCode(10, 10);
-  if(!window.confirm('Clear ' + m.alias + ' from all ' + n + ' installations?' + nl2 +
-      'This removes its DeviceMappings.xml entry and its .buttonMap everywhere on the next Apply. ' +
-      'The device stays listed because the hardware is still attached.')) return;
-  m.added = false;
-  m.aliasConfirmed = false;
-  m.buttonMap = false;
-  m.axes = m.axes.map(function(){ return ''; });
-  m.buttons = {};
-  eiPendingConfirm = false;
+  if(m.builtin){
+    if(!window.confirm('Reset the labels of ' + m.alias + ' in all ' + n + ' installations?' + nl2 +
+        'This removes the .buttonMap you or BindForge made, on the next Apply. Frontier’s entry is never touched, ' +
+        'and the next Elite-Intel startup generates fresh labels.')) return;
+    m.axes = (m.axes || []).map(function(){ return ''; });
+    m.buttons = {}; m.hats = {};
+  } else {
+    if(!window.confirm('Clear ' + m.alias + ' from all ' + n + ' installations?' + nl2 +
+        'This removes its DeviceMappings.xml entry and its .buttonMap everywhere on the next Apply. ' +
+        'The device stays listed while the hardware is attached.')) return;
+    m.added = false; m.aliasConfirmed = false; m.buttonMap = false;
+    m.axes = (m.axes || []).map(function(){ return ''; });
+    m.buttons = {}; m.hats = {};
+  }
+  adClose();
   eiRenderDeviceRows();
-  eiRenderDeviceEditor();
-  eiFlashBanner('CLEARED in the draft - will be removed from all ' + n +
-    ' installations on Apply. The device stays listed because the hardware is still attached');
 }
 
-function eiFlashBanner(msg){
-  var b = document.getElementById('alias-editbanner');
-  if(!b) return;
-  if(!b.dataset.original) b.dataset.original = b.innerHTML;
-  b.innerHTML = msg;
-  clearTimeout(b._t);
-  b._t = setTimeout(function(){ b.innerHTML = b.dataset.original; }, 3000);
-}
-
-function eiApplyAliasLock(){
-  var d = eiSelectedDevice ? eiDevices[eiSelectedDevice] : null;
-  var rec = d ? eiMaster(d) : null;
-  var locked = !!rec && !rec.builtin && !rec.aliasConfirmed && !eiPendingConfirm;
-  var sec  = document.getElementById('alias-io-section');
-  var note = document.getElementById('alias-lock-note');
-  var btn  = document.getElementById('alias-confirm-btn');
-  if(sec)  sec.classList.toggle('locked', locked);
-  if(note) note.classList.toggle('on', locked);
-  if(btn)  btn.style.display = locked ? '' : 'none';
-}
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape' && ad && !document.getElementById('ad-scrim').hidden){
+    if(!document.getElementById('ad-ask').hidden) adAskKeep(); else adBack();
+  }
+});
 
 // WHY: Apply is the only thing that reaches a game installation, and it carries the master to EVERY
 // one of them - that is the whole model. It reports per installation because a push that half-lands
@@ -1714,24 +1743,23 @@ function eiApplyToInstalls(){
         lines.push(i.label + '  ->  ' + m.alias + '.buttonMap only  (Frontier’s entry untouched)');
       } else {
         lines.push(i.label + '  ->  ' + m.alias +
-          (state === 'entry' ? '  (entry + .buttonMap)' : '  (.buttonMap labels)'));
+          (state === 'entry' ? '  (entry at the top + .buttonMap)' : '  (.buttonMap labels)'));
       }
     });
   });
   // WHY: the master lands in every installation, after which every installation matches it - which
-  // is what turns the row markers green. Simulated so the mockup demonstrates the repair, not just
-  // the diagnosis.
+  // is what turns the markers green. Simulated so the mockup demonstrates the repair, not just the diagnosis.
   eiDeviceOrder.forEach(function(id){
     var d = eiDevices[id], m = d.master;
     EI_INSTALLS.forEach(function(i){
       d.installs[i.id] = {
         added: m.added, builtin: m.builtin, alias: m.alias, buttonMap: m.buttonMap,
-        axes: (m.axes || []).slice(), buttons: JSON.parse(JSON.stringify(m.buttons || {}))
+        axes: (m.axes || []).slice(), buttons: JSON.parse(JSON.stringify(m.buttons || {})),
+        hats: JSON.parse(JSON.stringify(m.hats || {}))
       };
     });
   });
   eiRenderDeviceRows();
-  eiRenderDeviceEditor();
   var nl = String.fromCharCode(10);
   alert(lines.length
     ? 'Would write DeviceMappings.xml and .buttonMap to all ' + EI_INSTALLS.length +
@@ -1743,74 +1771,6 @@ function eiApplyToInstalls(){
 
 function eiSelectDefaultDevice(){
   eiRenderDeviceRows();
-  eiRenderDeviceEditor();
-}
-
-function eiRenderDeviceEditor(){
-  var host = document.getElementById('alias-editor-host');
-  var d    = eiSelectedDevice ? eiDevices[eiSelectedDevice] : null;
-  if(host) host.style.display = d ? '' : 'none';
-  if(!d) return;
-
-  var rec = eiMaster(d);
-
-  // WHY: this used to name the ONE installation being edited, with its path, because the expansion
-  // carried a tab per installation. There is one record now, so the header answers a different
-  // question: which installations does the user have, and has each one caught up? Read-only.
-  var head = document.getElementById('alias-insthead');
-  if(head){
-    var strip = EI_INSTALLS.map(function(i){
-      var st = eiMatchState(d, i.id);
-      var mk = st === 'match'  ? '<span class="ei-rowtab-mir">M</span>'
-             : st === 'labels' ? '<span class="ei-rowtab-mir warn">differs</span>'
-             : st === 'entry'  ? '<span class="ei-rowtab-mir bad">no entry</span>'
-             :                   '<span class="ei-rowtab-alias dim">not added</span>';
-      return '<div class="ei-instline">'
-           +   '<span class="ei-instlbl">' + i.label + '</span>' + mk
-           +   '<input class="ei-instpath" readonly value="' + i.path + '" title="' + i.path + '">'
-           + '</div>';
-    }).join('');
-    var behind = EI_INSTALLS.filter(function(i){ return eiMatchState(d, i.id) !== 'match'; }).length;
-    head.innerHTML = strip
-      + '<div class="sub">' + (rec.builtin
-          ? 'Frontier&rsquo;s built-in entry &mdash; its name and VID/PID are locked; labels are saved to <code>' + rec.alias + '.buttonMap</code>. '
-          : rec.added
-          ? 'Editing the master &mdash; one <code>DeviceMappings.xml</code> entry and one <code>.buttonMap</code>, applied to every installation. '
-          : 'This device has no entry yet &mdash; SAVE adds one to the master. ')
-      + (behind
-          ? '<b style="color:#D39207">' + behind + ' of ' + EI_INSTALLS.length +
-            ' installations do not match it yet</b> &mdash; Apply is what carries it out.'
-          : '<b style="color:#4FC56B">All ' + EI_INSTALLS.length + ' installations match.</b>')
-      + '</div>';
-  }
-
-  document.getElementById('alias-name').value = rec.alias;
-  var nameInput = document.getElementById('alias-name');
-  nameInput.readOnly = !!rec.builtin;
-  nameInput.title = rec.builtin ? 'Frontier\u2019s name \u2014 locked, because the entry is Frontier\u2019s definition' : '';
-  document.getElementById('alias-clear-btn').style.display = rec.builtin ? 'none' : '';
-  document.getElementById('alias-reset-btn').style.display = rec.builtin ? '' : 'none';
-  document.getElementById('alias-vid').value  = d.vid;
-  document.getElementById('alias-pid').value  = d.pid;
-  document.getElementById('alias-axiscount').textContent = d.axisCount;
-  document.getElementById('alias-btncount').textContent  = d.buttonCount;
-
-  Array.prototype.forEach.call(document.querySelectorAll('#io-axis .ei-io-cell'), function(cell, i){
-    cell.style.display = (i < d.axisCount) ? '' : 'none';
-    var inp = cell.querySelector('input');
-    if(inp) inp.value = rec.axes[i] || '';
-  });
-
-  Array.prototype.forEach.call(document.querySelectorAll('#io-buttons .ei-io-cell'), function(cell, i){
-    cell.style.display = (i < d.buttonCount) ? '' : 'none';
-    var inp = cell.querySelector('input');
-    if(inp) inp.value = rec.buttons[i + 1] || '';
-  });
-
-  document.getElementById('tab-buttons').style.display = d.buttonCount ? '' : 'none';
-  if(!d.buttonCount) eiShowIO('axis');
-
-  eiApplyAliasLock();
 }
 
 if(document.readyState === 'loading'){

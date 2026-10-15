@@ -16,7 +16,6 @@ class TtsProviderLanguageTest {
     @Test
     void onlyKokoroIsBeatenByCyrillic() {
         for (Language language : Language.values()) {
-            assertTrue(TtsProvider.EDGE.canVoice(language), "Edge carries every language: " + language);
             assertTrue(TtsProvider.GOOGLE.canVoice(language), "Google carries every language: " + language);
             assertTrue(TtsProvider.SUPERTONIC.canVoice(language), "Supertonic carries every language: " + language);
             assertEquals(!language.isCyrillicScript(), TtsProvider.KOKORO.canVoice(language),
@@ -82,7 +81,6 @@ class TtsProviderLanguageTest {
     void exactlyTheTwoOnnxEnginesAreLocal() {
         assertTrue(TtsProvider.KOKORO.isLocal());
         assertTrue(TtsProvider.SUPERTONIC.isLocal());
-        assertFalse(TtsProvider.EDGE.isLocal());
         assertFalse(TtsProvider.GOOGLE.isLocal());
     }
 
@@ -95,6 +93,7 @@ class TtsProviderLanguageTest {
         assertEquals(TtsProvider.KOKORO, TtsProvider.fromStored(null));
         assertEquals(TtsProvider.KOKORO, TtsProvider.fromStored(""));
         assertEquals(TtsProvider.KOKORO, TtsProvider.fromStored("ELEVENLABS"));
+        assertEquals(TtsProvider.KOKORO, TtsProvider.fromStored("EDGE"), "Edge was removed in v1.1.0026");
         assertEquals(TtsProvider.SUPERTONIC, TtsProvider.fromStored("supertonic"));
     }
 }

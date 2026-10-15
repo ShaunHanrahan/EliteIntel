@@ -2,6 +2,7 @@ package elite.intel.db.managers;
 
 import elite.intel.gameapi.journal.events.dto.LocationDto;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import org.junit.jupiter.api.Test;
 
 import static elite.intel.gameapi.journal.events.dto.LocationDto.LocationType.FLEET_CARRIER;
@@ -26,7 +27,7 @@ class LocationManagerStarNameTest {
         carrier.setStarName("76 Leonis");
         carrier.setStationName("GHY-L8X");
         carrier.setLocationType(FLEET_CARRIER);
-        locations.save(carrier);
+        LocationFixtures.store(carrier);
 
         assertEquals("76 Leonis", locations.findStarName(systemAddress));
     }
@@ -34,8 +35,7 @@ class LocationManagerStarNameTest {
     @Test
     void theSessionNamesTheSystemWhenNothingIsOnRecordForIt() {
         long systemAddress = 358999069402L;
-        player.setCurrentLocationId(0L, systemAddress);
-        player.setCurrentPrimaryStarName("Synuefe XR-H d11-102");
+        player.moveTo(new Position(systemAddress, "Synuefe XR-H d11-102", 0L));
 
         assertEquals("Synuefe XR-H d11-102", locations.findStarName(systemAddress));
     }
@@ -43,8 +43,7 @@ class LocationManagerStarNameTest {
     @Test
     void aSystemNeitherOnRecordNorCurrentHasNoName() {
         long systemAddress = 358999069403L;
-        player.setCurrentLocationId(0L, 358999069404L);
-        player.setCurrentPrimaryStarName("Somewhere Else");
+        player.moveTo(new Position(358999069404L, "Somewhere Else", 0L));
 
         assertNull(locations.findStarName(systemAddress));
     }
@@ -60,16 +59,14 @@ class LocationManagerStarNameTest {
         carrier.setStarName("Departure Test System");
         carrier.setStationName(carrierName);
         carrier.setLocationType(FLEET_CARRIER);
-        locations.save(carrier);
+        LocationFixtures.store(carrier);
 
         carrier.setStarName("Arrival Test System");
         carrier.setSystemAddress(358999069406L);
-        locations.save(carrier);
+        LocationFixtures.store(carrier);
 
-        assertTrue(locations.findByPrimaryStar("Departure Test System").values().stream()
-                .noneMatch(row -> carrierName.equals(row.getStationName())), "still filed under the system it left");
-        assertTrue(locations.findByPrimaryStar("Arrival Test System").values().stream()
-                .anyMatch(row -> carrierName.equals(row.getStationName())), "not filed under the system it is in");
+        assertFalse(locations.isSystemOnRecord("Departure Test System"), "still filed under the system it left");
+        assertTrue(locations.isSystemOnRecord("Arrival Test System"), "not filed under the system it is in");
     }
 
     @Test
@@ -79,8 +76,8 @@ class LocationManagerStarNameTest {
         moon.setStarName("");
         moon.setPlanetName("Unnamed Test Moon");
         moon.setLocationType(MOON);
-        locations.save(moon);
-        player.setCurrentLocationId(0L, 1L);
+        LocationFixtures.store(moon);
+        player.moveTo(new Position(1L, "Somewhere Else", 0L));
 
         assertNull(locations.findStarName(systemAddress));
     }

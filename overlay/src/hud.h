@@ -15,17 +15,10 @@
 #include <cairo/cairo.h>
 #include <limits.h>
 
+#include "hud_place.h"
+
 #define PROTOCOL_VERSION 1
 
-// "No position requested." Deliberately not -1, and not any small negative
-// number: a screen coordinate is legitimately negative on both platforms. A
-// monitor placed left of or above the primary one starts at a negative offset,
-// and a window nudged past the top or left edge sits at a negative coordinate
-// on its own. Using -1 as the sentinel made every such position unstorable -
-// the card came back centred with only its Y remembered - because the guard
-// that applied it could not tell the commander's coordinate from "unset".
-// Must match OverlayProtocol.POSITION_UNSET on the Java side.
-#define HUD_POS_UNSET INT_MIN
 
 #define MAX_ROWS   8
 // Stops on a row's track, and the number of slots the renderer lays them out
@@ -132,8 +125,8 @@ typedef struct {
 
 /// Where the card sits in the headset, as a point of the compass on the
 /// commander's forward view - TOP is straight above centre, RIGHT is off to the
-/// right at eye level. Only the VR shell reads this; a desktop window is placed
-/// by dragging it.
+/// right at eye level. Only the VR shell reads this; a desktop card is placed
+/// by section instead, see hud_place.h.
 ///
 /// Named for the view rather than for the compass (NORTH/EAST/...) because
 /// Elite already has a compass, pointing at planetary north, and a HUD setting
@@ -157,7 +150,16 @@ typedef struct {
     double alpha;            // background alpha; text is always opaque
     double scale;
     int  width;
-    int  want_x, want_y;     // requested position; HUD_POS_UNSET means "leave as is"
+    /// Where the app last asked for the desktop card to go, until the shell's
+    /// next layout pass resolves it (see hud_place.h). Desktop only.
+    ///
+    /// Two slots, resolved start first, because "move the overlay" while it is
+    /// closed arrives as a restore of the last spot followed at once by the move,
+    /// usually in one read. With one slot the move overwrote the restore and was
+    /// then judged against the monitor the fresh window happened to open on,
+    /// rather than the one the commander left the card on.
+    HudPlaceRequest place_start;     // RESTORE or SETTLE
+    HudPlaceRequest place_move;      // MOVE
     VrPosition vr_position;  // VR only; the desktop shells ignore it
 
     /// Desktop only; the VR shell ignores both, the mirror of vr_position above.
@@ -196,9 +198,14 @@ int hud_handle_command(char *line, int *quit);
 /// read bytes and hand them here; they own no parsing state of their own.
 int hud_feed(const char *bytes, int len, int *quit);
 
-/// Tells the app where the window now is. Shells call this when a drag ends, so
-/// the position survives a restart like every other overlay setting.
-void hud_report_position(int x, int y);
+/// Tells the app which section the card is pinned to and where its anchor is, as
+/// `PLACE <section> <x> <y>`. Shells call this when a drag ends and when a
+/// request asks for it (hud_place_resolve), so the spot survives a restart and
+/// the next "move overlay" to that section returns to it.
+void hud_report_placement(const HudPlacement *p);
+
+/// Whether the app has asked for a placement the shell has not resolved yet.
+int hud_place_pending(void);
 
 /// Advances the typewriter by one character. Returns 1 when something changed.
 int hud_tick_typewriter(void);

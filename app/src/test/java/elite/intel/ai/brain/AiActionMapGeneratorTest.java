@@ -54,7 +54,18 @@ class AiActionMapGeneratorTest {
      * English-speaking commander. The English aliases now exist and it belongs in the set.
      */
     private static final List<String> SNAPSHOT_BUILTIN_IDS = List.of(
+            // The HUD overlay itself: show, close, and move it around the monitor by compass section.
+            "show_hud_overlay",
+            "hide_hud_overlay",
+            "move_hud_overlay_to_screen_section",
             // Jukebox: the commander's own music. Always offered - with an empty playlist these answer
+            "bookmark_current_location",
+            "close_location_bookmarks",
+            "delete_location_bookmark",
+            "navigate_to_location_bookmark",
+            "next_location_bookmarks_page",
+            "previous_location_bookmarks_page",
+            "show_location_bookmarks",
             // "there is no music yet" rather than being withdrawn, which would have VEGA claim it
             // has no such function.
             "play_music",

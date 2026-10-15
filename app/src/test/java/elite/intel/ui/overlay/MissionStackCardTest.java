@@ -7,6 +7,7 @@ import elite.intel.gameapi.gamestate.dtos.NavRouteDto;
 import elite.intel.gameapi.journal.events.MissionAcceptedEvent;
 import elite.intel.gameapi.journal.events.dto.MissionDto;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import elite.intel.util.json.GsonFactory;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -54,7 +55,8 @@ class MissionStackCardTest {
     private final PlayerSession playerSession = PlayerSession.getInstance();
 
     private final List<Long> saved = new ArrayList<>();
-    private String previousPosition;
+    private static final long TEST_ADDRESS = 4802733233386L;
+    private Optional<Position> previousPosition;
 
     private String route;
     private String here;
@@ -63,7 +65,7 @@ class MissionStackCardTest {
     void clean() {
         missions.clear();
         shipRoute.clearRoute();
-        previousPosition = playerSession.getPrimaryStarName();
+        previousPosition = playerSession.position();
         route = null;
         here = null;
     }
@@ -72,7 +74,7 @@ class MissionStackCardTest {
     void tidy() {
         saved.forEach(missions::remove);
         shipRoute.clearRoute();
-        playerSession.setCurrentPrimaryStarName(previousPosition);
+        previousPosition.ifPresent(playerSession::moveTo);
     }
 
     // -- which mission is featured ---------------------------------------------
@@ -176,7 +178,7 @@ class MissionStackCardTest {
     void theRealCardReadsTheRouteItIsWiredTo() {
         COURIER_STACK.forEach(this::save);
         plotRoute("LHS 3447", "Umpilakap");
-        playerSession.setCurrentPrimaryStarName("LFT 6");
+        playerSession.moveTo(new Position(TEST_ADDRESS, "LFT 6", null));
 
         HudObjective card = new MissionObjectiveSource().currentObjective().orElseThrow();
 

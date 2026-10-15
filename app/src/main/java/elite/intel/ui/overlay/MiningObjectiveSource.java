@@ -240,7 +240,7 @@ public class MiningObjectiveSource implements HudObjectiveSource {
      * subtitle is optional and a blank line reads worse than no line.
      */
     private String systemLabel() {
-        String system = playerSession.getPrimaryStarName();
+        String system = playerSession.currentStarSystem();
         return system == null || system.isBlank() ? null : system.toUpperCase(Locale.ROOT);
     }
 

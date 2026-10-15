@@ -6,7 +6,6 @@ import elite.intel.db.managers.LocationManager;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
 import elite.intel.gameapi.search.edsm.dto.DeathsDto;
 import elite.intel.gameapi.search.edsm.dto.TrafficDto;
-import elite.intel.session.PlayerSession;
 import elite.intel.util.yaml.ToYamlConvertable;
 import elite.intel.util.yaml.YamlFactory;
 
@@ -21,17 +20,16 @@ public class AnalyzeSystemSecurityQuery extends BaseQueryAnalyzer implements Int
 
 
     @Override public String id() { return ID; }
-
-
-    private final PlayerSession playerSession = PlayerSession.getInstance();
     private final LocationManager locationManager = LocationManager.getInstance();
 
     @Override public JsonObject handle(String action, JsonObject params, String originalUserInput) throws Exception {
         //GameEventBus.publish(new AiVoxResponseEvent("Analyzing system security. Stand by."));
 
-        LocationDto currentLocation = locationManager.findByLocationData(playerSession.getLocationData());
-        DeathsDto deathsDto = currentLocation.getDeathsDto();
-        TrafficDto trafficDto = currentLocation.getTrafficDto();
+        // WHY the system's record: security and factions are filed on the body an arrival named, not on the ring or
+        // moon we may have dropped at since.
+        LocationDto system = locationManager.currentSystem();
+        DeathsDto deathsDto = system.getDeathsDto();
+        TrafficDto trafficDto = system.getTrafficDto();
 
         String instructions = """
                 Answer the user's question about system security and political status.
@@ -60,24 +58,24 @@ public class AnalyzeSystemSecurityQuery extends BaseQueryAnalyzer implements Int
                 - If a field is null or none, state that data is not available. Never name a faction that is
                   not in the data, and never offer stationFaction as the system's controlling faction.
                 """;
-        double pscp = currentLocation.getPowerplayStateControlProgress();
+        double pscp = system.getPowerplayStateControlProgress();
         String powerPlayStateControlProgress = pscp == 0 ? "none" : String.valueOf(pscp);
         return process(
                 new AiDataStruct(instructions,
                         new DataDto(
-                                currentLocation.getStarName(),
+                                system.getStarName(),
                                 trafficDto == null ? null : trafficDto.getData().getDiscovery(),
-                                currentLocation.getSecurity(),
-                                currentLocation.getSystemFaction(),
-                                currentLocation.getStationFaction(),
-                                currentLocation.getPopulation(),
-                                currentLocation.getSecondEconomy(),
-                                currentLocation.getGovernment(),
-                                currentLocation.getPowerplayState(),
-                                currentLocation.getControllingPower(),
+                                system.getSecurity(),
+                                system.getSystemFaction(),
+                                locationManager.findCurrentStation().getStationFaction(),
+                                system.getPopulation(),
+                                system.getSecondEconomy(),
+                                system.getGovernment(),
+                                system.getPowerplayState(),
+                                system.getControllingPower(),
                                 powerPlayStateControlProgress,
-                                currentLocation.getPowerplayStateReinforcement(),
-                                currentLocation.getPowerplayStateUndermining(),
+                                system.getPowerplayStateReinforcement(),
+                                system.getPowerplayStateUndermining(),
                                 deathsDto == null ? null : deathsDto.getData().getDeaths(),
                                 trafficDto == null ? null : trafficDto.getData().getTraffic()
                         )

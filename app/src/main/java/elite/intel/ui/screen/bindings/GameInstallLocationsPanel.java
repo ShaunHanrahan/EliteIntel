@@ -1,11 +1,11 @@
 package elite.intel.ui.screen.bindings;
 
-import elite.intel.bindforge.devices.ButtonMapAudit;
-import elite.intel.bindforge.devices.DeviceEntry;
-import elite.intel.bindforge.devices.DeviceMappingsParser;
+import elite.intel.bindforge.devicefiles.ButtonMapAudit;
+import elite.intel.bindforge.devicefiles.DeviceEntry;
+import elite.intel.bindforge.devicefiles.DeviceMappingsParser;
 import elite.intel.bindforge.install.GameInstallation;
+import elite.intel.bindforge.install.GameInstallationProvider;
 import elite.intel.bindforge.install.InstallationRegistry;
-import elite.intel.bindforge.install.WindowsGameInstallationProvider;
 import elite.intel.db.dao.BindForgeInstallationsDao.InstallationRow;
 import elite.intel.session.PlayerSession;
 import elite.intel.ui.dialog.HudConfirmDialog;
@@ -64,7 +64,7 @@ public class GameInstallLocationsPanel extends JPanel {
 
     public GameInstallLocationsPanel() {
         this(new InstallationRegistry(
-                new WindowsGameInstallationProvider(PlayerSession.getInstance().getBindingsDir())));
+                GameInstallationProvider.forThisPlatform(PlayerSession.getInstance().getBindingsDir())));
     }
 
     GameInstallLocationsPanel(InstallationRegistry registry) {
@@ -288,14 +288,14 @@ public class GameInstallLocationsPanel extends JPanel {
         if (!Files.isDirectory(controlSchemes)) {
             return getText("bindings.installLocations.deviceFiles.none");
         }
-        Path deviceMappings = controlSchemes.resolve("DeviceMappings.xml");
+        Path deviceMappings = GameInstallation.deviceMappingsIn(controlSchemes);
         if (!Files.isRegularFile(deviceMappings)) {
             return getText("bindings.installLocations.deviceFiles.noMappings");
         }
         try {
             List<DeviceEntry> entries = DeviceMappingsParser.parse(deviceMappings);
             ButtonMapAudit.Result audit =
-                    ButtonMapAudit.audit(entries, controlSchemes.resolve("DeviceButtonMaps"));
+                    ButtonMapAudit.audit(entries, GameInstallation.deviceButtonMapsIn(controlSchemes));
             int maps = audit.attached().size() + audit.orphaned().size();
             return audit.isClean()
                     ? getText("bindings.installLocations.deviceFiles.summary",

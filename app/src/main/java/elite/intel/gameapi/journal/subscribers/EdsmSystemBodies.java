@@ -1,6 +1,7 @@
 package elite.intel.gameapi.journal.subscribers;
 
 import elite.intel.db.managers.LocationManager;
+import elite.intel.gameapi.journal.ScanBodyClassifier;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
 import elite.intel.gameapi.journal.events.dto.MaterialDto;
 import elite.intel.gameapi.search.edsm.EdsmApiClient;
@@ -55,49 +56,74 @@ public final class EdsmSystemBodies {
 
         LocationManager locationManager = LocationManager.getInstance();
         for (BodyData data : bodies) {
-            LocationDto stellarObject = locationManager.findBySystemAddress(systemAddress, data.getBodyId());
-            stellarObject.setSystemAddress(systemAddress);
-            stellarObject.setAtmosphere(data.getAtmosphereType());
-            stellarObject.setBodyId(data.getBodyId());
-            stellarObject.setHasRings(data.getRings() != null && !data.getRings().isEmpty());
-            stellarObject.setTerraformable("Terraformable".equalsIgnoreCase(data.getTerraformingState()));
-            stellarObject.setLandable(data.isLandable());
-            stellarObject.setMaterials(toMaterials(data.getMaterials()));
-            stellarObject.setPlanetName(data.getName());
-            stellarObject.setMassEM(data.getEarthMasses());
-            double radiusMeters = data.getRadiusMeters(); // EDSM reports km, the journal and LocationDto use metres
-            stellarObject.setRadius(radiusMeters);
-            Double surfaceGravity = calculateSurfaceGravity(data.getEarthMasses(), radiusMeters);
-            stellarObject.setGravity(surfaceGravity == null ? 0 : surfaceGravity);
-            stellarObject.setSurfaceTemperature(data.getSurfaceTemperature()); // Keep Kelvin
-            stellarObject.setTidalLocked(data.isRotationalPeriodTidallyLocked());
-            LocationDto.LocationType bodyType = classifyEdsmBody(data);
-            if (bodyType != null) stellarObject.setLocationType(bodyType);
-            if (starPos != null) {
-                stellarObject.setX(starPos[0]);
-                stellarObject.setY(starPos[1]);
-                stellarObject.setZ(starPos[2]);
-            }
-            if (data.getDiscovery() != null) {
-                // EDSM can only contradict a discovery claim, never make one. It holds what commanders
-                // chose to upload, so "no discoverer recorded" covers most of the galaxy and reading it
-                // as "nobody got here first" flagged ordinary charted bodies as ours - which then paid a
-                // first-discovery bonus into every exobiology projection for them. A named commander is
-                // real evidence; silence is not, and the journal's own WasDiscovered settles those.
-                if (data.getDiscovery().getCommander() != null) {
-                    stellarObject.setOurDiscovery(false);
-                }
-                stellarObject.setDiscoveredBy(data.getDiscovery().getCommander());
-                stellarObject.setDiscoveredOn(data.getDiscovery().getDate());
-            }
-            stellarObject.setOrbitalPeriod(data.getOrbitalPeriod());
-            stellarObject.setAxialTilt(data.getAxialTilt());
-            stellarObject.setRotationPeriod(data.getRotationalPeriod());
-            stellarObject.setVolcanism(data.getVolcanismType());
-            applyBodyClass(stellarObject, data);
-            stellarObject.setStarName(starSystem);
-            locationManager.save(stellarObject);
+            if (data.getName() == null || data.getName().isBlank()) continue;
+            locationManager.updateNamedBody(systemAddress, data.getBodyId(), data.getName(),
+                    stellarObject -> file(stellarObject, data, systemAddress, starPos, starSystem));
         }
+    }
+
+    /**
+     * Files what EDSM knows about one body into its record, beneath what the journal recorded.
+     * <p>
+     * WHY the journal wins: EDSM holds what commanders chose to upload, and is sometimes offline or wrong; the
+     * commander's own journal is what the game said. This used to overwrite the record on every jump into the
+     * system, so a revisit replaced the commander's own scan with EDSM's copy. A record that already describes
+     * the body - a radius, which every Scan of a star or planet writes - keeps its description, and EDSM fills only
+     * what is still blank.
+     */
+    static void file(LocationDto stellarObject, BodyData data, long systemAddress, double[] starPos, String starSystem) {
+        stellarObject.setSystemAddress(systemAddress);
+        stellarObject.setBodyId(data.getBodyId());
+        stellarObject.setStarName(starSystem);
+        if (!hasText(stellarObject.getPlanetName())) stellarObject.setPlanetName(data.getName());
+        LocationDto.LocationType bodyType = classifyEdsmBody(data);
+        if (bodyType != null && ScanBodyClassifier.isUnclassified(stellarObject.getLocationType())) {
+            stellarObject.setLocationType(bodyType);
+        }
+        if (starPos != null && stellarObject.getX() == 0 && stellarObject.getY() == 0 && stellarObject.getZ() == 0) {
+            stellarObject.setX(starPos[0]);
+            stellarObject.setY(starPos[1]);
+            stellarObject.setZ(starPos[2]);
+        }
+        if (stellarObject.getRadius() > 0) return;
+
+        describe(stellarObject, data);
+    }
+
+    private static void describe(LocationDto stellarObject, BodyData data) {
+        stellarObject.setAtmosphere(data.getAtmosphereType());
+        stellarObject.setHasRings(data.getRings() != null && !data.getRings().isEmpty());
+        stellarObject.setTerraformable("Terraformable".equalsIgnoreCase(data.getTerraformingState()));
+        stellarObject.setLandable(data.isLandable());
+        stellarObject.setMaterials(toMaterials(data.getMaterials()));
+        stellarObject.setMassEM(data.getEarthMasses());
+        double radiusMeters = data.getRadiusMeters(); // EDSM reports km, the journal and LocationDto use metres
+        stellarObject.setRadius(radiusMeters);
+        Double surfaceGravity = calculateSurfaceGravity(data.getEarthMasses(), radiusMeters);
+        stellarObject.setGravity(surfaceGravity == null ? 0 : surfaceGravity);
+        stellarObject.setSurfaceTemperature(data.getSurfaceTemperature()); // Keep Kelvin
+        stellarObject.setTidalLocked(data.isRotationalPeriodTidallyLocked());
+        if (data.getDiscovery() != null) {
+            // EDSM can only contradict a discovery claim, never make one. It holds what commanders
+            // chose to upload, so "no discoverer recorded" covers most of the galaxy and reading it
+            // as "nobody got here first" flagged ordinary charted bodies as ours - which then paid a
+            // first-discovery bonus into every exobiology projection for them. A named commander is
+            // real evidence; silence is not, and the journal's own WasDiscovered settles those.
+            if (data.getDiscovery().getCommander() != null) {
+                stellarObject.setOurDiscovery(false);
+            }
+            stellarObject.setDiscoveredBy(data.getDiscovery().getCommander());
+            stellarObject.setDiscoveredOn(data.getDiscovery().getDate());
+        }
+        stellarObject.setOrbitalPeriod(data.getOrbitalPeriod());
+        stellarObject.setAxialTilt(data.getAxialTilt());
+        stellarObject.setRotationPeriod(data.getRotationalPeriod());
+        stellarObject.setVolcanism(data.getVolcanismType());
+        applyBodyClass(stellarObject, data);
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     /**

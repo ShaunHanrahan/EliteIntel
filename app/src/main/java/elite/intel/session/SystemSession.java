@@ -5,7 +5,6 @@ import elite.intel.ai.brain.ShipPersonality;
 import elite.intel.ai.mouth.RadioVoicing;
 import elite.intel.ai.mouth.TtsProvider;
 import elite.intel.ai.mouth.VoiceGender;
-import elite.intel.ai.mouth.edge.EdgeVoices;
 import elite.intel.ai.mouth.google.GoogleVoices;
 import elite.intel.ai.mouth.kokoro.KokoroVoices;
 import elite.intel.ai.mouth.supertonic.SupertonicVoices;
@@ -76,12 +75,6 @@ public class SystemSession {
     }
 
 
-    public String getEdgeVoiceName() {
-        ShipDao.Ship ship = shipManager.getShip();
-        return EdgeVoices.shortNameOrDefault(ship == null ? null : ship.getVoice());
-    }
-
-
     public KokoroVoices getKokoroVoice() {
         ShipDao.Ship ship = shipManager.getShip();
         return KokoroVoices.voiceOrDefault(ship == null ? null : ship.getVoice());
@@ -104,9 +97,6 @@ public class SystemSession {
      * <p>
      * A name the active engine does not know has no gender to read and resolves to that engine's default
      * voice, which is female. For a voice belonging to another engine that is also the voice actually spoken.
-     * For an unrecognised Edge ShortName (one a commander stored directly) Edge still synthesises the stored
-     * ShortName, and only the roster it fetches at runtime knows that voice's gender - which is why the
-     * fleet grid stores logical names.
      */
     public VoiceGender getVoiceGender() {
         ShipDao.Ship ship = shipManager.getShip();
@@ -727,8 +717,10 @@ public class SystemSession {
      * @param fontScale text size multiplier; {@code 0} means the commander has not chosen one, so the
      *                  caller derives it from screen height
      * @param width     card width in pixels
-     * @param x         screen position, or {@code -1} for "wherever the overlay opens"
-     * @param y         screen position, or {@code -1} for "wherever the overlay opens"
+     * @param x         the anchor point of {@code section} in screen pixels, a window top-left corner when
+     *                  {@code section} is empty, or {@code OverlayProtocol.POSITION_UNSET} for "wherever the
+     *                  overlay opens"
+     * @param y         as {@code x}
      * @param displayMode where the HUD is drawn - {@code DESKTOP}, {@code VR} or {@code BOTH}. Text
      *                  rather than the enum so the session layer does not depend on the UI layer,
      *                  and so a value written by a newer build is something an older one can fall
@@ -736,9 +728,13 @@ public class SystemSession {
      * @param colors    commander-chosen overlay text colours as stored, empty for the shipped palette.
      *                  Text for the same reason as {@code displayMode}, and parsed leniently, so a role
      *                  a newer build introduced costs an older one that role and not the whole palette
+     * @param section   the desktop card's section at its last placement, by enum name, empty when the row
+     *                  predates sections. Text for the same reason as {@code displayMode}
+     * @param sectionPoints the spot last left in each section, as stored, empty when none was adjusted
      */
     public record HudOverlayLayout(double alpha, double fontScale, int width, int x, int y,
-                                   String displayMode, String vrPosition, String colors) {
+                                   String displayMode, String vrPosition, String colors,
+                                   String section, String sectionPoints) {
     }
 
     public HudOverlayLayout getHudOverlayLayout() {
@@ -752,7 +748,9 @@ public class SystemSession {
                     session.getOverlayY(),
                     session.getOverlayDisplayMode(),
                     session.getOverlayVrPosition(),
-                    session.getOverlayColors());
+                    session.getOverlayColors(),
+                    session.getOverlaySection(),
+                    session.getOverlaySectionPoints());
         });
     }
 
@@ -767,6 +765,8 @@ public class SystemSession {
             session.setOverlayDisplayMode(layout.displayMode());
             session.setOverlayVrPosition(layout.vrPosition());
             session.setOverlayColors(layout.colors());
+            session.setOverlaySection(layout.section());
+            session.setOverlaySectionPoints(layout.sectionPoints());
             dao.save(session);
             return null;
         });

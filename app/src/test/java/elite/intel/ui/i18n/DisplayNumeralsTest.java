@@ -135,7 +135,7 @@ class DisplayNumeralsTest {
      */
     @Test
     void aLongLineOfOrdinaryWordsIsNotParsedWordByWord() {
-        String longLine = "present ".repeat(600); // what the Edge splitter test speaks
+        String longLine = "present ".repeat(600);
 
         long start = System.nanoTime();
         String shown = DisplayNumerals.digits(longLine, Language.EN);

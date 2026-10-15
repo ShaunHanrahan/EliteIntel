@@ -36,7 +36,7 @@ public class AnalyzeMarketsQuery extends BaseQueryAnalyzer implements IntelQuery
     @Override public JsonObject handle(String action, JsonObject params, String originalUserInput) throws Exception {
         //GameEventBus.publish(new AiVoxResponseEvent("Analyzing stations data. Stand by."));
 
-        String starName = playerSession.getPrimaryStarName();
+        String starName = playerSession.currentStarSystem();
         StationsDto stationsDto = EdsmApiClient.searchStations(starName, 0);
         List<Station> stations = stationsDto.getData().getStations();
         if (stations == null || stations.isEmpty()) {

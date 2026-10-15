@@ -62,8 +62,8 @@ public final class SystemSignalsFactSource implements MemoryFactSource {
 
     @Override
     public List<String> factsFor(MemoryFactContext context) {
-        Long systemAddress = PlayerSession.getInstance().getLocationData().getSystemAddress();
-        if (systemAddress == null) {
+        long systemAddress = PlayerSession.getInstance().currentSystemAddress();
+        if (systemAddress == 0) {
             return List.of();
         }
         Collection<LocationDto> locations = LocationManager.getInstance().findAllBySystemAddress(systemAddress);

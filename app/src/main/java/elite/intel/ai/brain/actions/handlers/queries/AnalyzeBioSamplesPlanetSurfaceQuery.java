@@ -37,7 +37,7 @@ public class AnalyzeBioSamplesPlanetSurfaceQuery extends BaseQueryAnalyzer imple
         //GameEventBus.publish(new AiVoxResponseEvent("Analyzing exobiology data. Stand by."));
 
 
-        LocationDto currentLocation = locationManager.findByLocationData(playerSession.getLocationData());
+        LocationDto currentLocation = locationManager.currentBody();
         if (currentLocation.getBodyId() < 0) {
             return process(StringUtls.localizedResponse("query.bio.noLocation"));
         }

@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 /**
@@ -48,6 +49,12 @@ public class NativeHudOverlay {
     private static final Logger log = LogManager.getLogger(NativeHudOverlay.class);
     private static final int OBJECTIVE_POLL_MS = 1000;
 
+    /**
+     * The overlay that is feeding a window right now, for {@link #isShowing()}. One per app in practice - the AI
+     * tab owns it - but tests build their own, so it is set on start rather than on construction.
+     */
+    private static final AtomicReference<NativeHudOverlay> live = new AtomicReference<>();
+
     private final List<HudObjectiveSource> sources = new ArrayList<>();
     private final PlayerSession playerSession = PlayerSession.getInstance();
     private final ShipManager shipManager = ShipManager.getInstance();
@@ -63,10 +70,22 @@ public class NativeHudOverlay {
     private double fontScale;
     private int width;
     /**
-     * Last known screen position, or -1 for "wherever the overlay opens".
+     * Where the desktop card was last pinned, as the overlay reported it. Empty until it reports one.
      */
-    private volatile int windowX = OverlayProtocol.POSITION_UNSET;
-    private volatile int windowY = OverlayProtocol.POSITION_UNSET;
+    private Optional<HudPlacement> placement = Optional.empty();
+    /**
+     * A window top-left corner from a row written before sections, sent once so the overlay can convert
+     * it. Cleared by the first placement the overlay reports.
+     */
+    private Optional<Point> legacyCorner = Optional.empty();
+    /**
+     * The spot the commander last left the card in each section - where "move the overlay" returns it.
+     */
+    private final Map<HudScreenSection, Point> sectionAnchors = new EnumMap<>(HudScreenSection.class);
+    /**
+     * A move asked for while the overlay was closed, sent right after the restore when it next starts.
+     */
+    private Optional<HudScreenSection> pendingMove = Optional.empty();
     /**
      * Where the card hangs in the headset. Ignored by a desktop child, which is
      * placed by dragging it.
@@ -108,11 +127,20 @@ public class NativeHudOverlay {
         // because the column exists now.
         fontScale = stored.fontScale() > 0 ? stored.fontScale() : defaultFontScale();
         width = stored.width() > 0 ? stored.width() : 760;
-        windowX = stored.x();
-        windowY = stored.y();
+        loadPlacement(stored);
         displayMode = parseDisplayMode(stored.displayMode());
         vrPosition = HudVrPosition.parse(stored.vrPosition());
         colorOverrides.putAll(HudOverlayColor.parseOverrides(stored.colors()));
+    }
+
+    private void loadPlacement(SystemSession.HudOverlayLayout stored) {
+        sectionAnchors.putAll(HudScreenSection.parsePoints(stored.sectionPoints()));
+        // Both or neither: saveLayout writes the pair together, so a half-set position is not a position
+        // the commander ever chose, and moving the window to one axis of it would be a guess.
+        if (stored.x() == OverlayProtocol.POSITION_UNSET || stored.y() == OverlayProtocol.POSITION_UNSET) return;
+        Point point = new Point(stored.x(), stored.y());
+        placement = HudScreenSection.parseStored(stored.section()).map(section -> new HudPlacement(section, point));
+        if (placement.isEmpty()) legacyCorner = Optional.of(point);
     }
 
     /**
@@ -134,6 +162,15 @@ public class NativeHudOverlay {
 
     public void addSource(HudObjectiveSource source) {
         sources.add(source);
+    }
+
+    /**
+     * Whether an overlay is on screen, desktop or VR. A voice feature that answers on the card and nowhere else
+     * asks this first, so it can say the overlay is off instead of answering into nothing.
+     */
+    public static boolean isShowing() {
+        NativeHudOverlay overlay = live.get();
+        return overlay != null && overlay.isRunning();
     }
 
     public synchronized boolean isRunning() {
@@ -208,9 +245,8 @@ public class NativeHudOverlay {
         send(OverlayProtocol.config(backgroundAlpha, fontScale, width));
         send(OverlayProtocol.colors(colorOverrides));
         send(OverlayProtocol.vrPosition(vrPosition));
-        // Both or neither: saveLayout writes the pair together, so a half-set position is not a position
-        // the commander ever chose, and moving the window to one axis of it would be a guess.
-        if (hasStoredPosition()) send(OverlayProtocol.position(windowX, windowY));
+        placementLinesOnStart().forEach(this::send);
+        pendingMove = Optional.empty();
         lastObjective = null;
         children.forEach(this::startOutputReader);
         children.forEach(this::startErrorReader);
@@ -221,6 +257,7 @@ public class NativeHudOverlay {
         GameEventBus.register(this);
         UiBus.register(this);
         startObjectivePolling();
+        live.set(this);
         log.info("HUD overlay started: {} ({})", binary, displayMode);
         return true;
     }
@@ -297,6 +334,7 @@ public class NativeHudOverlay {
             children.clear();
         }
         lastObjective = null;
+        live.compareAndSet(this, null);
     }
 
     /**
@@ -337,10 +375,11 @@ public class NativeHudOverlay {
     }
 
     /**
-     * Reads a child's stdout so a dragged window is remembered.
+     * Reads a child's stdout so where the card was placed is remembered.
      * <p>
      * The overlay is dragged with the mouse, so the app cannot know where it ended
-     * up unless the overlay says so. It reports its position when a drag finishes;
+     * up unless the overlay says so. It reports its placement when a drag finishes
+     * and after a move;
      * this thread is also what keeps that pipe drained, which matters whether or
      * not anything is listening - an unread stdout pipe eventually fills and
      * blocks the child mid-draw. Every child gets a reader for that reason, even
@@ -355,8 +394,8 @@ public class NativeHudOverlay {
                     new InputStreamReader(child.process().getInputStream(), StandardCharsets.UTF_8))) {
                 String line;
                 while ((line = in.readLine()) != null) {
-                    Optional<Point> position = OverlayProtocol.parsePosition(line);
-                    if (position.isPresent()) rememberPosition(position.get());
+                    Optional<HudPlacement> reported = OverlayProtocol.parsePlacement(line);
+                    if (reported.isPresent()) rememberPlacement(reported.get());
                     else if (line.startsWith("MODE\t")) logMode(child, line);
                 }
             } catch (IOException e) {
@@ -414,15 +453,49 @@ public class NativeHudOverlay {
     }
 
     /**
-     * Package-visible so the negative-coordinate case can be guarded without spawning a child process.
+     * What puts the card back where it was left, followed by a move asked for while the overlay was closed.
+     * <p>
+     * The move goes after the restore, never instead of it: a section names part of the monitor the card is
+     * on, and until the restore lands the card is on whichever monitor the fresh window opened on. The
+     * overlay resolves the two in that order (see {@code overlay/PROTOCOL.md}).
+     * <p>
+     * Package-visible so the restore can be tested without spawning a child process.
      */
-    boolean hasStoredPosition() {
-        return windowX != OverlayProtocol.POSITION_UNSET && windowY != OverlayProtocol.POSITION_UNSET;
+    synchronized List<String> placementLinesOnStart() {
+        List<String> lines = new ArrayList<>();
+        placement.map(OverlayProtocol::restore)
+                .or(() -> legacyCorner.map(corner -> OverlayProtocol.legacyPosition(corner.x, corner.y)))
+                .ifPresent(lines::add);
+        pendingMove.map(section -> OverlayProtocol.move(section, rememberedAnchor(section))).ifPresent(lines::add);
+        return lines;
     }
 
-    private void rememberPosition(Point position) {
-        windowX = position.x;
-        windowY = position.y;
+    /**
+     * Sends the desktop card to a section of the monitor it is on, returning to the spot the commander last
+     * left it there. Held for the next start when the overlay is closed, so the caller can open it after.
+     */
+    public synchronized void moveTo(HudScreenSection section) {
+        if (!section.isCommandable()) throw new IllegalArgumentException("Not a section to move to: " + section);
+        if (!isRunning()) {
+            pendingMove = Optional.of(section);
+            return;
+        }
+        send(OverlayProtocol.move(section, rememberedAnchor(section)));
+    }
+
+    private Optional<Point> rememberedAnchor(HudScreenSection section) {
+        return Optional.ofNullable(sectionAnchors.get(section)).map(Point::new);
+    }
+
+    /**
+     * Package-visible so a report can be fed in without a child process.
+     */
+    synchronized void rememberPlacement(HudPlacement reported) {
+        placement = Optional.of(reported);
+        legacyCorner = Optional.empty();
+        // WHY: the centre is where a drag can leave the card, not a place the commander can ask for, so its
+        // spot is the card's position and not a section's memory.
+        if (reported.section().isCommandable()) sectionAnchors.put(reported.section(), reported.anchor());
         saveLayout();
     }
 
@@ -449,11 +522,15 @@ public class NativeHudOverlay {
      * can be killed with the game, and a setting the commander adjusted and then
      * lost is worse than a spare row write.
      */
-    private void saveLayout() {
+    private synchronized void saveLayout() {
+        Point stored = placement.map(HudPlacement::anchor).or(() -> legacyCorner)
+                .orElse(new Point(OverlayProtocol.POSITION_UNSET, OverlayProtocol.POSITION_UNSET));
         systemSession.setHudOverlayLayout(new SystemSession.HudOverlayLayout(
-                backgroundAlpha, fontScale, width, windowX, windowY,
+                backgroundAlpha, fontScale, width, stored.x, stored.y,
                 displayMode.name(), vrPosition.name(),
-                HudOverlayColor.formatOverrides(colorOverrides)));
+                HudOverlayColor.formatOverrides(colorOverrides),
+                placement.map(p -> p.section().name()).orElse(""),
+                HudScreenSection.formatPoints(sectionAnchors)));
     }
 
     public double getFontScale() {
@@ -635,8 +712,11 @@ public class NativeHudOverlay {
         }
     }
 
+    /**
+     * A card the commander called up by voice, else the winner of the ranking. See {@link TemporaryHudCard}.
+     */
     private Optional<HudObjective> pollObjective() {
-        return highestPriority(sources);
+        return TemporaryHudCard.getInstance().current().or(() -> highestPriority(sources));
     }
 
     /**
@@ -663,6 +743,10 @@ public class NativeHudOverlay {
                 // the commander is flying there to buy, so it beats that one - but a build being hauled to
                 // says more than one leg of the shopping for it, and ties go to whoever is registered first.
                 new CommoditySearchObjectiveSource(),
+                // Ahead of exobiology, its equal in rank: in a system the commander discovered, the survey
+                // as a whole is the card in supercruise. It stands aside by itself when the ship is at a
+                // body with sampling to do, which is when the exobiology card says more.
+                new DiscoveryObjectiveSource(),
                 new ExobiologyObjectiveSource(),
                 // Ahead of the route card and behind everything else: a hunt is real work the commander
                 // is doing right now, but they never accepted it the way they accept a contract. The
@@ -723,5 +807,6 @@ public class NativeHudOverlay {
         // itself mid-teardown.
         if (objectivePoll != null) objectivePoll.shutdown();
         unregisterBuses();
+        live.compareAndSet(this, null);
     }
 }

@@ -126,6 +126,10 @@ From `elite.intel.devices.PACKAGE.md`:
   `DeviceIdentities` does it, confirmed against four real controllers — see
   [the device list](../02-features/bindforge/alias-designer.md#my-devices).
 - `model/ButtonInputMapper` translates SDL3 indices to `.binds` tokens (`Joy_N`, `Joy_XAxis` … `Joy_RZAxis`).
+- **Which axes and hats a controller has — added 2026-10-10 (A8b).** `DeviceService.description(deviceId)`
+  names each controller's axes by the game slot they take, read from its HID description, and its hat count —
+  what SDL's counts alone cannot say. See
+  [the Alias Designer spec](../02-features/bindforge/alias-designer.md#which-axes-and-hats-a-controller-has--2026-10-10-alan).
 - Duplicate VID/PID devices are detected and warned about, with `usbPath` available to tell two identical
   units apart — which is precisely the open question the StellarCore conflict notes raised.
 - Explicitly read-only: the package never writes to the game or to `.binds`.
@@ -173,7 +177,8 @@ StarVizion implementation begins — it is the most direct evidence of what the 
 ## File Access
 
 Elite-Intel has **no central file broker**. There is no Controlled Replace pattern, no shared backup-then-write
-service, no archive/restore service, and no Watch Path facility available generically.
+service, no archive/restore service, and no Watch Path facility available generically — the nearest is
+`elite.intel.io.FilePoller` (2026-10-11), which says which files changed but leaves the polling to its caller.
 
 What exists instead is BindForge-shaped already, and since 2026-10-03 it lives under `elite.intel.bindforge`
 (it moved out of `elite.intel.ai.hands`, which now only presses keys):
@@ -186,7 +191,8 @@ What exists instead is BindForge-shaped already, and since 2026-10-03 it lives u
 | `elite.intel.io.TimestampedBackups` | timestamped backups — **moved out of BindForge 2026-10-03**, replacing `io.BindingsBackupService`, because it knows nothing about `.binds` and StarVizion will want it too. See [the shared write path](#the-shared-write-path-is-eliteintelio--built-2026-10-03) |
 | `elite.intel.io.AtomicFiles` | safe replace: temp file, flush, rename over the target |
 | `io.BindingsApplyService`, `io.BindingsApplyException`, `io.BindingSaveResult` | apply-to-game with typed failure |
-| `io.BindingsMonitor` | external-change detection |
+| `io.BindingsMonitor` | external-change detection for the bindings folder (`WatchService`) |
+| `elite.intel.io.FilePoller` | polled change detection for files another process writes — first used by `devicefiles.DeviceFilesMonitor` for each installation's device files (C5, 2026-10-11) |
 | `rules.BindingConflictScanner`, `rules.BindingConflictRules` | conflict detection |
 | `model.BindingSection`, `model.BindingDisplayNames` | in-game section, group and row label for a `.binds` tag |
 | `db.dao.BindingConflictDao`, `db.managers.BindingConflictManager` | conflict persistence |
@@ -198,8 +204,9 @@ single most important next task is a detailed read of `elite.intel.bindforge.io`
 what must be rewritten.
 
 **Gaps against the ported specs:** the Archive Backup (ZIP) and Restore Archive operations that BindForge's
-File Manager is built on have no equivalent and must be written. `DeviceMappings.xml` and `.buttonMap` handling
-appears absent entirely — BindForge's Device Identity and Button Map domains are greenfield.
+File Manager is built on have no equivalent and must be written. ~~`DeviceMappings.xml` and `.buttonMap` handling
+appears absent entirely — BindForge's Device Identity and Button Map domains are greenfield.~~ Built since, in
+`elite.intel.bindforge.devicefiles` (Core C1–C3 and C5, 2026-10-04 to 2026-10-11).
 
 ---
 
@@ -642,11 +649,19 @@ fixes the same file on `V1.1-Release` produces a conflict in the most sensitive 
 real risk is not a bad merge but silently dropping a rule already shipped to users. The whole conversion was
 therefore done as one change on `V1.1-Release` and merged up.
 
-**Still to come: watching.** A folder watcher is deliberately *not* in this package yet. `AuxiliaryFilesMonitor`
-polls rather than using `WatchService`, because notifications for files another process writes arrive late, get
-merged, or never arrive, and a missed one is never recovered. `DeviceMappings.xml` is written by the game, so
-that applies directly — when BindForge needs to watch device files, it goes here with polling or a watch plus a
-periodic re-check, not a bare `WatchService`.
+**A new class here that only V1.2 calls is built on `V1.2-BindForge`** (Alan, 2026-10-11). It edits no file V1.1
+ships, so the conflict the rule above guards against cannot arise — the watcher below is the first.
+
+**A V1.2 feature that must change an existing file here, or in `bindforge.io` and `.rules`, goes on
+`V1.1-Release-bf-foundation`** (Krondor, 2026-10-12): a branch off `V1.1-Release` that he checks and merges, so it
+merges up like his fixes. What goes on it adds only and changes nothing V1.1 does —
+[the terms](../05-build-plan/README.md#the-foundation-branch--how-a-v12-feature-changes-a-file-v11-ships-krondor-2026-10-12).
+
+**Watching: `io.FilePoller` — built 2026-10-11 (C5).** It says which of a set of files changed since the last look,
+by last-modified plus size, and holds no thread. It polls rather than using `WatchService`, as
+`AuxiliaryFilesMonitor` does, because notifications for files another process writes arrive late, get merged, or
+never arrive, and a missed one is never recovered. Its first caller is BindForge's `DeviceFilesMonitor`, for the
+game-written `DeviceMappings.xml` and `.buttonMap` files.
 
 ---
 

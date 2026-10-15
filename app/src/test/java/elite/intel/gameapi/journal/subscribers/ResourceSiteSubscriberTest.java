@@ -6,6 +6,7 @@ import elite.intel.gameapi.journal.events.RedeemVoucherEvent;
 import elite.intel.gameapi.journal.events.SupercruiseDestinationDropEvent;
 import elite.intel.gameapi.signals.ResourceSiteGrade;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import elite.intel.session.ResourceSite;
 import elite.intel.util.Cypher;
 import elite.intel.util.json.GsonFactory;
@@ -49,7 +50,7 @@ class ResourceSiteSubscriberTest {
 
     @BeforeEach
     void inOdomazotz() {
-        PlayerSession.getInstance().setCurrentLocationId(1, ODOMAZOTZ);
+        PlayerSession.getInstance().moveTo(new Position(ODOMAZOTZ, "Odomazotz", 1L));
         resourceSite.cashedIn();
     }
 

@@ -20,6 +20,8 @@ import elite.intel.ai.mouth.sherpa.SherpaOnnxTTS;
 import elite.intel.ai.mouth.subscribers.events.AiVoxResponseEvent;
 import elite.intel.ai.mouth.subscribers.events.MissionCriticalAnnouncementEvent;
 import elite.intel.ai.mouth.supertonic.SupertonicTTS;
+import elite.intel.bindforge.devicefiles.DeviceFilesMonitor;
+import elite.intel.bindforge.devices.ButtonMapStartup;
 import elite.intel.bindforge.rules.KeyBindCheck;
 import elite.intel.devices.DeviceService;
 import elite.intel.diagnostics.*;
@@ -526,6 +528,14 @@ public class AppController {
         // After DEVICE, whose poll loop feeds it the button transitions, and after EARS, because the gate it
         // arms is the microphone's and there must be a microphone to gate.
         services.put(ServiceType.PUSH_TO_TALK, new ServiceHolder(PushToTalkService::getInstance));
+        // After DEVICE, whose connect events it acts on. It writes into game folders, so diagnostics stubs it
+        // like the other game-file services.
+        services.put(ServiceType.BUTTON_MAP_STARTUP, new ServiceHolder(
+                diagnostics ? NoOpService::new : ButtonMapStartup::new));
+        // Polls every installation's device files and asks the Alias Designer screen to re-read when one changes.
+        // Diagnostics stubs it with the other game-file services: the harness owns game state.
+        services.put(ServiceType.DEVICE_FILES_MONITOR, new ServiceHolder(
+                diagnostics ? NoOpService::new : DeviceFilesMonitor::new));
         // VEGA subsystem is the LLM service (the legacy command pipeline was removed). In diagnostics
         // mode it is wired with a recording execution gateway (file-fed phrases exercise the real routing path
         // without pressing keys into the game or calling third-party REST APIs) and a speech gateway that
@@ -549,14 +559,14 @@ public class AppController {
 
     /**
      * The engine that voices radio, in its radio role. The cloud engines are deliberately absent: Google is
-     * the paid main mouth, and radio chatter is not worth a commander's per-character bill; Edge is keyless
-     * but not local, and a local engine can now read every script (see {@link RadioVoicing}).
+     * the paid main mouth, and radio chatter is not worth a commander's per-character bill, while a local
+     * engine can read every script (see {@link RadioVoicing}).
      */
     private static ManagedService radioEngine(TtsProvider provider) {
         return switch (provider) {
             case KOKORO -> radioLocal(KokoroTTS.getInstance());
             case SUPERTONIC -> radioLocal(SupertonicTTS.getInstance());
-            case EDGE, GOOGLE -> throw new IllegalArgumentException(provider + " never voices radio transmissions");
+            case GOOGLE -> throw new IllegalArgumentException(provider + " never voices radio transmissions");
         };
     }
 
@@ -605,7 +615,7 @@ public class AppController {
     }
 
     enum ServiceType {
-        MOUTH, RADIO_MOUTH, EARS, HANDS, DEVICE, PUSH_TO_TALK, VEGA, NOTIFICATION_MONITOR,
-        MISSING_MISSION_MONITOR, WEB_SOCKET, JOURNAL_PARSER, AUXILIARY_FILES_MONITOR
+        MOUTH, RADIO_MOUTH, EARS, HANDS, DEVICE, PUSH_TO_TALK, BUTTON_MAP_STARTUP, DEVICE_FILES_MONITOR, VEGA,
+        NOTIFICATION_MONITOR, MISSING_MISSION_MONITOR, WEB_SOCKET, JOURNAL_PARSER, AUXILIARY_FILES_MONITOR
     }
 }

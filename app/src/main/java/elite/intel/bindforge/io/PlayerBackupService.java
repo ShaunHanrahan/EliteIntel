@@ -241,7 +241,10 @@ public class PlayerBackupService {
             String chosen = BindForgeSettingsManager.getInstance().getBackupDestination();
             return chosen == null || chosen.isBlank() ? null : Path.of(chosen);
         } catch (RuntimeException e) {
-            log.warn("Could not read the chosen backup destination, using the default: {}", e.getMessage());
+            // WHY: broad on purpose - a database failure (JDBI's are unchecked) and a stored path this platform cannot
+            // parse (InvalidPathException) both fall back to the default folder, so the backup is still taken. The
+            // exception is logged whole: the fallback hides the cause from the user, so the log must not hide it too.
+            log.warn("Could not read the chosen backup destination, using the default", e);
             return null;
         }
     }

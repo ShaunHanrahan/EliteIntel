@@ -1,7 +1,9 @@
 package elite.intel.devices;
 
 import elite.intel.devices.events.*;
+import elite.intel.devices.hid.DeviceDescriber;
 import elite.intel.devices.model.Device;
+import elite.intel.devices.model.DeviceDescription;
 import elite.intel.eventbus.DeviceBus;
 import org.lwjgl.sdl.*;
 import org.lwjgl.system.MemoryStack;
@@ -17,6 +19,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -24,7 +27,7 @@ import static org.lwjgl.sdl.SDLInit.*;
 
 /**
  * Polls SDL3 for joystick/HOTAS/gamepad/pedal input on a dedicated platform thread. Publishes
- * connect/disconnect, axis, and button events on DeviceBus. Read-only device
+ * connect/disconnect, axis, button and hat events on DeviceBus. Read-only device
  * access - never writes to the game or any game file.
  *
  * Singleton shared infrastructure: the input monitor, Bindings, and push-to-talk all consume these
@@ -78,6 +81,7 @@ public class DeviceService {
 
     private final AtomicBoolean running = new AtomicBoolean(false);
     private final AtomicBoolean available = new AtomicBoolean(false);
+    private final AtomicBoolean enumerated = new AtomicBoolean(false);
     private final AtomicBoolean mouseAvailable = new AtomicBoolean(false);
     // SDL button mask from the previous tick. Poll thread only.
     private int prevMouseMask;
@@ -85,11 +89,14 @@ public class DeviceService {
 
     // Written only from the poll thread; readable from any thread via CopyOnWriteArrayList.
     private final CopyOnWriteArrayList<Device> connectedDevices = new CopyOnWriteArrayList<>();
+    // Written only from the poll thread, before the connect is published; readable from any thread.
+    private final Map<Integer, DeviceDescription> descriptions = new ConcurrentHashMap<>();
 
     // Open joystick handles - keyed by SDL JoystickID. Accessed only from pollThread.
     private final Map<Integer, Long> openHandles = new LinkedHashMap<>();
     private final Map<Integer, short[]> prevAxes = new HashMap<>();
     private final Map<Integer, boolean[]> prevButtons = new HashMap<>();
+    private final Map<Integer, int[]> prevHats = new HashMap<>();
     private final Map<Integer, int[]> vidPidByDevice = new HashMap<>(); // [vendor, product]
 
     private DeviceService() {}
@@ -108,6 +115,13 @@ public class DeviceService {
     public boolean isAvailable() { return available.get(); }
 
     /**
+     * Whether the first look at the hardware is done - every controller present at start has been added to
+     * {@link #getConnectedDevices()}. {@link #isAvailable()} turns true before that, so an empty list while only it
+     * is true means "not looked yet", not "nothing plugged in". BindForge's missing-controller warning waits on this.
+     */
+    public boolean hasEnumerated() { return enumerated.get(); }
+
+    /**
      * Whether mouse buttons are being read. False on a Wayland session or wherever the video subsystem
      * would not start; a mouse push-to-talk mapping is then inert.
      */
@@ -120,6 +134,14 @@ public class DeviceService {
      */
     public List<Device> getConnectedDevices() {
         return Collections.unmodifiableList(new ArrayList<>(connectedDevices));
+    }
+
+    /**
+     * Which axes and hats a connected controller has - safe to call from any thread, and already there when its
+     * {@link DeviceConnectedEvent} is published. Empty for an id that is not connected.
+     */
+    public Optional<DeviceDescription> description(int deviceId) {
+        return Optional.ofNullable(descriptions.get(deviceId));
     }
 
     // -------------------------------------------------------------------------
@@ -160,6 +182,7 @@ public class DeviceService {
                 for (int id : currentIds) {
                     if (knownIds.add(id)) onDeviceAdded(id);
                 }
+                enumerated.set(true);
 
                 Iterator<Integer> it = knownIds.iterator();
                 while (it.hasNext()) {
@@ -186,6 +209,7 @@ public class DeviceService {
             closeAllHandles();
             SDLInit.SDL_Quit();
             available.set(false);
+            enumerated.set(false);
             mouseAvailable.set(false);
             log.info("Device service stopped");
         }
@@ -326,6 +350,9 @@ public class DeviceService {
         prevButtons.put(id, new boolean[Math.max(0, buttons)]);
 
         Device device = new Device(id, name, axes, buttons, usbPath, guid);
+        int hats = Math.max(0, SDLJoystick.SDL_GetNumJoystickHats(handle));
+        prevHats.put(id, new int[hats]);
+        descriptions.put(id, DeviceDescriber.describe(name, usbPath, axes, hats));
         connectedDevices.add(device);
         log.info("Device connected: {} (id={}, axes={}, buttons={})", name, id, axes, buttons);
         DeviceBus.publish(new DeviceConnectedEvent(device));
@@ -338,8 +365,10 @@ public class DeviceService {
         if (handle != null) SDLJoystick.SDL_CloseJoystick(handle);
         prevAxes.remove(id);
         prevButtons.remove(id);
+        prevHats.remove(id);
         vidPidByDevice.remove(id);
         connectedDevices.removeIf(d -> d.id() == id);
+        descriptions.remove(id);
         log.info("Device disconnected: id={}", id);
         DeviceBus.publish(new DeviceDisconnectedEvent(id));
     }
@@ -365,6 +394,18 @@ public class DeviceService {
                 DeviceBus.publish(new DeviceButtonEvent(id, b, pressed));
             }
         }
+
+        // WHY: polled for the Device Editor's live highlighting (BindForge A9, 2026-10-10). Same delta-only contract
+        // as the buttons; a hat starts centred, so one already pushed at connect is reported on the first tick.
+        int[] prevHat = prevHats.get(id);
+        if (prevHat == null) return;
+        for (int h = 0; h < prevHat.length; h++) {
+            int directions = SDLJoystick.SDL_GetJoystickHat(handle, h) & 0x0F;
+            if (directions != prevHat[h]) {
+                prevHat[h] = directions;
+                DeviceBus.publish(new DeviceHatEvent(id, h, directions));
+            }
+        }
     }
 
     private void closeAllHandles() {
@@ -372,8 +413,10 @@ public class DeviceService {
         openHandles.clear();
         prevAxes.clear();
         prevButtons.clear();
+        prevHats.clear();
         vidPidByDevice.clear();
         connectedDevices.clear();
+        descriptions.clear();
     }
 
     // -------------------------------------------------------------------------

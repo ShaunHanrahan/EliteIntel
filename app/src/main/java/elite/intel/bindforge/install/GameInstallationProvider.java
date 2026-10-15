@@ -1,5 +1,8 @@
 package elite.intel.bindforge.install;
 
+import elite.intel.util.OsDetector;
+
+import java.nio.file.Path;
 import java.util.List;
 
 /**
@@ -24,4 +27,19 @@ public interface GameInstallationProvider {
      * records. Implementations report what they can read and leave the rest to the manual add.
      */
     List<GameInstallation> findInstallations();
+
+    /**
+     * The provider for the operating system Elite-Intel is running on - the one place that asks.
+     *
+     * @param windowsBindingsFolder the one {@code Options\Bindings} folder every Windows installation shares; Linux
+     *                              finds each installation's own inside its Proton prefix
+     */
+    static GameInstallationProvider forThisPlatform(Path windowsBindingsFolder) {
+        return switch (OsDetector.getOs()) {
+            case WINDOWS -> new WindowsGameInstallationProvider(windowsBindingsFolder);
+            case LINUX -> new LinuxGameInstallationProvider();
+            // WHY: the game does not run on macOS. The manual add is still there for anyone who tries.
+            case MAC -> List::of;
+        };
+    }
 }

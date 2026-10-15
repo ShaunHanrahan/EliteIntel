@@ -4,7 +4,6 @@ import com.google.common.eventbus.Subscribe;
 import elite.intel.ai.brain.ShipPersonality;
 import elite.intel.ai.mouth.RadioVoicing;
 import elite.intel.ai.mouth.TtsProvider;
-import elite.intel.ai.mouth.edge.EdgeVoices;
 import elite.intel.ai.mouth.google.GoogleVoiceProvider;
 import elite.intel.ai.mouth.google.GoogleVoices;
 import elite.intel.ai.mouth.kokoro.KokoroVoices;
@@ -83,9 +82,7 @@ public class CommanderTabPanel extends JPanel {
      * Maps a stored voice enum name to a readable label, resolved against the active TTS provider's voices.
      * Google/Kokoro show "DisplayName - accent · quality": the accent disambiguates voices that share a display
      * name (e.g. Spanish vs Portuguese "Dora"), and the quality tier (HD vs Standard) shows what the selected
-     * language actually delivers. Edge shows "DisplayName - accent" using the same friendly descriptor Google
-     * uses for the same logical identity (see {@link #edgeVoiceLabel}) — the provider-native ShortName (e.g.
-     * "en-US-EmmaMultilingualNeural") is an implementation detail and must never leak into this UI.
+     * language actually delivers.
      * Falls back to the raw name when the stored voice is not valid for the active provider (for example after
      * a TTS provider switch).
      */
@@ -95,9 +92,6 @@ public class CommanderTabPanel extends JPanel {
             TtsProvider provider = SystemSession.getInstance().getTtsProvider();
             if (provider.isLocal()) {
                 return localVoiceLabel(provider, enumName);
-            }
-            if (provider == TtsProvider.EDGE) {
-                return edgeVoiceLabel(enumName);
             }
             GoogleVoices v = GoogleVoices.valueOf(enumName);
             String base = v.getDisplayName() + " - " + googleVoiceDescriptor(v);
@@ -113,11 +107,6 @@ public class CommanderTabPanel extends JPanel {
      * Fleet-label descriptor for a Google voice. In English the accent (American/British/Australian) tells the
      * voices apart; in any other language every Google voice is synthesized in that language (its Chirp3-HD
      * character), so only the localized gender is shown instead of a misleading English accent.
-     * <p>
-     * Also reused for Edge (see {@link #edgeVoiceLabel}): every {@link EdgeVoices} name intentionally has a
-     * {@link GoogleVoices} twin with the same accent, so the two providers show identical descriptors for the
-     * same logical identity rather than duplicating the "American female" / "British female" literals. The
-     * correspondence is one-way (Google also carries the WaveNet pair) and {@code EdgeVoicesTest} pins it.
      */
     private static String googleVoiceDescriptor(GoogleVoices v) {
         if (SystemSession.getInstance().getLanguage() == Language.EN) {
@@ -284,6 +273,8 @@ public class CommanderTabPanel extends JPanel {
         tabs.addTab(getText("player.tab.announcements"), HudScrollingPage.scrollPane(buildAnnouncementsPanel()));
         exoMasteryPanel = new ExoMasteryTabPanel();
         tabs.addTab(getText("player.tab.exoMastery"), HudScrollingPage.scrollPane(exoMasteryPanel));
+        // Like the fleet grid, a table that grows with the window: no scrolling page around it.
+        tabs.addTab(getText("player.tab.bookmarks"), new LocationBookmarksTabPanel());
 
         JPanel tabsHolder = transparentPanel(new BorderLayout());
         tabsHolder.setBorder(new EmptyBorder(HUD_GAP, 0, 0, 0));
@@ -445,10 +436,10 @@ public class CommanderTabPanel extends JPanel {
     }
 
     /**
-     * Every voice the engine that speaks radio currently carries, by enum name.
+     * Every voice the engine that speaks radio may transmit in, by enum name - its ship-only voices left out.
      */
     private static Stream<String> radioVoiceRoster() {
-        return RadioVoicing.engine().voiceRoster();
+        return RadioVoicing.engine().radioVoiceRoster();
     }
 
     /**
@@ -488,22 +479,6 @@ public class CommanderTabPanel extends JPanel {
         } catch (IllegalArgumentException e) {
             return enumName;
         }
-    }
-
-    /**
-     * Fleet-label for an Edge voice: "DisplayName - accent · gender" (e.g. "Mary - American female"), the same
-     * friendly format Google already uses for the same logical identity - see {@link #googleVoiceDescriptor}.
-     * Every {@link EdgeVoices} name has a {@link GoogleVoices} twin by design (pinned by {@code EdgeVoicesTest}),
-     * so the descriptor is looked up from {@link GoogleVoices} rather than duplicating "American female" /
-     * "British female" literals in {@link EdgeVoices}. Edge's provider-native ShortName (e.g. "en-US-EmmaMultilingualNeural") is an
-     * implementation detail of how the logical name is resolved for synthesis and must never appear in this UI.
-     * Accepts either the logical enum name or a legacy ShortName (both resolve via {@link EdgeVoices#find}), so a
-     * stored value in either form still renders as just the friendly logical label.
-     */
-    static String edgeVoiceLabel(String enumName) {
-        EdgeVoices voice = EdgeVoices.find(enumName);
-        if (voice == null) return enumName;
-        return voice.displayName() + " - " + googleVoiceDescriptor(GoogleVoices.valueOf(voice.name()));
     }
 
     static String displayShipName(ShipDao.Ship ship) {

@@ -34,8 +34,7 @@ public final class RadioVoicing {
     /**
      * The engine that voices a transmission written in {@code transmissionLanguage}: Kokoro wherever it can
      * pronounce the script, Supertonic where it cannot (see {@link TtsProvider#forLanguage}). Google is never
-     * a radio engine - it is the paid main mouth, and radio is chatter, not narration - and neither is Edge,
-     * now that a local engine can read Cyrillic.
+     * a radio engine - it is the paid main mouth, and radio is chatter, not narration.
      */
     public static TtsProvider engineFor(Language transmissionLanguage) {
         return TtsProvider.forLanguage(TtsProvider.KOKORO, transmissionLanguage);

@@ -1,5 +1,6 @@
 package elite.intel.junit.db.managers;
 
+import elite.intel.db.managers.LocationFixtures;
 import elite.intel.db.managers.LocationManager;
 import elite.intel.gameapi.journal.events.dto.BioSampleDto;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
@@ -46,7 +47,7 @@ class LocationBioSampleWriteTest {
         LocationDto body = new LocationDto(bodyId, systemAddress);
         body.setStarName(star);
         body.setPlanetName(planet);
-        locations.save(body);
+        LocationFixtures.store(body);
     }
 
     /**

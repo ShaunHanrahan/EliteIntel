@@ -3,17 +3,20 @@ package elite.intel.ai.brain.actions.handlers.queries;
 import com.google.gson.JsonObject;
 import elite.intel.ai.brain.actions.handlers.queries.struct.AiDataStruct;
 import elite.intel.db.managers.LocationManager;
+import elite.intel.db.managers.Whereabouts;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
 import elite.intel.gameapi.search.edsm.EdsmApiClient;
 import elite.intel.gameapi.search.edsm.dto.DeathsDto;
 import elite.intel.gameapi.search.edsm.dto.TrafficDto;
 import elite.intel.gameapi.search.edsm.dto.data.DeathsStats;
 import elite.intel.gameapi.search.edsm.dto.data.TrafficStats;
-import elite.intel.session.PlayerSession;
 import elite.intel.session.Status;
 import elite.intel.util.SolarDayCalculator;
+import elite.intel.util.StringUtls;
 import elite.intel.util.yaml.ToYamlConvertable;
 import elite.intel.util.yaml.YamlFactory;
+
+import java.util.Optional;
 
 @RegisterQuery
 public class AnalyzeCurrentLocationQuery extends BaseQueryAnalyzer implements IntelQuery {
@@ -28,15 +31,20 @@ public class AnalyzeCurrentLocationQuery extends BaseQueryAnalyzer implements In
     @Override public String id() { return ID; }
 
 
-    private final PlayerSession playerSession = PlayerSession.getInstance();
     private final LocationManager locationManager = LocationManager.getInstance();
 
     @Override public JsonObject handle(String action, JsonObject params, String originalUserInput) throws Exception {
         Status status = Status.getInstance();
 
-        LocationDto location = locationManager.findByLocationData(playerSession.getLocationData());
-        DeathsDto deathsDto = EdsmApiClient.searchDeaths(location.getStarName());
-        TrafficDto trafficDto = EdsmApiClient.searchTraffic(location.getStarName());
+        Optional<Whereabouts> here = locationManager.here();
+        if (here.isEmpty()) return process(StringUtls.localizedResponse("query.noData"));
+        String starSystem = here.get().starSystem();
+        // WHY two records: the body's own (radius, temperature, day length) and the system's (security, factions,
+        // powers), which the arrival events file on the body they arrive at - not necessarily where we are now.
+        LocationDto location = here.get().body();
+        LocationDto system = here.get().system();
+        DeathsDto deathsDto = EdsmApiClient.searchDeaths(starSystem);
+        TrafficDto trafficDto = EdsmApiClient.searchTraffic(starSystem);
 
         // The station is looked up separately: it is not the body this location record describes.
         LocationDto dockedAt = locationManager.findCurrentStation();
@@ -88,12 +96,12 @@ public class AnalyzeCurrentLocationQuery extends BaseQueryAnalyzer implements In
                         instructions,
                         new DataDto(
                                 flightStatus,
-                                playerSession.getPrimaryStarName(),
+                                starSystem,
                                 location.getPlanetShortName(),
-                                location.getSecurity(),
-                                location.getSystemFaction(),
-                                location.getStationFaction(),
-                                location.getPowers() == null ? null : location.getPowers().toArray(String[]::new),
+                                system.getSecurity(),
+                                system.getSystemFaction(),
+                                dockedAt.getStationFaction(),
+                                system.getPowers() == null ? null : system.getPowers().toArray(String[]::new),
                                 deathsDto.getData() == null ? null : deathsDto.getData().getDeaths(),
                                 trafficDto.getData() == null ? null : trafficDto.getData().getTraffic(),
                                 (int) Math.round(location.getRadius() / 1000.0), // stored in metres, prompt asks for km

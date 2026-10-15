@@ -8,6 +8,7 @@ import elite.intel.ui.theme.HudPalette;
 
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.HierarchyEvent;
 
 import static elite.intel.ui.i18n.MultiLingualTextProvider.getText;
 
@@ -24,6 +25,13 @@ public class BindingsTabPanel extends JPanel {
 
     public BindingsTabPanel() {
         buildUi();
+        // WHY: activation is the first opening of the BindForge tab - this one, not the Alias Designer sub-tab
+        // (Alan, 2026-10-13, A1b). Opening BindForge is the user coming to it; first setup may open over whichever
+        // sub-tab is showing.
+        addHierarchyListener(event -> {
+            if ((event.getChangeFlags() & HierarchyEvent.SHOWING_CHANGED) == 0 || !isShowing()) return;
+            aliasDesignerPanel.activateOnFirstShowing();
+        });
     }
 
     private void buildUi() {
@@ -35,9 +43,6 @@ public class BindingsTabPanel extends JPanel {
         tabs.setTabPlacement(JTabbedPane.TOP);
         tabs.addTab(getText("bindings.tab.bindingProfile"), bindingProfilePanel);
         tabs.addTab(getText("bindings.tab.bindingManagement"), bindingManagementPanel);
-        // WHY: shown while it holds only the divergence list, at Alan's request, so the red and yellow on a
-        // real machine can be looked at. It is not yet what "Alias Designer" promises - the device list and
-        // the editor are still to come - so the name is ahead of the thing for now, deliberately.
         tabs.addTab(getText("bindings.tab.aliasDesigner"), aliasDesignerPanel);
 
         add(tabs, BorderLayout.CENTER);
@@ -45,6 +50,7 @@ public class BindingsTabPanel extends JPanel {
 
     public void dispose() {
         bindingProfilePanel.dispose();
+        aliasDesignerPanel.dispose();
     }
 
     /**

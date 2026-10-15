@@ -13,10 +13,19 @@ import java.util.List;
  * Stores and reads rows; it does not decide what the list should contain. Reconciling a fresh detection
  * against these rows is the caller's job, because that needs the filesystem and a provider, and neither
  * belongs in a manager.
+ * <p>
+ * <strong>The list is held in memory</strong> and read from the table again only after one of this manager's own
+ * writes, which are the only writes the table gets. {@code DeviceFilesMonitor} asks for it every two seconds, for as
+ * long as Elite-Intel runs, and the list changes only when the user or a rescan changes it.
  */
 public class BindForgeInstallationsManager {
 
     private static volatile BindForgeInstallationsManager instance;
+
+    /**
+     * The rows as last read, or {@code null} after a write. Guarded by {@code this}.
+     */
+    private List<InstallationRow> cached;
 
     private BindForgeInstallationsManager() {
         // Private constructor to prevent instantiation
@@ -33,8 +42,13 @@ public class BindForgeInstallationsManager {
         return instance;
     }
 
-    public List<InstallationRow> findAll() {
-        return Database.withDao(BindForgeInstallationsDao.class, BindForgeInstallationsDao::findAll);
+    // WHY: synchronized with every write, so a read that started before a write cannot store the old list after
+    // that write has dropped it.
+    public synchronized List<InstallationRow> findAll() {
+        if (cached == null) {
+            cached = List.copyOf(Database.withDao(BindForgeInstallationsDao.class, BindForgeInstallationsDao::findAll));
+        }
+        return cached;
     }
 
     /**
@@ -57,8 +71,9 @@ public class BindForgeInstallationsManager {
      *
      * @return the row for that folder, whether it was just created or already there
      */
-    public InstallationRow record(String storefront, Path root, boolean addedByHand) {
+    public synchronized InstallationRow record(String storefront, Path root, boolean addedByHand) {
         String rootPath = root.toString();
+        cached = null;
         return Database.withDao(BindForgeInstallationsDao.class, dao -> {
             InstallationRow existing = dao.findByPath(rootPath);
             if (existing != null) return existing;
@@ -74,7 +89,8 @@ public class BindForgeInstallationsManager {
      * an uninstall are indistinguishable from here, and dropping the row would take its device records away
      * with it.
      */
-    public void setMissing(long id, boolean missing) {
+    public synchronized void setMissing(long id, boolean missing) {
+        cached = null;
         Database.withDao(BindForgeInstallationsDao.class, dao -> {
             dao.setMissing(id, missing);
             return Void.TYPE;
@@ -85,7 +101,8 @@ public class BindForgeInstallationsManager {
      * Repoints an installation at a new folder, keeping its id and everything keyed to it - the
      * reinstalled-to-another-drive case.
      */
-    public void relocate(long id, Path newRoot) {
+    public synchronized void relocate(long id, Path newRoot) {
+        cached = null;
         Database.withDao(BindForgeInstallationsDao.class, dao -> {
             dao.relocate(id, newRoot.toString());
             return Void.TYPE;
@@ -98,7 +115,8 @@ public class BindForgeInstallationsManager {
      * Deliberately discards what was held against it. There is no orphan-retention scheme and no undo beyond
      * adding the folder again: device records are cheap to rebuild, and backups are not kept here.
      */
-    public void remove(long id) {
+    public synchronized void remove(long id) {
+        cached = null;
         Database.withDao(BindForgeInstallationsDao.class, dao -> {
             dao.delete(id);
             return Void.TYPE;

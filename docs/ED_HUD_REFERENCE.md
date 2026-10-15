@@ -416,6 +416,8 @@ References: Universal Cartographics, Promotion to Master, Community Goal.
 - **Buttons:** primary → a bright fill with dark text (`makeButton`); the rest → a dim outline (`makeButtonSubtle`).
 - **Footer
   layout:** the left slot goes LEFT; primary goes RIGHT; EXTRA sits left of primary. The layout comes from `HudModalSpec` — do not lay out WEST/EAST by hand. The former "primary on the left" canon is REVOKED.
+- **The middle place** (`HudModalSpec.middle`, the `MIDDLE` role): a destructive action kept away from both BACK and the primary — the Device Editor's CLEAR — centred between the left slot and the right-hand group, subtle like any non-primary button. Use it only for that; an ordinary secondary action is EXTRA. *Added 2026-10-10 (BindForge A9).*
+- **A modal's unsaved hint** goes in through `HudModalSpec.unsavedHint(HudUnsavedHint)`, which places it immediately left of the right-hand group, as for a tab footer below. *Added 2026-10-10.*
 - **One footer for
   everything:** both modals and tab footers are assembled by `HudFooter.build(modal, …)`. The only difference is the left slot: modal (`modal=true`) gets `BACK`/dismiss; non-modal (`modal=false`) gets status or info, and
   **`BACK` is forbidden** (the flag is what guarantees that).
@@ -448,7 +450,7 @@ scaffold.** `AppTheme.hudModalScaffold(HudModalSpec)` returns a wrapper `JPanel`
 `HudFooter`/`hudFooterBorder()` are the scaffold's INTERNALS and are not laid out directly in windows.
 
 **`HudModalSpec` (a builder):** `title` (nullable → no header), `onClose`, `body`, `scrollBody`
-(bool → viewport bg `HUD_COLOR_ROLE_DIALOG_BODY_BACKGROUND`), and buttons with the `primary`/`dismiss`/`extra` roles (§10). The scaffold does NOT create buttons; it accepts finished ones. ESC and the default button are set by the window after `setContentPane`.
+(bool → viewport bg `HUD_COLOR_ROLE_DIALOG_BODY_BACKGROUND`), buttons with the `primary`/`dismiss`/`extra`/`middle` roles (§10), and an optional `unsavedHint`. The scaffold does NOT create buttons; it accepts finished ones. ESC and the default button are set by the window after `setContentPane`.
 
 **The side inset** is the single `HUD_DIALOG_BODY_INSET` token (`HUD_GAP×2`). With `scrollBody`
 the `body` itself carries no border of its own. The 18/16/12 literals are revoked.

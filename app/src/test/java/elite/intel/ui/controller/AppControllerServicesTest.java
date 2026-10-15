@@ -31,14 +31,14 @@ class AppControllerServicesTest {
         // Cloud main mouth, Latin-script language: radio is voiced by a dedicated always-on Kokoro engine.
         assertTrue(AppController.buildServices(TtsProvider.GOOGLE, TtsProvider.KOKORO)
                 .containsKey(ServiceType.RADIO_MOUTH));
-        // Kokoro main mouth, Cyrillic language: Kokoro cannot pronounce it, so Edge runs alongside for radio.
-        assertTrue(AppController.buildServices(TtsProvider.KOKORO, TtsProvider.EDGE)
+        // Kokoro main mouth, Cyrillic client: Kokoro cannot pronounce it, so Supertonic runs alongside for radio.
+        assertTrue(AppController.buildServices(TtsProvider.KOKORO, TtsProvider.SUPERTONIC)
                 .containsKey(ServiceType.RADIO_MOUTH));
         // The main mouth IS the radio engine: it voices radio through its own queue, no extra engine. A second
         // holder would hand the same singleton the RADIO role and silence all narration.
         assertFalse(AppController.buildServices(TtsProvider.KOKORO, TtsProvider.KOKORO)
                 .containsKey(ServiceType.RADIO_MOUTH));
-        assertFalse(AppController.buildServices(TtsProvider.EDGE, TtsProvider.EDGE)
+        assertFalse(AppController.buildServices(TtsProvider.SUPERTONIC, TtsProvider.SUPERTONIC)
                 .containsKey(ServiceType.RADIO_MOUTH));
     }
 
@@ -63,6 +63,22 @@ class AppControllerServicesTest {
             assertTrue(order.indexOf(ServiceType.DEVICE) < order.indexOf(ServiceType.PUSH_TO_TALK));
             assertTrue(order.indexOf(ServiceType.EARS) < order.indexOf(ServiceType.PUSH_TO_TALK));
         }
+    }
+
+    /** The startup .buttonMap acts on the device poll loop's connect events, so it comes up after it. */
+    @Test
+    void buttonMapStartupComesUpAfterTheDevices() {
+        List<ServiceType> order =
+                List.copyOf(AppController.buildServices(TtsProvider.GOOGLE, TtsProvider.KOKORO).keySet());
+        assertTrue(order.contains(ServiceType.BUTTON_MAP_STARTUP));
+        assertTrue(order.indexOf(ServiceType.DEVICE) < order.indexOf(ServiceType.BUTTON_MAP_STARTUP));
+    }
+
+    /** The device-file watch is a service of its own, so a change is noticed whether or not the screen is open. */
+    @Test
+    void deviceFilesWatchIsRegistered() {
+        assertTrue(AppController.buildServices(TtsProvider.GOOGLE, TtsProvider.KOKORO)
+                .containsKey(ServiceType.DEVICE_FILES_MONITOR));
     }
 
     @Test

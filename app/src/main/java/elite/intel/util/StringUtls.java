@@ -291,11 +291,11 @@ public class StringUtls {
     }
 
     /**
-     * The extra pass the cloud mouths run over {@link #sanitizeTts(String, boolean)} output: "present" is spoken
+     * The extra pass the cloud mouth runs over {@link #sanitizeTts(String, boolean)} output: "present" is spoken
      * as "detected", and any underscore or asterisk that survived sanitization inside a word is dropped.
      * <p>
-     * The rule predates both cloud engines and is preserved verbatim, in one place, so {@code GoogleTTSImpl} and
-     * {@code EdgeTTSImpl} cannot drift apart on what they say. Kokoro does not apply it.
+     * The rule predates the cloud engine and is preserved verbatim for {@code GoogleTTSImpl}. Kokoro does not
+     * apply it.
      */
     public static String sanitizeCloudSpeech(String input) {
         if (input == null) return "";
@@ -448,5 +448,12 @@ public class StringUtls {
 
     public static String affirmative() {
         return localizedSpeech("speech.affirmative");
+    }
+
+    /**
+     * An exception's message for the user to read, or its kind when it carries none - never the word "null".
+     */
+    public static String messageOf(Throwable e) {
+        return e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
     }
 }

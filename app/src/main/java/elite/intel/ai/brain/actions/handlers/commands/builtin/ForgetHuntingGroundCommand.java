@@ -53,7 +53,7 @@ public final class ForgetHuntingGroundCommand implements IntelCommand {
 
     @Override
     public String execute(JsonObject params, String responseText) {
-        String starSystem = playerSession.getPrimaryStarName();
+        String starSystem = playerSession.currentStarSystem();
         if (starSystem == null || starSystem.isBlank()) {
             return StringUtls.localizedResponse("handler.pirate.positionUnknown");
         }

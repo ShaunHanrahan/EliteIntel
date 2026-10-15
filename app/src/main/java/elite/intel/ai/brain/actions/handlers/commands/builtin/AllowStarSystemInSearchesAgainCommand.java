@@ -42,7 +42,7 @@ public final class AllowStarSystemInSearchesAgainCommand implements IntelCommand
 
     @Override
     public String execute(JsonObject params, String responseText) {
-        String starSystem = PlayerSession.getInstance().getPrimaryStarName();
+        String starSystem = PlayerSession.getInstance().currentStarSystem();
         if (starSystem == null || starSystem.isBlank()) {
             return StringUtls.localizedResponse("handler.searchExclusion.positionUnknown");
         }

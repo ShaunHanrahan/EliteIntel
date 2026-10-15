@@ -41,7 +41,7 @@ class ExobiologyObjectiveCardTest {
 
         assertEquals("EXOBIOLOGY", card.title());
         assertEquals(HudObjective.PRIORITY_AMBIENT, card.priority());
-        assertEquals(List.of("GENUS", "BACTERIUM", "FONTICULUA"), labels(card));
+        assertEquals(List.of("GENUS", "BACTERIUM (500m)", "FONTICULUA (500m)"), labels(card));
         assertEquals(0, card.rows().getFirst().current());
         assertEquals(2, card.rows().getFirst().max());
     }
@@ -54,9 +54,27 @@ class ExobiologyObjectiveCardTest {
         HudObjective card = ExobiologyObjectiveSource.card(
                 body, List.of(completed("Bacterium", "$Codex_Ent_Bacterial_Genus_Name;")), ID).orElseThrow();
 
-        assertEquals(List.of("GENUS", "FONTICULUA"), labels(card));
+        assertEquals(List.of("GENUS", "FONTICULUA (500m)"), labels(card));
         assertEquals(1, card.rows().getFirst().current(), "one of two genuses is done");
         assertEquals(2, card.rows().getFirst().max());
+    }
+
+    @Test
+    void theColonyRangeFollowsTheSymbolNotTheClientLanguage() {
+        LocationDto body = bodyWith(genus("Conque", "$Codex_Ent_Conchas_Genus_Name;"));
+
+        HudObjective card = ExobiologyObjectiveSource.card(body, List.of(), ID).orElseThrow();
+
+        assertEquals(List.of("GENUS", "CONQUE (150m)"), labels(card));
+    }
+
+    @Test
+    void aGenusWithNoKnownRangeShowsItsNameAlone() {
+        LocationDto body = bodyWith(genus("Mystery", "$Codex_Ent_Mystery_Genus_Name;"));
+
+        HudObjective card = ExobiologyObjectiveSource.card(body, List.of(), ID).orElseThrow();
+
+        assertEquals(List.of("GENUS", "MYSTERY"), labels(card));
     }
 
     @Test
@@ -183,6 +201,29 @@ class ExobiologyObjectiveCardTest {
                 "header + capped genus rows + overflow");
         assertEquals("MORE GENUS", card.rows().getLast().label());
         assertEquals("+2", card.rows().getLast().value());
+    }
+
+    /**
+     * A genus that the overflow row hid is the one being walked to as soon as it is sampled, so it
+     * moves to the top rather than staying folded into the count.
+     */
+    @Test
+    void aGenusBeingSampledLeadsTheCardEvenWhenItWasInTheOverflow() {
+        GenusDto[] many = new GenusDto[ExobiologyObjectiveSource.MAX_GENUS_ROWS + 2];
+        for (int i = 0; i < many.length; i++) {
+            many[i] = genus("Genus" + i, "$Codex_Ent_Genus" + i + "_Name;");
+        }
+        LocationDto body = bodyWith(many);
+        int last = many.length - 1;
+        body.addBioScan(partial("Genus" + last, "$Codex_Ent_Genus" + last + "_Name;", 1));
+
+        HudObjective card = ExobiologyObjectiveSource.card(body, List.of(), ID).orElseThrow();
+
+        HudRow first = card.rows().get(1);
+        assertEquals("GENUS" + last, first.label());
+        assertTrue(first.hasProgress(), "the genus being sampled carries its bar");
+        assertEquals("GENUS0", card.rows().get(2).label(), "the rest keep their order");
+        assertEquals("+2", card.rows().getLast().value(), "the overflow count is unchanged");
     }
 
     /**

@@ -1,6 +1,7 @@
 package elite.intel.junit.db.managers;
 
 import elite.intel.db.dao.LocationDao;
+import elite.intel.db.managers.LocationFixtures;
 import elite.intel.db.managers.LocationManager;
 import elite.intel.gameapi.journal.events.dto.LocationDto;
 import org.junit.jupiter.api.BeforeEach;
@@ -110,7 +111,7 @@ class KnownStationRadiusSearchTest {
         primaryStar.setX(x);
         primaryStar.setY(y);
         primaryStar.setZ(z);
-        locations.save(primaryStar);
+        LocationFixtures.store(primaryStar);
 
         LocationDto dock = new LocationDto(1L, address);
         dock.setLocationType(LocationDto.LocationType.STATION);
@@ -119,7 +120,7 @@ class KnownStationRadiusSearchTest {
         // the locationName column - the station name itself lives in the JSON.
         dock.setPlanetName(station(stationSuffix));
         dock.setStationName(station(stationSuffix));
-        locations.save(dock);
+        LocationFixtures.store(dock);
     }
 
     private String star(String suffix) {

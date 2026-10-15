@@ -116,6 +116,55 @@ looked correct and the content was gone. Re-indent what is there; never regenera
 while an edited layout is in place. The session above opened the game normally and did not exercise that
 path.)*
 
+### 1.2d Two entries for one VID/PID: the first in the file wins — measured 2026-10-03
+
+**The question:** can a user give a Frontier-recognised controller a name of their own? Two ways were tried on
+the developer's Steam install, using the Thrustmaster T.Flight pedals (`044F:B679`), which Frontier ships as
+`<T-Rudder>`.
+
+**Test 1 — a duplicate, added after Frontier's entry.** A `<MyRudder>` element carrying the same VID/PID was
+appended at the end of `<Root>`, with a `MyRudder.buttonMap` beside it. **The game ignored it.** The pedals
+stayed `T-Rudder`, with no labels from `MyRudder.buttonMap`. When two elements claim the same VID/PID, **the
+first one in file order wins** (Alan), and the other is never used.
+
+**Test 2 — Frontier's entry renamed in place.** `<T-Rudder>` was renamed to `<MyRudder>` at its own position,
+which left one entry for that hardware. The test recorded:
+
+| | Result |
+|---|---|
+| The active preset (`DualVirpilDawnTreader.4.2.binds`) | loads; it names the pedals `Device="MyRudder"` (2 bindings) |
+| A game save at 00:08:41 (`.binds` and `StartPreset.4.start` written together) | **keeps `MyRudder`** — the game writes the name it resolved |
+| `DeviceMappings.xml` | **not rewritten** by the game after the edit at 23:49 — the renamed entry stands |
+| The inactive preset (`DualVirpilTesting.4.2.binds`) | still names `T-Rudder` 6 times, and `BindingLoadingErrors.log` carries **6× `Failed to find GUID for device: T-Rudder`** |
+
+The active preset's two `T-Rudder` references were changed to `MyRudder` **by hand** (Alan) — the game did not
+rename them. What the game did was keep the new name through its own save, re-emitting `MyRudder` rather than
+reverting to Frontier's.
+
+**Four conclusions:**
+
+1. **Position decides, not authorship.** Nothing in the file marks Frontier's entries, and the game treats
+   them like any other. An entry placed **before** Frontier's wins over it. So BindForge writes the user's
+   elements **at the top of `<Root>`**, where anything the user does on purpose is the one the game uses — and
+   moves a user element it finds further down up to the top (Alan, 2026-10-04).
+2. **Frontier's entries can be renamed or removed without breaking the game.** The rename loaded normally and
+   survived a game save. What makes this safe for BindForge is that it carries
+   [Frontier's shipped list](../reference-data/FrontierStock-README.md) itself, so any Frontier entry can be
+   put back. *This reverses "BindForge never edits a Frontier entry" (2026-09-13) — see
+   [Built-in controllers in My Devices](../alias-designer.md#built-in-controllers-in-my-devices--settled-2026-09-13).*
+3. **A rename still costs every preset that names the old element** — including presets that are not active,
+   because [the game validates every `.binds` in the folder](#12b-what-happens-when-a-device-name-has-no-entry--measured-2026-09-22).
+   Test 2's inactive preset is that failure, measured again. A Frontier name is no different from a user's
+   name here: [the rename transaction](../alias-designer.md#renaming-a-device) rewrites every `.binds`.
+4. **Shadowing is the narrower tool for a multi-pair entry.** A user element at the top carrying only *their*
+   controller's VID/PID wins for that controller, and leaves Frontier's element in place for everything else
+   it covers. For `<T-Rudder>` (one pair), shadowing and renaming give the same result. For `<GamePad>`
+   (80 pairs), renaming renames every controller on it, while shadowing takes one.
+
+**Not a reason to prune.** Removing Frontier entries nobody uses is safe by the same evidence, but it buys a
+shorter file at a real cost: a controller plugged in later, such as a friend's gamepad, finds no entry and
+is bound by raw hex. Pruning is something a user may ask for, never something BindForge does to tidy up.
+
 ### 1.3 Additional per-device metadata — confirmed 2026-10-03
 
 The source material noted two possibilities without a confirmed schema. **Both are now confirmed against
@@ -177,6 +226,13 @@ Each child element's tag is an input token drawn from the same vocabulary as `.b
 
 `<DeviceName>` matches the element tag name used for that device in `DeviceMappings.xml`. Examples: `VPCPanel.buttonMap` corresponds to `<VPCPanel>` in `DeviceMappings.xml`; `T-Rudder.buttonMap` corresponds to `<T-Rudder>`.
 
+**Where it lives: the installation's `ControlSchemes\DeviceButtonMaps\`** — Frontier's maps and the user's alike,
+one set per installation (Alan, 2026-10-06: *"no reason to doubt these fundamental file positions"*).
+[Frontier's readme for custom button names](../reference-data/Frontier-ButtonMap-Readme.txt) tells users to put
+them in the bindings folder instead; that instruction is not what this project builds on, and does not reopen the
+location. The readme is kept for its icon tokens (§2.4) and its note that a change shows on re-entering the
+controls screen.
+
 ### 2.3 Input codes supported
 
 A `.buttonMap` file may contain labels for any of:
@@ -195,7 +251,12 @@ Observed label text styles:
 - Directional indicators: `Clockwise`, `Up`, `Left`
 - Axis names: `A1`, `A2`
 
-**Gap — no confirmed icon token syntax.** The source material does not document any structured "icon token" format inside a label value (e.g. a placeholder like `{icon:...}`). Every observed label is plain text. If Elite's own UI renders icons for some devices, the mechanism behind that is not established by the available source material — do not assume a token syntax exists without confirming it against a real `.buttonMap` file taken from a device the in-game UI is known to show icons for.
+**Icon tokens — confirmed 2026-10-06 from Frontier's own readme.** A label may be an icon name in square
+brackets: `<Joy_1>[x360A]</Joy_1>` shows the Xbox 360 A-button icon in place of `Joy_1`. The readme lists the
+sets: `x360…`, `xb1…` (Xbox One), `ps4…`, `x52…`, `x52pro…`, `hts4…` (T.Flight HOTAS 4) and `xb1hts…` (T.Flight
+Hotas One). Those last four match the elements Frontier's file marks `<SupportsIcons>` (§1.3), so for those
+devices the game draws icons by itself, and a plain-text label would replace them. *This replaces a "gap — no
+confirmed icon token syntax" note; the readme is the confirmation it asked for.*
 
 ### 2.5 Fallback behaviour
 
@@ -215,5 +276,5 @@ Carried forward explicitly rather than papered over:
 
 - Exact schema for a device with alternative VID/PID pairs in `DeviceMappings.xml` (§1.3) — real, but shape unconfirmed.
 - Exact schema/tag name for any icon-support metadata in `DeviceMappings.xml` (§1.3) — real, but shape unconfirmed.
-- Whether `.buttonMap` labels ever encode an icon reference rather than plain text (§2.4) — no evidence found either way in the source material.
+- ~~Whether `.buttonMap` labels ever encode an icon reference rather than plain text (§2.4).~~ **Answered 2026-10-06:** they can — `[x360A]` and the like, from Frontier's readme.
 - Exact VID/PID → hex-ID formatting details (byte order, case, zero-padding) — see `EliteDangerous-BindsFileFormat.md` §4.2 for the same caveat, since it applies equally to `DeviceMappings.xml` as the origin of those values.

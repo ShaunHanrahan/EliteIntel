@@ -7,6 +7,7 @@ import elite.intel.gameapi.journal.events.MissionAcceptedEvent;
 import elite.intel.gameapi.journal.subscribers.MissionAbandonedSubscriber;
 import elite.intel.gameapi.journal.subscribers.MissionAcceptedSubscriber;
 import elite.intel.session.PlayerSession;
+import elite.intel.session.Position;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -24,7 +25,7 @@ class MissionAbandonedSubscriberTest {
     @BeforeEach
     void clearMissions() {
         missionManager.clear();
-        PlayerSession.getInstance().setCurrentPrimaryStarName("Sol");
+        PlayerSession.getInstance().moveTo(new Position(10477373803L, "Sol", null));
     }
 
     @Test

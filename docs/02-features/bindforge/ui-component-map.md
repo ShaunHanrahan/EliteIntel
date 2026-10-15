@@ -23,7 +23,7 @@ segmented selector, combos, checkboxes, tables with boolean and combo cell edito
 scaffold, `HudConfirmDialog`, the unsaved-changes footer, the split pane — and, already built for the Bindings
 section, the chord capture field, the live keyboard map, the conflict callout and the slot cell renderer.
 
-**Six gaps, two of them load-bearing:**
+**Seven gaps, three of them load-bearing** *(the seventh added 2026-10-10)*:
 
 | # | Missing | Needed by | Blocks, or degrades? |
 |---|---|---|---|
@@ -31,8 +31,9 @@ section, the chord capture field, the live keyboard map, the conflict callout an
 | 2 | **Editable table cells beyond boolean and combo** — free text, and numbers | Alias Designer's button and axis labels; the 21 free-number settings | **Blocks** in-cell editing; editing in a form beside the table is the fallback |
 | 3 | **A HUD context menu** | Game Mode's right-click Expand All / Collapse All | Degrades — two buttons do the same job |
 | 4 | **A badge on a tab** | the Anomalies count, the destructive-change Error signal | Degrades — the count goes in the tab title, the app's existing pattern |
-| 5 | **Tabs inside a table row** | Alias Designer — one tab per detected installation | Blocks that one layout only |
+| 5 | ~~**Tabs inside a table row**~~ | ~~Alias Designer — one tab per detected installation~~ | **Avoided 2026-10-08** — the markers are one column per installation |
 | 6 | **Esc clears a search field** | the Bind Editor shell | Degrades — the × already clears |
+| 7 | ~~**A middle place in a dialog's footer**~~ | Alias Designer's Device Editor — CLEAR between BACK and SAVE (2026-10-10) | **Built with A9** — `HudModalSpec.middle`, and in the canon's §10 |
 
 **Two tensions with the canon**, which are design questions rather than missing code — see
 [below](#tensions-with-the-canon).
@@ -172,14 +173,27 @@ first.
 |---|---|
 | The two views, toggled | `HudTabbedPane` `COMPACT` ✓ |
 | The device list | `HudTable` ✓ |
-| One tab per detected installation, **inside the row**, marked **M** or *not added* | **GAP 5** |
-| The editor, **expanding inline beneath the open device** | **GAP 1** — the same disclosure family as a collapsible group |
-| Alias, VID and PID | `HudTextField` ✓ |
-| Button and axis labels | **GAP 2** if edited in cells; `HudTextField` rows in the editor if not |
-| MIRROR, CLEAR, RESET LABELS, APPLY | `HudButton` ✓ |
+| One marker per detected installation, **M**, *not added* or the divergence colour | One `HudTable` column per installation ✓ — GAP 5 avoided (A4, 2026-10-08) |
+| ~~The editor, **expanding inline beneath the open device**~~ | ~~**GAP 1**~~ — no longer needed here, 2026-10-10 |
+| The gear at the end of each row, opening the editor | the fleet list's gear cell ✓ — a renderer and a one-column editor; **copied** into Alias Designer for now, to become one shared HUD gear column when a third list takes it |
+| The Device Editor — a dialog with DEVICE, AXES, BUTTONS and HATS tabs | `hudModalScaffold` ✓, `HudTabbedPane` `COMPACT` ✓ for the tabs and the `1–32` button groups |
+| Name, VID and PID | `HudTextField` ✓, all three read-only until Rename |
+| Button, axis and hat labels | `HudTextField` boxes in a grid beside each input's name ✓ — not table cells, so **GAP 2 is not needed** here |
+| BACK · CLEAR · SAVE along the dialog's bottom | `HudButton` ✓ and **GAP 7** for CLEAR's middle place |
+| Save / Discard / Keep editing on leaving with edits | `HudConfirmDialog.show` ✓ — already takes three answers (primary, extra, dismiss) |
+| APPLY, beneath the list | `HudButton` ✓ |
 | Rename and onboarding dialogs | `hudModalScaffold` ✓ |
 
-**GAP 5 has one user**, so the canon lets it stay local to Alias Designer. It is also the most unusual thing
+**The Device Editor became a dialog, 2026-10-10 (Alan)** — see
+[the Device Editor](alias-designer.md#a-dialog-opened-from-the-row--2026-10-10-alan). A table row cannot host a
+panel beneath itself, so the inline expansion needed GAP 1; a dialog opened from a gear needs neither GAP 1 nor
+GAP 2, both of which stay open for the Bind Editor. MIRROR was removed from this table: the action went on
+2026-09-26.
+
+**GAP 5 was avoided, 2026-10-08 (Alan).** The Installations markers became one column per installation — see
+[the Installations markers](alias-designer.md#the-installations-markers--2026-10-08-alan) — so nothing paints
+several markers in one cell. The Device Editor's install strip sits inside the expansion, not in a row, and is the
+`COMPACT` row suggested below. *What was written before:* **GAP 5 has one user**, so the canon lets it stay local to Alias Designer. It is also the most unusual thing
 BindForge asks of the kit — a JTable row does not host components, so tabs inside one means painting them in a
 renderer and hit-testing clicks. **Worth weighing against a plainer layout** before building it: the
 installations could be a `COMPACT` tab row inside the inline editor, which the kit already does.
@@ -252,6 +266,18 @@ See [Alias Designer](#alias-designer) — one user, and a plainer layout is avai
 
 `HudSearchField` clears on its ×, not on Esc. The Bind Editor spec requires both — *"which, in a bind editor,
 is most of them."* A small change to the widget itself, so every search field in the app gains it.
+
+### 7. A middle place in a dialog's footer
+
+*Added 2026-10-10.* `HudModalSpec` takes a **dismiss** button (left) and **primary** and **extra** buttons (right,
+extras first) — there is no middle. Alan put the Device Editor's CLEAR in the middle, between BACK and SAVE, so
+the destructive button is not next to either of the ones reached for by habit. **Built with A9** as a new role in
+`HudModalSpec`/`HudModalScaffold`, and documented in the canon's dialog section in the same commit, as the canon
+requires. Custom Commands' DELETE could use it later.
+
+*Built 2026-10-10 (A9):* `HudModalSpec.Builder.middle(button)` — the `MIDDLE` role — centred by `HudFooter` between
+the left slot and the right-hand group. The same change gave the spec `unsavedHint(component)`, so a modal can put
+the canon's `HudUnsavedHint` immediately left of SAVE, as §10 asks; the right-hand group held buttons only before.
 
 ---
 
