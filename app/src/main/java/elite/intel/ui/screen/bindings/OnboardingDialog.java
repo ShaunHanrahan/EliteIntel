@@ -19,9 +19,7 @@ import java.util.List;
 import java.util.function.Consumer;
 
 import static elite.intel.ui.i18n.MultiLingualTextProvider.getText;
-import static elite.intel.ui.theme.AppTheme.makeButton;
-import static elite.intel.ui.theme.AppTheme.makeButtonSubtle;
-import static elite.intel.ui.theme.AppTheme.transparentPanel;
+import static elite.intel.ui.theme.AppTheme.*;
 
 /**
  * Onboarding: a name for each controller that has none, one page each (spec, alias-designer.md, <em>What it asks:
@@ -30,13 +28,18 @@ import static elite.intel.ui.theme.AppTheme.transparentPanel;
  * Each page is prefilled with the default name. <strong>Skip</strong> takes it, <strong>Next</strong> takes what is
  * typed once the rule accepts it, and on the last page <strong>Finish</strong> hands every name to the screen,
  * which writes them all in one pass. <strong>BACK, the close glyph and Esc leave having written nothing</strong>, and
- * ask nothing - only typed names are lost, and the controllers are offered again next run or from the gear.
+ * ask nothing - only typed names are lost, and the controllers are offered again by CHECK AGAIN, the next run, or the gear.
  * <p>
  * Labels are not asked for: they are generated, and renamed later in the Device Editor.
  */
 final class OnboardingDialog extends JDialog {
 
-    private static final int NAME_COLUMNS = 30;
+    /**
+     * The body's width. Every long line - a controller's full product string, the move notice carrying a name of up to
+     * {@link DeviceNames#MAX_LENGTH} characters - wraps to it instead of widening the dialog past the screen or being
+     * cut off.
+     */
+    private static final int BODY_WIDTH = 600;
 
     private final List<Onboarding.Page> pages;
     private final Collection<String> taken;
@@ -46,11 +49,11 @@ final class OnboardingDialog extends JDialog {
     private int page;
 
     private JLabel progress;
-    private JLabel device;
+    private JTextArea device;
     private JLabel hardware;
     private HudTextField name;
-    private JLabel problem;
-    private JLabel moves;
+    private JTextArea problem;
+    private JTextArea moves;
     private JButton next;
 
     /**
@@ -79,20 +82,21 @@ final class OnboardingDialog extends JDialog {
     private void buildUi() {
         JPanel body = transparentPanel(new GridBagLayout());
         int row = 0;
-        row = addRow(body, row, AppTheme.hudReadoutValue(getText(pages.size() == 1
+        row = addRow(body, row, paragraph(getText(pages.size() == 1
                         ? "bindings.aliasDesigner.onboarding.intro.one"
                         : "bindings.aliasDesigner.onboarding.intro.many", pages.size()),
                 HudPalette.HUD_COLOR_ROLE_PRIMARY_TEXT));
-        progress = AppTheme.hudReadoutValue("", HudPalette.HUD_COLOR_ROLE_SECONDARY_TEXT);
+        progress = AppTheme.hudReadoutValue(" ", HudPalette.HUD_COLOR_ROLE_SECONDARY_TEXT);
         row = addRow(body, row, progress);
-        device = AppTheme.hudReadoutLabel("");
-        body.add(device, cell(0, row));
-        hardware = AppTheme.hudReadoutValue("", HudPalette.HUD_COLOR_ROLE_SECONDARY_TEXT);
-        body.add(hardware, cell(1, row++));
+        // WHY: on rows of their own. A product string runs to 60 characters and more, and beside the hardware IDs it
+        // pushed both columns past the body and clipped them.
+        device = paragraph(" ", HudPalette.HUD_COLOR_ROLE_PRIMARY_TEXT);
+        row = addRow(body, row, device);
+        hardware = AppTheme.hudReadoutValue(" ", HudPalette.HUD_COLOR_ROLE_SECONDARY_TEXT);
+        row = addRow(body, row, hardware);
 
         body.add(AppTheme.hudReadoutLabel(getText("bindings.aliasDesigner.onboarding.field.name")), cell(0, row));
         name = new HudTextField();
-        name.setColumns(NAME_COLUMNS);
         name.getDocument().addDocumentListener(new DocumentListener() {
             @Override
             public void insertUpdate(DocumentEvent e) {
@@ -111,12 +115,14 @@ final class OnboardingDialog extends JDialog {
         });
         GridBagConstraints field = cell(1, row++);
         field.fill = GridBagConstraints.HORIZONTAL;
+        field.weightx = 1;
+        field.insets.right = 0;
         body.add(name, field);
-        problem = AppTheme.hudReadoutValue(" ", HudPalette.HUD_COLOR_ROLE_WARNING);
+        problem = paragraph(" ", HudPalette.HUD_COLOR_ROLE_WARNING);
         row = addRow(body, row, problem);
-        moves = AppTheme.hudReadoutValue(" ", HudPalette.HUD_COLOR_ROLE_WARNING);
+        moves = paragraph(" ", HudPalette.HUD_COLOR_ROLE_WARNING);
         row = addRow(body, row, moves);
-        addRow(body, row, AppTheme.hudReadoutValue(getText("bindings.aliasDesigner.onboarding.labels"),
+        addRow(body, row, paragraph(getText("bindings.aliasDesigner.onboarding.labels"),
                 HudPalette.HUD_COLOR_ROLE_SECONDARY_TEXT));
 
         next = makeButton("");
@@ -141,22 +147,24 @@ final class OnboardingDialog extends JDialog {
         // WHY: Enter in the name box is Next - the one field on the page, and Next refuses a name the rule does not.
         getRootPane().setDefaultButton(next);
         setDefaultCloseOperation(WindowConstants.DISPOSE_ON_CLOSE);
-        pack();
-        setLocationRelativeTo(getOwner());
     }
 
     private void showPage() {
         Onboarding.Page current = pages.get(page);
         MyDevice controller = current.device();
         progress.setText(getText("bindings.aliasDesigner.onboarding.progress", page + 1, pages.size()));
-        device.setText(controller.label());
         hardware.setText(getText("bindings.aliasDesigner.onboarding.hardware", controller.vid(), controller.pid()));
+        setParagraph(device, controller.label());
         name.setText(chosen.get(page));
-        if (!current.waitsForApply()) moves.setText(" ");
+        if (!current.waitsForApply()) setParagraph(moves, " ");
         next.setText(getText(page == pages.size() - 1
                 ? "bindings.aliasDesigner.onboarding.finish"
                 : "bindings.aliasDesigner.onboarding.next"));
         judge();
+        // WHY: packed here, not once when built. Packed before the first page was filled in, the dialog took the
+        // height of empty rows, and every line of the real text was squeezed into it and cut off.
+        pack();
+        setLocationRelativeTo(getOwner());
         name.requestFocusInWindow();
         name.selectAll();
     }
@@ -164,13 +172,24 @@ final class OnboardingDialog extends JDialog {
     /** Says what is wrong with the typed name, and dims Next until it is right. */
     private void judge() {
         DeviceNames.Verdict verdict = Onboarding.check(name.getText().trim(), page, chosen, taken);
-        problem.setText(verdict.valid() ? " " : problemText(verdict));
+        setParagraph(problem, verdict.valid() ? " " : problemText(verdict));
         next.setEnabled(verdict.valid());
         Onboarding.Page current = pages.get(page);
         if (current.waitsForApply()) {
             String shown = verdict.valid() ? name.getText().trim() : current.defaultName();
-            moves.setText(getText("bindings.aliasDesigner.onboarding.movesAtApply", current.bindings(), shown));
+            setParagraph(moves, getText("bindings.aliasDesigner.onboarding.movesAtApply", current.bindings(), shown));
         }
+        growToFit();
+    }
+
+    /**
+     * Makes the dialog tall enough for its text, which can wrap onto another line as a name is typed. It only grows:
+     * shrinking back would make the buttons jump under the pointer on every keystroke.
+     */
+    private void growToFit() {
+        if (!isDisplayable()) return;
+        int wanted = getPreferredSize().height;
+        if (wanted > getHeight()) setSize(getWidth(), wanted);
     }
 
     private static String problemText(DeviceNames.Verdict verdict) {
@@ -208,10 +227,41 @@ final class OnboardingDialog extends JDialog {
         onFinish.accept(names);
     }
 
+    /**
+     * Text that wraps to the body's width. A text area, not a label: a JLabel lays its text out on one line at its own
+     * width and is cut off when that is wider than the dialog (see {@code HudOverlaySettingsDialog.wrappedNote}).
+     */
+    private static JTextArea paragraph(String text, Color color) {
+        JTextArea area = new JTextArea();
+        area.setLineWrap(true);
+        area.setWrapStyleWord(true);
+        area.setEditable(false);
+        area.setFocusable(false);
+        area.setOpaque(false);
+        area.setBorder(null);
+        area.setForeground(color);
+        area.setFont(UIManager.getFont("Label.font").deriveFont(HudPalette.HUD_FONT_READOUT_VALUE));
+        area.putClientProperty(AppTheme.HUD_LOCKED_FOREGROUND, Boolean.TRUE);
+        setParagraph(area, text);
+        return area;
+    }
+
+    /**
+     * Sets a {@link #paragraph}'s text and the height it needs, wrapped at the body's width.
+     */
+    private static void setParagraph(JTextArea area, String text) {
+        area.setText(text);
+        area.setPreferredSize(null);
+        area.setSize(BODY_WIDTH, Short.MAX_VALUE);
+        area.setPreferredSize(new Dimension(BODY_WIDTH, area.getPreferredSize().height));
+        area.revalidate();
+    }
+
     /** A component across both columns, on its own row. */
     private static int addRow(JPanel panel, int row, JComponent component) {
         GridBagConstraints c = cell(0, row);
         c.gridwidth = 2;
+        c.insets.right = 0;
         panel.add(component, c);
         return row + 1;
     }

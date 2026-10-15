@@ -1,44 +1,17 @@
 package elite.intel.ui.screen.bindings;
 
 import com.google.common.eventbus.Subscribe;
-import elite.intel.bindforge.devicefiles.Activation;
-import elite.intel.bindforge.devicefiles.BeforeBindForgeBackup;
-import elite.intel.bindforge.devicefiles.BindsDeviceReferences;
-import elite.intel.bindforge.devicefiles.ButtonMapLabels;
-import elite.intel.bindforge.devicefiles.DeviceApply;
-import elite.intel.bindforge.devicefiles.DeviceDivergence;
-import elite.intel.bindforge.devicefiles.DeviceDivergenceScanner;
-import elite.intel.bindforge.devicefiles.DeviceEntry;
+import elite.intel.bindforge.devicefiles.*;
 import elite.intel.bindforge.devicefiles.DeviceEntry.HardwareId;
-import elite.intel.bindforge.devicefiles.DeviceFilesAdopt;
-import elite.intel.bindforge.devicefiles.DeviceFilesCheck;
-import elite.intel.bindforge.devicefiles.DeviceFilesPush;
-import elite.intel.bindforge.devicefiles.DeviceMappingsParser;
-import elite.intel.bindforge.devicefiles.DeviceOnboarding;
-import elite.intel.bindforge.devicefiles.DivergenceWaysOut;
 import elite.intel.bindforge.devicefiles.DivergenceWaysOut.WayOut;
-import elite.intel.bindforge.devicefiles.DraftChanges;
-import elite.intel.bindforge.devicefiles.FirstSetup;
-import elite.intel.bindforge.devicefiles.FrontierStockDevices;
-import elite.intel.bindforge.devicefiles.InstallationDeviceScanner;
-import elite.intel.bindforge.devicefiles.LabelReMerge;
-import elite.intel.bindforge.devices.BuiltInDevice;
-import elite.intel.bindforge.devices.BuiltInDeviceList;
-import elite.intel.bindforge.devices.DeviceEditorInputs;
-import elite.intel.bindforge.devices.DeviceEditorMiddle;
-import elite.intel.bindforge.devices.DeviceIdentities;
-import elite.intel.bindforge.devices.InstallationMarkers;
-import elite.intel.bindforge.devices.MissingControllerWarning;
-import elite.intel.bindforge.devices.MyDevice;
-import elite.intel.bindforge.devices.MyDeviceList;
-import elite.intel.bindforge.devices.Onboarding;
+import elite.intel.bindforge.devices.*;
 import elite.intel.bindforge.install.GameInstallation;
 import elite.intel.bindforge.install.InstallationRegistry;
 import elite.intel.bindforge.install.WindowsGameInstallationProvider;
 import elite.intel.bindforge.io.DeviceRewriteResult;
-import elite.intel.db.dao.BindForgeInstallationsDao.InstallationRow;
 import elite.intel.db.dao.BindForgeDeviceDraftDao.DraftRow;
 import elite.intel.db.dao.BindForgeDeviceMasterDao.DeviceRow;
+import elite.intel.db.dao.BindForgeInstallationsDao.InstallationRow;
 import elite.intel.db.managers.BindForgeActivationManager;
 import elite.intel.db.managers.BindForgeDeviceDraftManager;
 import elite.intel.db.managers.BindForgeDeviceMasterManager;
@@ -70,15 +43,8 @@ import java.awt.*;
 import java.awt.event.HierarchyEvent;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.EventObject;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.OptionalInt;
-import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
@@ -86,9 +52,7 @@ import java.util.stream.Collectors;
 
 import static elite.intel.ui.i18n.MultiLingualTextProvider.getText;
 import static elite.intel.ui.theme.AppTheme.*;
-import static elite.intel.ui.theme.HudPalette.HUD_COLOR_ROLE_APPLICATION_BACKGROUND;
-import static elite.intel.ui.theme.HudPalette.HUD_ICON_TABLE;
-import static elite.intel.ui.theme.HudPalette.HUD_TABLE_ROW_HEIGHT;
+import static elite.intel.ui.theme.HudPalette.*;
 
 /**
  * Alias Designer, being built in stages: My Devices above the divergence list, and first setup opened from here
@@ -129,7 +93,7 @@ import static elite.intel.ui.theme.HudPalette.HUD_TABLE_ROW_HEIGHT;
  * bindings name, spoken and logged, once (Alan, 2026-10-11, A13; {@link MissingControllerWarning}).
  * <p>
  * <strong>Onboarding opens once per run, right after activation</strong>, when an attached controller has no name
- * - and from the gear, for one controller (Alan, 2026-10-14, A6b; {@link OnboardingDialog}). A controller no binding
+ * - again on CHECK AGAIN, and from the gear, for one controller (Alan, 2026-10-14, A6b; {@link OnboardingDialog}). A controller no binding
  * names by hardware id is written to every installation when the user finishes; one {@code .binds} names by hex is
  * held in the draft for APPLY, which moves those bindings to the name.
  */
@@ -208,8 +172,8 @@ public class AliasDesignerPanel extends JPanel {
     private List<String> currentChanges = List.of();
     private boolean screenActionRunning;
     /**
-     * Set when activation is tried, and taken by the first refresh after it that finds BindForge activated and the
-     * hardware listed: onboarding opens once per run, for the controllers attached then (Alan, 2026-10-14, A6b).
+     * Set when activation is tried and on CHECK AGAIN, and taken by the first refresh after it that finds BindForge
+     * activated and the hardware listed: onboarding opens then, for the controllers attached (Alan, 2026-10-14, A6b).
      */
     private final AtomicBoolean onboardingWanted = new AtomicBoolean();
 
@@ -310,7 +274,13 @@ public class AliasDesignerPanel extends JPanel {
         myDevices.addTab(getText("bindings.aliasDesigner.section.builtIn"), builtIn);
 
         JButton rescanButton = makeButton(getText("bindings.aliasDesigner.button.recheck"));
-        rescanButton.addActionListener(e -> initData());
+        // WHY: it offers onboarding again too. Backed out of, onboarding is spent for the run, and a refresh alone
+        // changes nothing on screen - so CHECK AGAIN looked dead to a user who still had controllers to name. It says
+        // nothing when nobody needs a name.
+        rescanButton.addActionListener(e -> {
+            onboardingWanted.set(true);
+            initData();
+        });
 
         // WHY: offered only until BindForge is activated - first setup runs once. Activation opens it on its own the
         // first time the tab is shown; abandoned, it waits here for the user (Alan, 2026-10-13).
