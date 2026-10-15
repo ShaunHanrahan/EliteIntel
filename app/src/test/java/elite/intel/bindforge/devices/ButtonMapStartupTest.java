@@ -167,8 +167,17 @@ class ButtonMapStartupTest {
         List<Controller> seen = new CopyOnWriteArrayList<>();
         AtomicBoolean activated = new AtomicBoolean(false);
         CountDownLatch done = new CountDownLatch(1);
-        startup = new ButtonMapStartup(recording(seen, done), () -> List.of(LVWAP), DESCRIBED, activated::get);
+        CountDownLatch heldBack = new CountDownLatch(1);
+        // WHY: startup's own look at LVWAP must have answered "not activated" before activation, or a slow worker
+        // reads the flag after it is set and LVWAP is handled twice - once from startup, once from activation.
+        BooleanSupplier askedOnce = () -> {
+            boolean answer = activated.get();
+            heldBack.countDown();
+            return answer;
+        };
+        startup = new ButtonMapStartup(recording(seen, done), () -> List.of(LVWAP), DESCRIBED, askedOnce);
         startup.start();
+        assertTrue(heldBack.await(5, TimeUnit.SECONDS));
 
         activated.set(true);
         startup.onActivated(new BindForgeActivatedEvent());
