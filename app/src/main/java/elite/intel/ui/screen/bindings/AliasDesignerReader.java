@@ -58,7 +58,7 @@ final class AliasDesignerReader {
     record Snapshot(Map<String, String> labels, Map<String, String> paths, DeviceFilesCheck.Report report,
                     List<DeviceDivergence.Finding> findings, List<MyDevice> myDevices, List<BuiltInDevice> builtIn,
                     Markers markers, Boolean activated, List<String> changes, Boolean running, boolean listed,
-                    boolean applyWork) {
+                    boolean applyWork, List<Long> foundAgain) {
     }
 
     /**
@@ -88,6 +88,7 @@ final class AliasDesignerReader {
         Boolean running = null;
         boolean listed = false;
         boolean applyWork = false;
+        List<Long> foundAgain = List.of();
         try {
             activated = BindForgeActivationManager.getInstance().isActivated();
             changes = DraftChanges.stored();
@@ -104,6 +105,8 @@ final class AliasDesignerReader {
             if (check.activated()) {
                 report = check;
                 findings = DeviceDivergenceScanner.scanAgainstMaster(check, bindings);
+                // WHY: after the detection above, which marks a folder that came back as present again.
+                foundAgain = MissedWrites.storedFoundAgain();
             } else {
                 findings = DeviceDivergenceScanner.scan(controlSchemesByInstall(rows), bindings);
             }
@@ -130,7 +133,7 @@ final class AliasDesignerReader {
             log.warn("Could not refresh the divergence list", e);
         }
         return new Snapshot(labels, paths, report, findings, myDevices, builtIn, markers, activated, changes, running,
-                listed, applyWork);
+                listed, applyWork, foundAgain);
     }
 
     // ------------------------------------------------------------------ onboarding

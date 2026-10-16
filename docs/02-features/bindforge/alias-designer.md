@@ -1359,8 +1359,9 @@ missing, locked or unavailable installation is rare, and it never holds back wha
 installation that can be written is, the report names the one that could not and why, and nothing is rolled back
 to wait for it. **When that installation is found again** — at Elite-Intel startup, or whenever the check next
 reaches it — BindForge asks: *"Found the Epic installation that was missing. Write your recent control
-configuration changes to it?"* Yes is the same push as **Revert**. This is a slice of its own (A14), not built
-with onboarding; until it is, the divergence list's **Revert** on that installation's row does the same.
+configuration changes to it?"* ~~Yes is the same push as **Revert**.~~ Yes is Apply's push to that installation
+alone, removals and renames included — *changed 2026-10-15 (Alan), since Revert removes nothing.* Built in slice
+A14 — see [Catch-up](#catch-up--2026-10-15-alan-a14).
 *Alan: "when a user edits and applies, those should be the priority, and the rare, weird and highly unlikely
 things get a message to the user."*
 
@@ -1517,6 +1518,63 @@ Alan answered five questions, one at a time:
   Applies remove nothing, so the read was wasted — and when the folder was missing, its warning described a hold-back
   that never happened.
 - **A stale CLEAR or undo shows its own message**, not wrapped in *"This could not be done"*.
+
+#### Catch-up — 2026-10-15 (Alan, A14)
+
+Built as `bindforge.devicefiles.MissedWrites` (the flag, and who is found again), `DeviceFilesPush.push(installIds,
+removals)`, `DeviceApply.catchUp`, `InstallationHoldings` (what settles), `CatchUpAnnouncement` (the startup line)
+and the question in `AliasDesignerController`. Alan answered four questions, one at a time:
+
+- **A missed write is a stored fact** — `missed_write` on `bindforge_installations`, migration `12006`. The check
+  alone cannot tell an installation that missed an Apply from one edited in the game: both differ from the master,
+  and they need different questions. **Any write that misses an installation marks it** — Apply, first setup,
+  Revert, onboarding, catch-up itself. **Only a push carrying everything Apply carries clears it** — Apply, first
+  setup and catch-up. Revert removes nothing and onboarding writes one element, so either can land on an installation
+  that still holds a device the others lost to a CLEAR.
+- **Yes writes what Apply would, to that installation alone** (option 3 of three). The master, the pending removals
+  `.binds` does not hold back, and the renames; the bindings follow a rename or a hardware id as Apply's would, so a
+  catch-up that is the first to take a rename moves them. **The draft is never promoted** — what the user saved and
+  has not applied stays theirs to apply — and **no other installation is written**: one edited in the game meanwhile
+  is not this question's to revert. ~~Revert's push only~~ would have left a CLEAR undone, and ~~Apply again without
+  the draft~~ would have reverted the other installations unasked.
+- **Settled from the files.** A removal stops being pending, and a rename's old name is forgotten, once no
+  installation may still hold the name, read as the push would find it. Catch-up's own report covers one
+  installation, and cannot say whether the others took the removal earlier. An installation that cannot be read
+  counts as holding it — **unless it has missed no write**: it took every write that carried everything. *The one
+  case this misjudges is a removal held back for `.binds` when that installation was last written and released since;
+  it lingers there as a leftover the check already expects.*
+- **No asks again next run** (option 1 of three). Nothing is written, the flag stays, and the question is not
+  repeated in this run. The divergence list's Revert row and APPLY stay available meanwhile.
+- **Spoken at startup, asked on the screen** (option 2 of three). At startup the user is often already in the game
+  with Elite-Intel's window behind it, so a dialog would block the window unseen. `CatchUpAnnouncement` — after
+  activation and the run's one detection — says once and logs: *"The Epic installation is back, and it missed your
+  last control changes. Open BindForge to update it."* The question opens the first time the Alias Designer screen is
+  shown in the run, and whenever a refresh there finds one later — the "whenever the check next reaches it" above.
+
+*Also settled while building it (Alan approved them as defaults with the sources):*
+
+- **Several at once are one question**, naming them all; Yes writes each and reports per installation.
+- **Catch-up before onboarding.** It finishes writes the user already made; onboarding's offer waits for the refresh
+  after the answer, so the two never write one installation at once.
+- **The report is Apply's** — updated N of M, what was removed, held back, moved, renamed.
+- **A write missed before this slice is not asked about**: existing rows start unflagged. APPLY stays lit for such an
+  installation ([`ApplyWork`](#built--2026-10-11-alan-a10)), which repairs it all the same.
+
+*After review — 2026-10-15 (`code-integrity-review.md`, Alan: all but the record constructors of #6, and P2):*
+
+- **The run's one detection is waited for.** A second reader arriving while it ran got the list straight away, with a
+  folder that came back still marked missing — so the startup line could go silent, and a screen's first refresh
+  could draw a stale marker. `InstallationRegistry.currentWithStartupScan()` now holds every caller until it ends.
+- **The first showing asks from the stored flag**, not from the last refresh, which may have run before the folder
+  came back. The refresh it starts still decides whether the installation can be reached.
+- **A write that starts between the offer and the dialog gives the question back**, for the refresh that ends the
+  write to offer again — two writes to one installation at once would each keep an Edit History copy of a file the
+  other replaces.
+- **One push loop for every kind** (Apply, catch-up, revert), so the missed-write rule is written once; and **one
+  meaning of "landed"** (`Outcome.landed()` on the push's and onboarding's outcomes), so a new outcome counts as a
+  miss on every path.
+- *Left as built (Alan):* the short `Target` and `InstallationRow` constructors the existing tests use; and a Revert
+  that lands leaves the flag, so catch-up still asks about that installation (review P2) — as ruled above.
 
 ## Renaming a Device
 

@@ -13,6 +13,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -215,6 +216,48 @@ class DeviceFilesPushTest {
         assertTrue(read(epic.controlSchemes().resolve("DeviceMappings.xml")).contains("<RVWAP>"));
         assertEquals(DEVICE_MAPPINGS, read(steam.controlSchemes().resolve("DeviceMappings.xml")));
         assertEquals(List.of(epic), rescanned);
+    }
+
+    /**
+     * Catch-up: Apply's push - removals included - to the installations named, and no other installation touched
+     * (Alan, 2026-10-15, A14).
+     */
+    @Test
+    void catchUpPushesWithRemovalsToTheNamedInstallationAlone() throws IOException {
+        Target steam = installation(1, "STEAM");
+        Target epic = installation(2, "EPIC");
+        push(List.of(steam, epic), List.of(RVWAP));
+        String steamBefore = read(steam.controlSchemes().resolve("DeviceMappings.xml"));
+        rescanned.clear();
+
+        Report report = pusher(List.of(steam, epic), List.of()).push(List.of(2L), Set.of("RVWAP"));
+
+        assertEquals(1, report.installations().size());
+        assertEquals(Outcome.WRITTEN, resultFor(report, epic).outcome());
+        assertFalse(read(epic.controlSchemes().resolve("DeviceMappings.xml")).contains("RVWAP"));
+        assertEquals(steamBefore, read(steam.controlSchemes().resolve("DeviceMappings.xml")));
+        assertEquals(List.of(epic), rescanned);
+    }
+
+    /** A missed installation is marked by any push; only Apply's push and catch-up clear it, never revert. */
+    @Test
+    void missedWritesAreRecordedByTheKindOfPush() throws IOException {
+        Target steam = new Target(1, "STEAM", installation(1, "STEAM").controlSchemes(), false, true);
+        Target away = new Target(2, "EPIC", temp.resolve("gone"), false);
+        Map<Long, Boolean> stored = new HashMap<>();
+        DeviceFilesPush push = new DeviceFilesPush(() -> List.of(steam, away), () -> List.of(RVWAP),
+                FrontierStockDevices.getInstance(), new TimestampedBackups(), history, () -> 10, rescanned::add,
+                new MissedWrites(stored::put));
+
+        push.push(1);
+        assertEquals(Map.of(), stored, "revert landing clears nothing");
+
+        push.push(Set.of());
+        assertEquals(Map.of(1L, false, 2L, true), stored, "Apply landing clears, a skip marks");
+
+        stored.clear();
+        push.push(List.of(1L), Set.of());
+        assertEquals(Map.of(1L, false), stored, "catch-up landing clears");
     }
 
     @Test

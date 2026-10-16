@@ -81,6 +81,15 @@ class AppControllerServicesTest {
                 .containsKey(ServiceType.DEVICE_FILES_MONITOR));
     }
 
+    /** The catch-up line is spoken, so it comes up after the voice that speaks it (A14). */
+    @Test
+    void catchUpAnnouncementComesUpAfterTheMouth() {
+        List<ServiceType> order =
+                List.copyOf(AppController.buildServices(TtsProvider.GOOGLE, TtsProvider.KOKORO).keySet());
+        assertTrue(order.contains(ServiceType.CATCH_UP_ANNOUNCEMENT));
+        assertTrue(order.indexOf(ServiceType.MOUTH) < order.indexOf(ServiceType.CATCH_UP_ANNOUNCEMENT));
+    }
+
     @Test
     void audioComesUpBeforeVegaAndJournal() {
         List<ServiceType> order =

@@ -1,6 +1,5 @@
 package elite.intel.bindforge.devicefiles;
 
-import elite.intel.bindforge.devicefiles.DeviceFilesPush.Outcome;
 import elite.intel.bindforge.devicefiles.DeviceFilesPush.Report;
 import elite.intel.bindforge.io.DeviceReferenceRewrite;
 import elite.intel.bindforge.io.DeviceRewriteResult;
@@ -13,6 +12,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -23,6 +23,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
@@ -53,6 +54,11 @@ import java.util.stream.Collectors;
  * up later. When no installation took it, nothing was applied for the bindings to follow, and they stay as they are
  * for the next Apply. One of Frontier's names is never a target. Both moves are derived from the files each time, so a
  * move that stopped is retried by the next Apply with no record of its own.
+ * <p>
+ * <strong>Catch-up</strong> ({@link #catchUp(Collection)}, Alan, 2026-10-15, A14) is Apply for an installation that
+ * missed one and is found again: the same push, removals and moves, to that installation alone, and never the draft -
+ * what the user saved and has not applied stays theirs to apply. What it settles is read from every installation's
+ * files ({@link Holdings}), since its own report covers only the one it wrote.
  */
 public final class DeviceApply {
 
@@ -85,6 +91,30 @@ public final class DeviceApply {
      *                 they hold the same bindings
      */
     record Rewritten(DeviceRewriteResult.Status status, int bindings) {
+    }
+
+    /**
+     * The two pushes Apply and catch-up make - {@link DeviceFilesPush} in use. One seam rather than two, since both
+     * come from one push (review, 2026-10-15).
+     */
+    interface Pushes {
+        /** Apply's: every installation, with the removals. */
+        Report push(Set<String> removals);
+
+        /** Catch-up's: the installations named only, with the removals. */
+        Report push(Collection<Long> installIds, Set<String> removals);
+    }
+
+    /**
+     * Whether any installation may still hold a name - what catch-up settles a removal or a rename by, since its push
+     * reaches only the installation that missed them. {@link InstallationHoldings} in use.
+     */
+    public interface Holdings {
+        /** As the push removes it. */
+        boolean mayHoldRemoval(String name);
+
+        /** As the push renames it. */
+        boolean mayHoldOldName(String oldName, String newName);
     }
 
     /** What became of the bindings a move was for. */
@@ -149,11 +179,12 @@ public final class DeviceApply {
     }
 
     private final Supplier<List<String>> promote;
-    private final Function<Set<String>, Report> push;
+    private final Pushes pushes;
     private final BindsNames bindsNames;
     private final FrontierStockDevices stock;
     private final BindForgeDeviceMasterManager master;
     private final BindsRewrite binds;
+    private final Holdings holdings;
 
     /**
      * Promotes the stored draft and pushes to the stored installations.
@@ -161,10 +192,15 @@ public final class DeviceApply {
      * @throws IOException if Elite-Intel's data folder cannot be created for Edit History
      */
     public DeviceApply() throws IOException {
-        this(BindForgeDeviceDraftManager.getInstance()::promote, new DeviceFilesPush()::push,
+        this(new DeviceFilesPush());
+    }
+
+    private DeviceApply(DeviceFilesPush push) throws IOException {
+        this(BindForgeDeviceDraftManager.getInstance()::promote, push,
                 () -> BindsDeviceReferences.referenceCounts(PlayerSession.getInstance().getBindingsDir()).keySet(),
                 FrontierStockDevices.getInstance(), BindForgeDeviceMasterManager.getInstance(),
-                BindsDeviceRewrite.stored(PlayerSession.getInstance().getBindingsDir()));
+                BindsDeviceRewrite.stored(PlayerSession.getInstance().getBindingsDir()),
+                InstallationHoldings.stored());
     }
 
     /** With nothing for {@code .binds} to move - for the tests that are about removals. */
@@ -176,13 +212,48 @@ public final class DeviceApply {
     /** @param bindsNames must throw rather than answer when it cannot be sure - a missing folder is not "none" */
     DeviceApply(Supplier<List<String>> promote, Function<Set<String>, Report> push, BindsNames bindsNames,
                 FrontierStockDevices stock, BindForgeDeviceMasterManager master, BindsRewrite binds) {
+        this(promote, applyOnly(push), bindsNames, stock, master, binds, NOTHING_SETTLED);
+    }
+
+    /** @param holdings what settles a removal or rename after catch-up */
+    DeviceApply(Supplier<List<String>> promote, Pushes pushes, BindsNames bindsNames, FrontierStockDevices stock,
+                BindForgeDeviceMasterManager master, BindsRewrite binds, Holdings holdings) {
         this.promote = promote;
-        this.push = push;
+        this.pushes = pushes;
         this.bindsNames = bindsNames;
         this.stock = stock;
         this.master = master;
         this.binds = binds;
+        this.holdings = holdings;
     }
+
+    /** Apply's push alone, for the tests that are about Apply - catch-up is not theirs to call. */
+    private static Pushes applyOnly(Function<Set<String>, Report> push) {
+        return new Pushes() {
+            @Override
+            public Report push(Set<String> removals) {
+                return push.apply(removals);
+            }
+
+            @Override
+            public Report push(Collection<Long> installIds, Set<String> removals) {
+                throw new UnsupportedOperationException("built for Apply only");
+            }
+        };
+    }
+
+    /** Every name may still be somewhere, so catch-up settles nothing. */
+    private static final Holdings NOTHING_SETTLED = new Holdings() {
+        @Override
+        public boolean mayHoldRemoval(String name) {
+            return true;
+        }
+
+        @Override
+        public boolean mayHoldOldName(String oldName, String newName) {
+            return true;
+        }
+    };
 
     private static final BindsRewrite NOTHING_TO_MOVE = new BindsRewrite() {
         @Override
@@ -203,16 +274,9 @@ public final class DeviceApply {
 
     public Result apply() {
         List<String> removed = promote.get();
+        Split split = pendingRemovals();
 
-        Set<String> inMaster = master.findAll().stream().map(DeviceRow::deviceName).collect(Collectors.toSet());
-        List<String> pending = master.pendingRemovals().stream().filter(name -> !inMaster.contains(name)).toList();
-
-        // WHY: read only when it can decide something. Frontier's names never consult it, and most Applies remove
-        // nothing - reading it then is wasted, and its warning would describe a hold-back that never happened.
-        boolean anyUsersName = pending.stream().anyMatch(name -> !stock.ships(name));
-        Split split = split(pending, anyUsersName ? readBindsNames() : Optional.empty());
-
-        Report report = push.apply(split.removals());
+        Report report = pushes.push(split.removals());
         List<String> cleanedUp = List.of();
         List<String> notEverywhere = List.of();
         if (!split.removals().isEmpty()) {
@@ -223,10 +287,55 @@ public final class DeviceApply {
                 notEverywhere = List.copyOf(split.removals());
             }
         }
-        Renames renames = moveRenamedReferences(report);
+        boolean everywhere = everyInstallationTookIt(report);
+        Renames renames = moveRenamedReferences(report, row -> everywhere);
         Moves moves = moveHardwareIds(report);
         return new Result(removed, report, cleanedUp, notEverywhere, split.heldBack(), split.bindsUnread(),
                 moves.moves(), renames.moves(), moves.unread() || renames.unread(), renames.finished());
+    }
+
+    /**
+     * Catch-up: the installations named, which missed a write and are found again, brought in line as Apply would -
+     * the master, the pending removals {@code .binds} does not hold back, the renames, and the bindings that follow
+     * them. The draft is left alone (Alan, 2026-10-15, A14).
+     * <p>
+     * <strong>Settled from the files.</strong> A removal stops being pending, and a rename's old name is forgotten,
+     * once no installation may hold it ({@link Holdings}) - not from this push's report, which covers only the
+     * installations it wrote.
+     */
+    public Result catchUp(Collection<Long> installIds) {
+        Split split = pendingRemovals();
+
+        Report report = pushes.push(installIds, split.removals());
+        List<String> cleanedUp = new ArrayList<>();
+        List<String> notEverywhere = new ArrayList<>();
+        for (String name : split.removals()) {
+            if (holdings.mayHoldRemoval(name)) {
+                notEverywhere.add(name);
+            } else {
+                master.clearPendingRemoval(name);
+                cleanedUp.add(name);
+            }
+        }
+        Renames renames = moveRenamedReferences(report,
+                row -> !holdings.mayHoldOldName(row.previousName(), row.deviceName()));
+        Moves moves = moveHardwareIds(report);
+        return new Result(List.of(), report, cleanedUp, notEverywhere, split.heldBack(), split.bindsUnread(),
+                moves.moves(), renames.moves(), moves.unread() || renames.unread(), renames.finished());
+    }
+
+    /**
+     * The pending removals of devices no longer in the master, split into those this write carries out and those
+     * {@code .binds} holds back.
+     */
+    private Split pendingRemovals() {
+        Set<String> inMaster = master.findAll().stream().map(DeviceRow::deviceName).collect(Collectors.toSet());
+        List<String> pending = master.pendingRemovals().stream().filter(name -> !inMaster.contains(name)).toList();
+
+        // WHY: read only when it can decide something. Frontier's names never consult it, and most Applies remove
+        // nothing - reading it then is wasted, and its warning would describe a hold-back that never happened.
+        boolean anyUsersName = pending.stream().anyMatch(name -> !stock.ships(name));
+        return split(pending, anyUsersName ? readBindsNames() : Optional.empty());
     }
 
     /**
@@ -240,8 +349,11 @@ public final class DeviceApply {
      * <strong>A rename is finished</strong> - its old name forgotten - once every installation took the new name and
      * no binding names the old one. Until then the push renames wherever the old name is still found, and the next
      * Apply moves what is left.
+     *
+     * @param lostOldName whether every installation has lost a device's old name - from Apply's report, or for
+     *                    catch-up from the files
      */
-    private Renames moveRenamedReferences(Report report) {
+    private Renames moveRenamedReferences(Report report, Predicate<DeviceRow> lostOldName) {
         List<DeviceRow> renamedDevices = master.findAll().stream()
                 .filter(row -> row.previousName() != null && !row.previousName().equals(row.deviceName()))
                 .filter(row -> !stock.ships(row.deviceName()) && !stock.ships(row.previousName()))
@@ -258,7 +370,6 @@ public final class DeviceApply {
         }
 
         boolean applied = report.matchingCount() > 0;
-        boolean everywhere = everyInstallationTookIt(report);
         List<RenameMove> moves = new ArrayList<>();
         List<String> finished = new ArrayList<>();
         for (DeviceRow row : renamedDevices) {
@@ -277,7 +388,7 @@ public final class DeviceApply {
                     bindsSettled = outcome != MoveOutcome.FAILED;
                 }
             }
-            if (everywhere && bindsSettled) {
+            if (bindsSettled && lostOldName.test(row)) {
                 master.clearPreviousName(row.id());
                 finished.add(to);
                 log.info("Rename of {} to {} finished in every installation and in .binds", from, to);
@@ -400,7 +511,7 @@ public final class DeviceApply {
 
     private static boolean everyInstallationTookIt(Report report) {
         return !report.installations().isEmpty() && report.installations().stream()
-                .allMatch(result -> result.outcome() == Outcome.WRITTEN || result.outcome() == Outcome.UNCHANGED);
+                .allMatch(result -> result.outcome().landed());
     }
 
     private static Set<String> folded(Set<String> names) {

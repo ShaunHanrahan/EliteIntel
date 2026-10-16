@@ -10,6 +10,7 @@ import elite.intel.bindforge.install.InstallationRegistry;
 import elite.intel.db.dao.BindForgeInstallationsDao.InstallationRow;
 import elite.intel.db.managers.BindForgeActivationManager;
 import elite.intel.db.managers.BindForgeDeviceDraftManager;
+import elite.intel.db.managers.BindForgeInstallationsManager;
 import elite.intel.eventbus.UiBus;
 import elite.intel.ui.dialog.HudConfirmDialog;
 import elite.intel.ui.event.AppLogEvent;
@@ -31,9 +32,9 @@ import static elite.intel.ui.i18n.MultiLingualTextProvider.getText;
 import static elite.intel.util.StringUtls.messageOf;
 
 /**
- * The Alias Designer screen's flows: the refresh, activation, first setup, APPLY and DISCARD, the ways out, onboarding,
- * and opening the Device Editor. It decides when each runs, runs the disk work off the EDT, asks and tells the user,
- * and hands what it read to {@link AliasDesignerPanel}, which only draws.
+ * The Alias Designer screen's flows: the refresh, activation, first setup, APPLY and DISCARD, the ways out, catch-up,
+ * onboarding, and opening the Device Editor. It decides when each runs, runs the disk work off the EDT, asks and tells
+ * the user, and hands what it read to {@link AliasDesignerPanel}, which only draws.
  * <p>
  * State is kept on the EDT, but for the three flags background threads touch, which are atomic.
  */
@@ -45,7 +46,7 @@ final class AliasDesignerController {
      * What the screen shows before its first refresh has finished.
      */
     private static final Snapshot NOTHING_YET = new Snapshot(Map.of(), Map.of(), null, List.of(), List.of(),
-            List.of(), AliasDesignerReader.Markers.NONE, false, List.of(), false, false, false);
+            List.of(), AliasDesignerReader.Markers.NONE, false, List.of(), false, false, false, List.of());
 
     private final AliasDesignerPanel view;
     private final AliasDesignerReader reader;
@@ -67,6 +68,11 @@ final class AliasDesignerController {
      * activated and the hardware listed: onboarding opens then, for the controllers attached (Alan, 2026-10-14, A6b).
      */
     private final AtomicBoolean onboardingWanted = new AtomicBoolean();
+    /**
+     * The installations catch-up has asked about in this run, answered either way - No is asked again next run, not
+     * again this one (Alan, 2026-10-15, A14). EDT only.
+     */
+    private final Set<Long> catchUpAsked = new HashSet<>();
 
     /**
      * The last refresh, with its unread answers filled from the one before. EDT only.
@@ -119,11 +125,12 @@ final class AliasDesignerController {
     /**
      * The screen became visible. The first time in a run, not at startup (Alan, 2026-10-11, A13): the refresh at
      * startup runs before the Device Service has looked at any hardware, so this asks for one of its own and the
-     * missing-controller warning judges that one. Onboarding's offer, still waiting, asks the same.
+     * missing-controller warning judges that one. Onboarding's offer, still waiting, asks the same - and so does
+     * catch-up, for an installation found again that it has not asked about in this run.
      */
     void onShown() {
         boolean warning = MissingControllerWarning.getInstance().pending();
-        if (!warning && !onboardingWanted.get()) return;
+        if (!warning && !onboardingWanted.get() && !catchUpMayBeWanted()) return;
         if (warning) missingWarningWanted.set(true);
         refresh();
     }
@@ -158,10 +165,14 @@ final class AliasDesignerController {
                 shown = keepingLastAnswers(read);
                 refreshButtons();
                 view.render(shown);
+                // WHY: catch-up first - it finishes writes the user already made - and onboarding waits for the next
+                // refresh, so the two never write the same installation at once (Alan, 2026-10-15, A14).
+                boolean catchUpOffered = offerCatchUp();
                 // WHY: only once the hardware is listed, and only while the user is looking. Before the listing every
                 // controller reads absent, so nobody would need a name and the offer would be spent on nothing; a
                 // refresh the user did not start would put the dialog over another screen.
-                if (activated() && read.listed() && view.isShowing() && onboardingWanted.compareAndSet(true, false)) {
+                if (!catchUpOffered && activated() && read.listed() && view.isShowing()
+                        && onboardingWanted.compareAndSet(true, false)) {
                     openOnboarding(null);
                 }
                 // WHY: something asked for a refresh while this one ran - the screen shown, a device file changed, an
@@ -181,7 +192,8 @@ final class AliasDesignerController {
                 read.changes(),
                 read.running() != null ? read.running() : shown.running(),
                 read.listed(),
-                read.applyWork());
+                read.applyWork(),
+                read.foundAgain());
     }
 
     private boolean activated() {
@@ -368,6 +380,67 @@ final class AliasDesignerController {
             BindForgeDeviceDraftManager.getInstance().discard();
             return null;
         });
+    }
+
+    // ------------------------------------------------------------------ catch-up
+
+    /**
+     * The installations found again - each missed a write and can be reached now - that catch-up has not asked about in
+     * this run. EDT only.
+     */
+    private List<Long> catchUpToAsk() {
+        return shown.foundAgain().stream().filter(id -> !catchUpAsked.contains(id)).toList();
+    }
+
+    /**
+     * Whether some installation missed a write and has not been asked about in this run - from the stored flag, not
+     * the last refresh, which may have run before the folder came back (review, 2026-10-15). A held list, so no disk
+     * is read here; the refresh this asks for decides whether the installation can be reached.
+     */
+    private boolean catchUpMayBeWanted() {
+        return BindForgeInstallationsManager.getInstance().findAll().stream()
+                .anyMatch(row -> row.missedWrite() && !catchUpAsked.contains(row.id()));
+    }
+
+    /**
+     * Asks about the installations found again, once per run each, while the user is on the screen (Alan, 2026-10-15,
+     * A14) - whether the startup announcement said so or the check has just found one. Asked after this refresh has
+     * finished drawing, so the dialog never holds a refresh open.
+     *
+     * @return whether it is asking - onboarding's offer then waits for the refresh after the answer
+     */
+    private boolean offerCatchUp() {
+        if (!activated() || actionRunning || !view.isShowing()) return false;
+        List<Long> ids = catchUpToAsk();
+        if (ids.isEmpty()) return false;
+        catchUpAsked.addAll(ids);
+        SwingUtilities.invokeLater(() -> askCatchUp(ids));
+        return true;
+    }
+
+    private void askCatchUp(List<Long> ids) {
+        // WHY: a click queued before this - APPLY, a revert - may have started a write since the offer. Two writes to
+        // one installation at once would each keep an Edit History copy of a file the other is replacing, so the
+        // question goes back, and the refresh that ends that write offers it again (review, 2026-10-15).
+        if (actionRunning) {
+            ids.forEach(catchUpAsked::remove);
+            return;
+        }
+        String title = getText("bindings.aliasDesigner.catchUp.title");
+        AliasDesignerReports reports = reports();
+        String names = reports.namesOf(ids);
+        String question = ids.size() == 1
+                ? getText("bindings.aliasDesigner.catchUp.confirm.one", names)
+                : getText("bindings.aliasDesigner.catchUp.confirm.many", names);
+        if (!HudConfirmDialog.confirm(view, title, question,
+                getText("bindings.aliasDesigner.catchUp.do"),
+                getText("bindings.aliasDesigner.catchUp.notNow"))) {
+            log.info("Catch-up declined for {} - asked again next run", names);
+            // WHY: a refresh, so onboarding's offer - held back for this question - is made now.
+            refresh();
+            return;
+        }
+        runAndReport(title, () -> reports.applyText(new DeviceApply().catchUp(ids)));
     }
 
     // ------------------------------------------------------------------ the ways out
