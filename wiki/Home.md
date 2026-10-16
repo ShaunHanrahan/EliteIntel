@@ -13,7 +13,7 @@ Data is sourced in real time from [Spansh](https://spansh.co.uk/) and [EDSM](htt
 
 [[youtube:fo9oIDTzJAs]]
 
-**Supported languages:** English, Spanish, French, German, Italian, Portuguese, Brazilian Portuguese, Ukrainian, Russian
+**Supported languages:** English, Spanish, French, German, Italian, Portuguese, Brazilian Portuguese
 
 > ### ⚠️ A language model (LLM) is required
 > Elite Intel is the voice and the hands — the LLM is the brain. Without one, the app cannot run.
@@ -52,7 +52,7 @@ If you have used voice recognition software with Elite Dangerous before, expect 
 
 **Kokoro TTS** is built in and works out of the box. No downloads, no API keys, no configuration. It provides 53 voices covering English, Spanish, French, Italian and Portuguese, and supports the full personality system.
 
-For German, Ukrainian and Russian, **Google TTS** delivers natural-sounding speech in every language Elite Intel supports. An API key is required and is configured under [Settings → AI Services](UI-Settings-Tab).
+For German, **Google TTS** delivers natural-sounding speech in every language Elite Intel supports. An API key is required and is configured under [Settings → AI Services](UI-Settings-Tab).
 
 Each ship in your fleet gets its own voice and personality — see the [Commander tab](UI-Commander-Tab).
 

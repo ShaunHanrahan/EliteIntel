@@ -14,7 +14,7 @@ Streifen **Allgemein**, der überall gilt, dann drei Unterreiter: **KI-Dienste**
 **Sprache** — die Sprache deiner Sprachbefehle und der App-Oberfläche. Eine Auswahl stellt das
 ganze Fenster sofort neu dar, und Vega sagt den Wechsel laut an.
 
-Unterstützt: Englisch, Russisch, Ukrainisch, Deutsch, Französisch, Spanisch, Italienisch,
+Unterstützt: Englisch, Deutsch, Französisch, Spanisch, Italienisch,
 Portugiesisch (Portugal), Portugiesisch (Brasilien).
 
 **Journal-Ordner** — wo Elite Dangerous seine Journaldateien schreibt. Optional: leer gelassen
@@ -80,12 +80,11 @@ einen zweiten Schalter zur Wahl der Engine.
 | Engine | Wo sie läuft | Hinweise |
 |--------|---------------|-------|
 | **Kokoro** | Auf deinem PC | Der Standard. Kein Schlüssel, nichts verlässt deinen PC. Kann kein Kyrillisch aussprechen — siehe unten |
-| **Supertonic 3** | Auf deinem PC | Zehn Stimmen, alle Sprachen einschließlich Russisch und Ukrainisch. Kein Schlüssel. Mit dem Regler **Supertonic-3-Verstärkung (0–100 %)** hebst du die Lautstärke an |
+| **Supertonic 3** | Auf deinem PC | Zehn Stimmen, alle unterstützten Sprachen. Kein Schlüssel. Mit dem Regler **Supertonic-3-Verstärkung (0–100 %)** hebst du die Lautstärke an |
 | **Google** | Googles Server | Google Cloud Text-to-Speech. Braucht einen **Google-TTS-Schlüssel** (mit demselben Kästchen Gesperrt). Mit dem Regler **Google-WaveNet-Tonhöhe** für die WaveNet-Stimmen |
 | **Microsoft Edge** | Microsofts Server | Microsofts Online-Vorlesestimmen. Kein Schlüssel nötig |
 
-**Kokoro und Kyrillisch.** Ist die App-Sprache Russisch oder Ukrainisch — oder schreibt dein
-*Spielclient* den Funkverkehr auf Russisch —, ist das Kokoro-Segment ausgegraut, ein Banner
+**Kokoro und Kyrillisch.** Schreibt dein *Spielclient* den Funkverkehr auf Russisch, ist das Kokoro-Segment ausgegraut, ein Banner
 erklärt den Grund, und Supertonic 3 spricht stattdessen.
 
 > Ein Engine-Wechsel setzt die Stimme jedes Schiffs auf die Standardstimme der neuen Engine

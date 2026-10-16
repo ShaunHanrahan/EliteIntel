@@ -10,7 +10,7 @@ Elite Intel conecta tu voz con tu nave. Sin listas de comandos que memorizar, si
 
 Los datos se obtienen en tiempo real de [Spansh](https://spansh.co.uk/) y [EDSM](https://www.edsm.net/).
 
-**Idiomas admitidos:** inglés, español, francés, ucraniano, alemán, ruso
+**Idiomas admitidos:** inglés, español, francés, alemán
 
 > ### ⚠️ Se necesita un modelo de lenguaje (LLM)
 > Elite Intel es la voz y las manos; el LLM es el cerebro. Sin él, la aplicación no puede funcionar.

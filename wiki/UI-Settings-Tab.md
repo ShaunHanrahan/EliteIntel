@@ -14,8 +14,7 @@ Shown above the sub-tabs, because it applies to all of them.
 **Language** — the language of both your voice commands and the app's own interface. Choosing
 one re-renders the whole window immediately and Vega announces the change out loud.
 
-Supported: English, Russian, Ukrainian, German, French, Spanish, Italian, Portuguese, Brazilian
-Portuguese.
+Supported: English, German, French, Spanish, Italian, Portuguese, Brazilian Portuguese.
 
 **Journal Directory** — where Elite Dangerous writes its journal files. Optional: leave it
 blank and the standard location for your platform is used. This is how Elite Intel knows what
@@ -79,12 +78,11 @@ second switch to pick its engine.
 | Engine | Where it runs | Notes |
 |--------|---------------|-------|
 | **Kokoro** | On your PC | The default. No key, nothing leaves your PC. Cannot pronounce Cyrillic — see below |
-| **Supertonic 3** | On your PC | Ten voices, every language including Russian and Ukrainian. No key. Has a **Supertonic 3 boost (0–100%)** slider to raise its output level |
+| **Supertonic 3** | On your PC | Ten voices, every supported language. No key. Has a **Supertonic 3 boost (0–100%)** slider to raise its output level |
 | **Google** | Google's servers | Google Cloud Text-to-Speech. Needs a **Google TTS Key** (with the same Locked checkbox). Has a **Google WaveNet Pitch** slider, used by the WaveNet voices |
 | **Microsoft Edge** | Microsoft's servers | Microsoft's online Read Aloud voices. No key needed |
 
-**Kokoro and Cyrillic.** When the app language is Russian or Ukrainian — or when your *game
-client* writes its radio chatter in Russian — the Kokoro segment is greyed out, a banner explains
+**Kokoro and Cyrillic.** When your *game client* writes its radio chatter in Russian, the Kokoro segment is greyed out, a banner explains
 why, and Supertonic 3 speaks instead.
 
 > Switching engines resets every ship's voice to the new engine's default voice. Ship

@@ -10,7 +10,7 @@ Elite Intel verbindet deine Stimme mit deinem Schiff. Keine Befehlslisten zum Au
 
 Daten werden in Echtzeit von [Spansh](https://spansh.co.uk/) und [EDSM](https://www.edsm.net/) bezogen.
 
-**Unterstützte Sprachen:** Englisch, Spanisch, Französisch, Ukrainisch, Deutsch, Russisch
+**Unterstützte Sprachen:** Englisch, Spanisch, Französisch, Deutsch
 
 > ### ⚠️ Ein Sprachmodell (LLM) wird benötigt
 > Elite Intel ist Stimme und Hände — das LLM ist das Gehirn. Ohne LLM läuft die App nicht.

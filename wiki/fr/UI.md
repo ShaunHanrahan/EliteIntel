@@ -59,8 +59,8 @@ pour que vous n'ayez pas à chercher ce qui manque. Par ordre d'importance :
 - **Changer de langue reconstruit la fenêtre.** Choisir une autre langue dans *Paramètres →
   Général* redessine immédiatement tous les onglets dans cette langue, et Vega annonce le
   changement.
-- **Neuf langues sont prises en charge :** anglais, espagnol, français, allemand, italien,
-  portugais, portugais du Brésil, ukrainien et russe.
+- **Sept langues sont prises en charge :** anglais, espagnol, français, allemand, italien,
+  portugais et portugais du Brésil.
 - **Plusieurs commandants sur un même PC.** Elite Intel garde les données de chaque commandant
   séparément et bascule automatiquement quand un autre commandant est chargé dans le jeu — la
   liste de la flotte et les réglages par commandant suivent.

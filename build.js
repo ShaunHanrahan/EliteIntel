@@ -11,8 +11,6 @@
  *   ROOT/fr/*.html       ← French
  *   ROOT/es/*.html       ← Spanish
  *   ROOT/de/*.html       ← German
- *   ROOT/uk/*.html       ← Ukrainian
- *   ROOT/ru/*.html       ← Russian
  *   sitemap.xml          ← all locales, with hreflang
  *   robots.txt
  *
@@ -45,8 +43,6 @@ const LOCALES = [
     { code: 'fr', label: 'FR', wikiDir: path.join(WIKI_DIR, 'fr'),   outDir: path.join(ROOT, 'fr'),   urlBase: `${DOMAIN}/fr/`,  assetBase: '../', hreflang: 'fr' },
     { code: 'es', label: 'ES', wikiDir: path.join(WIKI_DIR, 'es'),   outDir: path.join(ROOT, 'es'),   urlBase: `${DOMAIN}/es/`,  assetBase: '../', hreflang: 'es' },
     { code: 'de', label: 'DE', wikiDir: path.join(WIKI_DIR, 'de'),   outDir: path.join(ROOT, 'de'),   urlBase: `${DOMAIN}/de/`,  assetBase: '../', hreflang: 'de' },
-    { code: 'uk', label: 'UK', wikiDir: path.join(WIKI_DIR, 'uk'),   outDir: path.join(ROOT, 'uk'),   urlBase: `${DOMAIN}/uk/`,  assetBase: '../', hreflang: 'uk' },
-    { code: 'ru', label: 'RU', wikiDir: path.join(WIKI_DIR, 'ru'),   outDir: path.join(ROOT, 'ru'),   urlBase: `${DOMAIN}/ru/`,  assetBase: '../', hreflang: 'ru' },
 ];
 
 /* ── download helper ─────────────────────────────────────── */

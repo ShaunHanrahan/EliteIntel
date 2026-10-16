@@ -14,7 +14,7 @@ Affiché au-dessus des sous-onglets, parce qu'il s'applique à tous.
 **Langue** — la langue de vos commandes vocales et de l'interface de l'application. La changer
 redessine toute la fenêtre immédiatement, et Vega annonce le changement à voix haute.
 
-Prises en charge : anglais, russe, ukrainien, allemand, français, espagnol, italien, portugais,
+Prises en charge : anglais, allemand, français, espagnol, italien, portugais,
 portugais du Brésil.
 
 **Dossier du journal** — l'endroit où Elite Dangerous écrit ses fichiers de journal. Facultatif :
@@ -80,12 +80,11 @@ second sélecteur pour choisir le moteur.
 | Moteur | Où il tourne | Remarques |
 |--------|---------------|-------|
 | **Kokoro** | Sur votre PC | Le moteur par défaut. Pas de clé, rien ne quitte votre PC. Ne sait pas prononcer le cyrillique — voir plus bas |
-| **Supertonic 3** | Sur votre PC | Dix voix, toutes les langues y compris le russe et l'ukrainien. Pas de clé. Un curseur **Amplification Supertonic 3 (0–100 %)** relève son niveau |
+| **Supertonic 3** | Sur votre PC | Dix voix, toutes les langues prises en charge. Pas de clé. Un curseur **Amplification Supertonic 3 (0–100 %)** relève son niveau |
 | **Google** | Serveurs de Google | Google Cloud Text-to-Speech. Nécessite une **Clé Google TTS** (avec la même case Verrouillé). Un curseur **Hauteur Google WaveNet** pour les voix WaveNet |
 | **Microsoft Edge** | Serveurs de Microsoft | Les voix de lecture à voix haute en ligne de Microsoft. Pas de clé |
 
-**Kokoro et le cyrillique.** Quand la langue de l'application est le russe ou l'ukrainien — ou
-quand votre *client de jeu* écrit les échanges radio en russe —, le segment Kokoro est grisé, un
+**Kokoro et le cyrillique.** Quand votre *client de jeu* écrit les échanges radio en russe, le segment Kokoro est grisé, un
 bandeau explique pourquoi, et Supertonic 3 parle à sa place.
 
 > Changer de moteur remet la voix de chaque vaisseau à la voix par défaut du nouveau moteur. Les

@@ -58,8 +58,8 @@ suchen musst, was fehlt. Nach Wichtigkeit geordnet:
 - **Ein Sprachwechsel baut das Fenster neu auf.** Wählst du in *Einstellungen → Allgemein* eine
   neue Sprache, wird jeder Reiter sofort in dieser Sprache dargestellt, und Vega sagt den Wechsel
   an.
-- **Neun Sprachen werden unterstützt:** Englisch, Spanisch, Französisch, Deutsch, Italienisch,
-  Portugiesisch, brasilianisches Portugiesisch, Ukrainisch und Russisch.
+- **Sieben Sprachen werden unterstützt:** Englisch, Spanisch, Französisch, Deutsch, Italienisch,
+  Portugiesisch und brasilianisches Portugiesisch.
 - **Mehrere Kommandanten auf einem PC.** Elite Intel hält die Daten jedes Kommandanten getrennt
   und wechselt automatisch, sobald ein anderer Kommandant im Spiel geladen wird — Flottenliste
   und kommandantenbezogene Einstellungen ziehen mit.

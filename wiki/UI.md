@@ -56,8 +56,8 @@ hunt for what is missing. In order of importance:
   press **Apply**.
 - **Language changes rebuild the window.** Selecting a new language in *Settings → Common*
   re-renders every tab in that language immediately, and Vega announces the change.
-- **Nine languages are supported:** English, Spanish, French, German, Italian, Portuguese,
-  Brazilian Portuguese, Ukrainian and Russian.
+- **Seven languages are supported:** English, Spanish, French, German, Italian, Portuguese and
+  Brazilian Portuguese.
 - **Several commanders on one PC.** Elite Intel keeps each commander's data separately and
   switches automatically when a different commander loads into the game — the fleet list and
   per-commander settings follow.

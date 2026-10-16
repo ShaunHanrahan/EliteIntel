@@ -56,8 +56,8 @@ no tienes que buscar qué falta. Por orden de importancia:
   se escribe en Elite Dangerous al pulsar **Aplicar**.
 - **Cambiar de idioma reconstruye la ventana.** Al elegir otro idioma en *Ajustes → General*,
   todas las pestañas se redibujan en ese idioma al momento, y Vega anuncia el cambio.
-- **Se admiten nueve idiomas:** inglés, español, francés, alemán, italiano, portugués, portugués
-  de Brasil, ucraniano y ruso.
+- **Se admiten siete idiomas:** inglés, español, francés, alemán, italiano, portugués, portugués
+  y portugués de Brasil.
 - **Varios comandantes en un mismo PC.** Elite Intel guarda los datos de cada comandante por
   separado y cambia automáticamente cuando otro comandante entra en el juego — la lista de flota
   y los ajustes por comandante le siguen.

@@ -51,7 +51,6 @@ For those, **type the order into the in-game chat** instead. Start the line with
 - The line is handled exactly as if you had said it, and it interrupts Vega if she is speaking.
 - Use the **local** channel. Only your own sent lines are read — nothing another commander types
   can ever give Vega an order.
-- In Russian and Ukrainian the Cyrillic spelling (`@Вега`) works too.
 
 ---
 
