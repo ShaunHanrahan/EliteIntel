@@ -74,6 +74,12 @@ grid.** The grid, search, conflict colouring and the keyboard capture dialog shi
 
 ## Hand-off notes — newest first
 
+**2026-10-15, E1 fix: the input page is larger.** A controller page is now eight rows of four, so a 32-button
+stick no longer scrolls, and a page with more than 32 inputs splits into numbered group tabs (`1–32`, `33–64`…),
+as the Device Editor does. Pressing an input brings its group forward (`ControllerInputsPanel.showGroup`).
+Recorded in [bind-editor.md](../02-features/bindforge/bind-editor.md#tabs-are-input-sources-sub-tabs-are-input-kinds).
+**For E2:** an AXIS DIRECTIONS page built through `page()` gets the same grouping for free.
+
 **2026-10-15, E1 reworked after Alan's first run.**
 
 -

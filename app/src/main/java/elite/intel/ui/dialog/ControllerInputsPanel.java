@@ -34,7 +34,12 @@ final class ControllerInputsPanel extends JPanel {
 
     private static final int COLUMNS = 4;
     private static final int CELL_HEIGHT = 26;
-    private static final int VISIBLE_ROWS = 6;
+    private static final int VISIBLE_ROWS = 8;
+    /**
+     * One group fills the page exactly, so a 32-button stick shows whole and a larger device is split, never
+     * scrolled - the Device Editor groups its buttons the same way.
+     */
+    private static final int INPUTS_PER_GROUP = COLUMNS * VISIBLE_ROWS;
 
     private final CaptureControllers.Controller controller;
     private final Predicate<String> inUse;
@@ -43,6 +48,10 @@ final class ControllerInputsPanel extends JPanel {
      * Whether each token is held elsewhere, for the slot being edited - asked once per slot.
      */
     private final Map<String, Boolean> used = new HashMap<>();
+    /**
+     * Brings each grouped token's group forward; a page of one group has no entry.
+     */
+    private final Map<String, Runnable> showGroup = new HashMap<>();
     private final JTabbedPane pages;
     /**
      * What the slot being edited will hold, when it is on this controller.
@@ -106,11 +115,28 @@ final class ControllerInputsPanel extends JPanel {
         JLabel cell = activeToken == null ? null : cells.get(activeToken);
         if (bringForward && cell != null) {
             pages.setSelectedIndex(isHat(activeToken) ? 1 : 0);
+            Runnable group = showGroup.get(activeToken);
+            if (group != null) group.run();
             cell.scrollRectToVisible(new Rectangle(cell.getSize()));
         }
     }
 
     private JComponent page(List<String> tokens, SavedDeviceLabels labels, Consumer<String> onPick) {
+        if (tokens.size() <= INPUTS_PER_GROUP) return group(tokens, labels, onPick);
+        JTabbedPane groups = AppTheme.makeCompactTabs();
+        for (int from = 0; from < tokens.size(); from += INPUTS_PER_GROUP) {
+            int to = Math.min(from + INPUTS_PER_GROUP, tokens.size());
+            List<String> group = tokens.subList(from, to);
+            int index = groups.getTabCount();
+            // WHY positions, not token numbers: buttons run from 1 without gaps, so for BUTTONS the two agree,
+            // and a hat page has no single number per token.
+            groups.addTab((from + 1) + "–" + to, group(group, labels, onPick));
+            for (String token : group) showGroup.put(token, () -> groups.setSelectedIndex(index));
+        }
+        return groups;
+    }
+
+    private JComponent group(List<String> tokens, SavedDeviceLabels labels, Consumer<String> onPick) {
         JPanel grid = new JPanel(new GridLayout(0, COLUMNS, 4, 4));
         grid.setOpaque(false);
         for (String token : tokens) {
@@ -139,7 +165,8 @@ final class ControllerInputsPanel extends JPanel {
         scroll.getVerticalScrollBar().setUnitIncrement(CELL_HEIGHT);
         scroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
         // WHY a fixed height: the page keeps its size whatever the controller has, so the dialog does not jump
-        // between tabs - a 79-button throttle scrolls inside it (bind-editor.md, Capture Dialog).
+        // between tabs. A group fills it, so it scrolls only when the screen caps the dialog (bind-editor.md,
+        // Capture Dialog).
         scroll.setPreferredSize(new Dimension(0, VISIBLE_ROWS * (CELL_HEIGHT + 4) + 6));
         return scroll;
     }

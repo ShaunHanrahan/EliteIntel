@@ -531,6 +531,14 @@ rather than the hardware.
 of the throttle's 82 inputs are buttons — so the dialog keeps a constant size that fits the app window, and
 the input list scrolls inside it.
 
+**Revised 2026-10-15 (Alan, E1): the page is eight rows of four, and a larger page is split into numbered
+groups of 32 instead of scrolling.** With six rows, a 32-button stick had to be scrolled through a small window
+to find a button. Eight rows show it whole. A page with more than 32 inputs gets a row of group tabs —
+`1–32`, `33–64`, `65–79` — the same groups the [Device Editor](alias-designer.md#device-editor) uses, and pressing an input
+on the hardware brings its group forward. The page still scrolls if the screen caps the dialog's height.
+**This replaces the `.buttonMap` headings above**, which were never built: number ranges work for every
+controller, labelled or not.
+
 #### What the dialog shows
 
 The **title is the in-game name**, and the first rows say where it lives and what the file calls it:
