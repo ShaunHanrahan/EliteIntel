@@ -94,4 +94,19 @@ class HotPlugOffersTest {
 
         assertEquals(Set.of(LEFT), offers.take());
     }
+
+    /** A candidate of an open identity question keeps waiting, and is offered once the question lets it go (A12). */
+    @Test
+    void aHeldBackControllerKeepsWaiting() {
+        HotPlugOffers offers = new HotPlugOffers();
+        offers.connected(1, LEFT);
+        offers.connected(2, RIGHT);
+
+        assertTrue(offers.anyWaitingBesides(Set.of(LEFT)));
+        assertEquals(Set.of(RIGHT), offers.take(Set.of(LEFT)));
+        assertFalse(offers.anyWaitingBesides(Set.of(LEFT)));
+        assertTrue(offers.anyWaiting());
+
+        assertEquals(Set.of(LEFT), offers.take(Set.of()));
+    }
 }

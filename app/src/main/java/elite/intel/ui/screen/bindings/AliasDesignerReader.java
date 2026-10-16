@@ -11,6 +11,7 @@ import elite.intel.db.dao.BindForgeInstallationsDao.InstallationRow;
 import elite.intel.db.managers.BindForgeActivationManager;
 import elite.intel.db.managers.BindForgeDeviceDraftManager;
 import elite.intel.db.managers.BindForgeDeviceMasterManager;
+import elite.intel.db.managers.BindForgeIdentityAnswerManager;
 import elite.intel.devices.DeviceService;
 import elite.intel.devices.model.Device;
 import elite.intel.devices.model.DeviceDescription;
@@ -54,11 +55,13 @@ final class AliasDesignerReader {
      * @param running   whether the Device Service was running; {@code null} when the refresh failed before the
      *                  hardware, for the same reason
      * @param listed    whether the Device Service had finished its first look at the hardware
+     * @param identity  the identity questions (A12) - none before activation or before the hardware is listed, when
+     *                  every controller reads absent
      */
     record Snapshot(Map<String, String> labels, Map<String, String> paths, DeviceFilesCheck.Report report,
                     List<DeviceDivergence.Finding> findings, List<MyDevice> myDevices, List<BuiltInDevice> builtIn,
                     Markers markers, Boolean activated, List<String> changes, Boolean running, boolean listed,
-                    boolean applyWork, List<Long> foundAgain) {
+                    boolean applyWork, List<Long> foundAgain, IdentityQuestions.Reading identity) {
     }
 
     /**
@@ -89,6 +92,7 @@ final class AliasDesignerReader {
         boolean listed = false;
         boolean applyWork = false;
         List<Long> foundAgain = List.of();
+        IdentityQuestions.Reading identity = IdentityQuestions.Reading.NONE;
         try {
             activated = BindForgeActivationManager.getInstance().isActivated();
             changes = DraftChanges.stored();
@@ -123,6 +127,7 @@ final class AliasDesignerReader {
             // WHY: only against a master. Before first setup M, not added and the divergence colour mean
             // nothing, and the column is left out rather than filled with an invented state.
             if (report != null) markers = markersFor(rows, entries, myDevices, findings);
+            if (report != null && listed) identity = readIdentity(myDevices, bindings);
             // WHY: last, so nothing it does can cost the screen what this refresh has already read.
             if (judgeMissing) {
                 MissingControllerWarning.getInstance().judgeOnce(attached.listed(), myDevices, bindings);
@@ -133,7 +138,58 @@ final class AliasDesignerReader {
             log.warn("Could not refresh the divergence list", e);
         }
         return new Snapshot(labels, paths, report, findings, myDevices, builtIn, markers, activated, changes, running,
-                listed, applyWork, foundAgain);
+                listed, applyWork, foundAgain, identity);
+    }
+
+    // ------------------------------------------------------------------ the identity question
+
+    /**
+     * Which missing controllers to ask about, and which candidates onboarding leaves alone meanwhile (Alan, 2026-10-15,
+     * A12). The user's controllers are read as the next Apply will leave them - the draft's when one is started - so a
+     * retarget the user already answered is not asked again. Answers whose controller is attached again, or no longer
+     * the user's, are forgotten here: that is the hardware changing.
+     * <p>
+     * Only once the hardware is listed - before then every controller reads absent, and the forgetting would be wrong
+     * too. A {@code .binds} that cannot be read asks nothing: without the counts every missing controller would look
+     * unbound.
+     */
+    private static IdentityQuestions.Reading readIdentity(List<MyDevice> devices, Path bindings) {
+        Map<String, Integer> counts;
+        try {
+            counts = BindsDeviceReferences.referenceCounts(bindings);
+        } catch (IOException e) {
+            log.warn("Could not read which devices the bindings name, so no identity question is asked: {}",
+                    e.getMessage());
+            return IdentityQuestions.Reading.NONE;
+        }
+        List<DeviceRow> masterRows = BindForgeDeviceMasterManager.getInstance().findAll();
+        BindForgeDeviceDraftManager draft = BindForgeDeviceDraftManager.getInstance();
+        List<DraftRow> draftRows = draft.findAll();
+        List<IdentityQuestions.Known> known = new ArrayList<>();
+        if (draft.isStarted()) {
+            Map<Long, DeviceRow> masterById = masterRows.stream()
+                    .collect(Collectors.toMap(DeviceRow::id, row -> row, (first, second) -> first));
+            for (DraftRow row : draftRows) {
+                if (row.vid() == null || row.pid() == null) continue;
+                DeviceRow from = row.masterId() == null ? null : masterById.get(row.masterId());
+                known.add(new IdentityQuestions.Known(row.deviceName(), Arrays.asList(row.deviceName(),
+                        row.previousName(), from == null ? null : from.deviceName(),
+                        from == null ? null : from.previousName()), new HardwareId(row.vid(), row.pid())));
+            }
+        } else {
+            for (DeviceRow row : masterRows) {
+                if (row.vid() == null || row.pid() == null) continue;
+                known.add(new IdentityQuestions.Known(row.deviceName(),
+                        Arrays.asList(row.deviceName(), row.previousName()), new HardwareId(row.vid(), row.pid())));
+            }
+        }
+        List<HardwareId> heldByDraft = draftRows.stream().map(row -> new HardwareId(row.vid(), row.pid())).toList();
+        BindForgeIdentityAnswerManager answers = BindForgeIdentityAnswerManager.getInstance();
+        FrontierStockDevices stock = FrontierStockDevices.getInstance();
+        IdentityQuestions.Reading reading =
+                IdentityQuestions.read(known, devices, heldByDraft, counts, stock::ships, answers.findAll());
+        answers.forget(reading.forget());
+        return reading;
     }
 
     // ------------------------------------------------------------------ onboarding
@@ -150,10 +206,12 @@ final class AliasDesignerReader {
      * the bindings name by hardware id would be named straight away, leaving those bindings on an id that may no
      * longer resolve.
      *
-     * @param only the controllers to ask about - one from the gear's NAME, those plugged in later (A7) - or {@code null}
-     *             for every controller that needs a name
+     * @param only     the controllers to ask about - one from the gear's NAME, those plugged in later (A7) - or
+     *                 {@code null} for every controller that needs a name
+     * @param heldBack controllers left out - candidates of an identity question still open, which naming would end
+     *                 unasked (Alan, 2026-10-15, A12). Empty from NAME: the user chose to name that one
      */
-    OnboardingReading readOnboarding(Set<HardwareId> only) {
+    OnboardingReading readOnboarding(Set<HardwareId> only, Set<HardwareId> heldBack) {
         if (!BindForgeActivationManager.getInstance().isActivated()) {
             return new OnboardingReading(List.of(), List.of(), getText("bindings.aliasDesigner.onboarding.notActivated"));
         }
@@ -183,9 +241,10 @@ final class AliasDesignerReader {
         entries.values().forEach(list -> list.forEach(entry -> taken.add(entry.name())));
         List<HardwareId> heldByDraft = draft.stream().map(row -> new HardwareId(row.vid(), row.pid())).toList();
 
-        List<MyDevice> asked = only == null
-                ? devices
-                : devices.stream().filter(device -> only.contains(device.hardware())).toList();
+        List<MyDevice> asked = devices.stream()
+                .filter(device -> only == null || only.contains(device.hardware()))
+                .filter(device -> !heldBack.contains(device.hardware()))
+                .toList();
         List<Onboarding.Page> pages = Onboarding.pages(asked, heldByDraft, taken, hardwareIds,
                 AliasDesignerReader::generatedLabels);
         return new OnboardingReading(pages, List.copyOf(taken), null);

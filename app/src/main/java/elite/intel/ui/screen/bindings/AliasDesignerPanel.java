@@ -173,6 +173,14 @@ public class AliasDesignerPanel extends JPanel {
         controller.activateOnFirstShowing();
     }
 
+    /**
+     * What <strong>Review in Bind Editor</strong> does, after a retarget (A12): the BindForge tab shows the bindings.
+     * Set by the tab that holds both screens; until then the button only closes the notice.
+     */
+    public void setReviewBindings(Runnable showBindings) {
+        controller.setReviewBindings(showBindings);
+    }
+
     private void buildUi() {
         setLayout(new BorderLayout());
         setBorder(hudSubtabContentBorder());

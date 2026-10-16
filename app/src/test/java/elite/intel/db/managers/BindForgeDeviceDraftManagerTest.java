@@ -77,6 +77,33 @@ class BindForgeDeviceDraftManagerTest {
         assertEquals("83F4", master.findByName("LVWAP").pid());
     }
 
+    /** The identity question's yes (A12): the name and labels stay, the hardware moves - in the draft only. */
+    @Test
+    void retargetingByNameKeepsTheNameAndLabelsAndStartsTheDraft() {
+        assertTrue(draft.retargetByName("LVWAP", "3344", "83f4", "3344", "83F5"));
+
+        assertTrue(draft.isStarted());
+        DraftRow row = draft.findByName("LVWAP");
+        assertEquals("83F5", row.pid());
+        assertEquals(labels("Joy_1", "LV MAIN TRIGGER", "Joy_2", "PINKY"), draft.labelsOf(row.id()));
+        assertEquals("83F4", master.findByName("LVWAP").pid(), "Apply moves the master, not the answer");
+    }
+
+    @Test
+    void aRetargetFromHardwareTheDeviceNoLongerHasWritesNothing() {
+        assertFalse(draft.retargetByName("LVWAP", "3344", "0001", "3344", "83F5"));
+        assertFalse(draft.retargetByName("Gone", "3344", "83F4", "3344", "83F5"));
+
+        assertEquals("83F4", draft.findByName("LVWAP").pid());
+    }
+
+    @Test
+    void aRetargetOntoHardwareAnotherDeviceHasWritesNothing() {
+        assertFalse(draft.retargetByName("LVWAP", "3344", "83F4", "3344", "03f5"));
+
+        assertEquals("83F4", draft.findByName("LVWAP").pid());
+    }
+
     /** The Device Editor's SAVE: the whole set replaces the device's labels in the draft, never the master's. */
     @Test
     void savingLabelsReplacesTheDraftDevicesSetAndLeavesTheMasterAlone() {

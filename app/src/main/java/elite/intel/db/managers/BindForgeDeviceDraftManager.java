@@ -105,6 +105,34 @@ public class BindForgeDeviceDraftManager {
     }
 
     /**
+     * The identity question's answer, <em>this is the same controller</em>: the device keeps its name and labels and
+     * takes the attached controller's VID/PID, in one transaction with starting the draft (Alan, 2026-10-15, A12).
+     * Bindings name the device, so they follow it; Apply writes the new VID/PID to every installation.
+     *
+     * @return {@code false}, writing nothing, when the device is gone, no longer has the hardware the question showed,
+     *         or another draft device already has the new hardware - the caller read a list that has changed since
+     */
+    public boolean retargetByName(String deviceName, String wasVid, String wasPid, String vid, String pid) {
+        return inTransaction(daos -> {
+            startIfNone(daos);
+            BindForgeDeviceDraftDao draft = daos.draft();
+            DraftRow row = draft.findByName(deviceName);
+            if (row == null || !sameHardware(row, wasVid, wasPid)) return false;
+            if (draft.findAll().stream().anyMatch(other -> other.id() != row.id() && sameHardware(other, vid, pid))) {
+                return false;
+            }
+            draft.retarget(row.id(), vid, pid);
+            return true;
+        });
+    }
+
+    // WHY: VID/PID hex has no case convention, even inside Frontier's own file.
+    private static boolean sameHardware(DraftRow row, String vid, String pid) {
+        return row.vid() != null && row.pid() != null && row.vid().equalsIgnoreCase(vid)
+                && row.pid().equalsIgnoreCase(pid);
+    }
+
+    /**
      * Removes a device from the draft, labels and all. Applying the draft records the device as a pending
      * removal - see {@link #promote()} - because Apply itself never removes anything from a game file.
      */

@@ -52,11 +52,28 @@ public final class HotPlugOffers {
         return !waiting.isEmpty();
     }
 
+    /** Whether any controller is waiting for an offer that may be made now - one not among {@code heldBack}. */
+    public synchronized boolean anyWaitingBesides(Collection<HardwareId> heldBack) {
+        return waiting.stream().anyMatch(hardware -> !heldBack.contains(hardware));
+    }
+
     /** Takes every waiting controller to offer now, in the order they came; each counts as offered from here on. */
     public synchronized Set<HardwareId> take() {
-        Set<HardwareId> taken = new LinkedHashSet<>(waiting);
+        return take(Set.of());
+    }
+
+    /**
+     * Takes every waiting controller but those held back, in the order they came; each taken counts as offered from
+     * here on. A held-back one - a candidate of an identity question still open (Alan, 2026-10-15, A12) - keeps
+     * waiting, so it is offered once the question no longer holds it.
+     */
+    public synchronized Set<HardwareId> take(Collection<HardwareId> heldBack) {
+        Set<HardwareId> taken = new LinkedHashSet<>();
+        for (HardwareId hardware : waiting) {
+            if (!heldBack.contains(hardware)) taken.add(hardware);
+        }
         offered.addAll(taken);
-        waiting.clear();
+        waiting.removeAll(taken);
         return taken;
     }
 

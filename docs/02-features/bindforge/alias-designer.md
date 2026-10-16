@@ -773,6 +773,50 @@ back. Starting unbound destroys work that no later step can recover.
 whenever a retarget crosses to a device the user picked from the candidate list, and a firmware
 update that keeps the same layout costs them one dismissed dialog.
 
+### Built — 2026-10-15 (Alan, A12)
+
+Built as `bindforge.devices.IdentityQuestions` (who is asked, about what - pure), `ui.screen.bindings.IdentityDialog`,
+`BindForgeDeviceDraftManager.retargetByName`, and the remembered answers in `bindforge_identity_answer` (migration
+`12007`, `BindForgeIdentityAnswerManager`), run by `AliasDesignerController`. Alan answered four questions, one at a time:
+
+- **Named controllers only.** A12 asks about a controller the master names. One the bindings know only by its hardware
+  id - the spec's first sketch, *"Your .binds references 334483F3"* - is **slice A17**: a yes there must name the new
+  controller *and* move bindings from the **old** hex to the name, which Apply's hex move cannot find (it looks for a
+  device's current VID/PID), so it needs a stored "old id → name" record of its own.
+- **Asked only when bindings use the missing controller**, by its current, master or old name - the
+  [missing-controller warning's](#built--2026-10-11-alan-a13) rule. The question exists to save bindings; an entry for a
+  stick sold years ago is not worth one whenever a new controller is plugged in. Frontier's names are never asked about.
+- **Not now and None of these are remembered across restarts**, keyed on the missing controller and the set of
+  candidates the question listed. *"Until the hardware situation changes"* is that set changing - a controller plugged
+  in or taken away - or the missing controller being attached again, which forgets the answer.
+- **While a question is deferred, onboarding leaves its candidates alone.** Naming a candidate would end the question
+  unasked. The automatic offer and the hot-plug offer skip them (a hot-plugged one keeps waiting); **CHECK AGAIN** asks
+  the deferred questions first, then onboards whatever is left; **NAME** from the Device Editor names the controller,
+  since that is the user choosing - and naming it takes it out of every question's candidates, which is None of these
+  without a stored row.
+
+*Also settled while building it (Alan approved them with the sources):*
+
+- **The list form, not Yes / No / Not now.** One dialog per missing controller, a row per candidate marked *same vendor,
+  different product ID* where it is, and a last row **None of these**. **OK** takes the selected row; **Not now**, the
+  close glyph and Esc defer.
+- **A candidate** is an attached controller onboarding would ask about (not Frontier's, no entry, not in the master)
+  that the draft does not already hold - a controller named for Apply, or one a retarget points at, is spoken for. A
+  controller picked for one question drops out of the next; a question left with no candidate is not put.
+- **Yes retargets in the draft** (`retargetByName`: name and labels kept, the VID/PID changed, in one transaction with
+  starting the draft). Apply writes the new `<VID>`/`<PID>` to every installation, as it brings any element into line
+  with the master; `.binds` is not touched, since the name does not change. A device whose hardware changed between the
+  question and the answer writes nothing and says so.
+- **The notice says the bindings follow when you apply**, not that they moved - nothing reaches the game until then -
+  and names the risk: bindings and labels keep their button numbers. **Review in Bind Editor** opens the Binding
+  Profile tab.
+- **Where it runs:** in the refresh, after catch-up and before onboarding, under onboarding's conditions - activated,
+  the hardware listed, the user on the screen, no write running, no other dialog open. None of these asks for
+  onboarding's offer on the next refresh. A question put once in a run is not put again in that run unless CHECK AGAIN
+  asks, so a write that fails cannot bring the dialog straight back.
+- **The automatic onboarding offer no longer opens over another dialog**, as the hot-plug offer already did - a refresh
+  can land while the identity questions are showing.
+
 ## Automatic Device Registration
 
 Any controller connected to the system — whether already connected when BindForge starts, or plugged in later during a session (hot-plug) — is automatically added to the My Devices working copy with no user action required. This applies the same "detect and inform, don't ask" principle already used for [First Run](#first-run-and-hot-plug) below, extended to individual devices as they're seen.
