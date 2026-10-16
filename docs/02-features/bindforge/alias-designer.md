@@ -780,8 +780,34 @@ Any controller connected to the system — whether already connected when BindFo
 - **Default alias:** the name the Device Service reports, **cleaned into a valid name** by the [default-name rule](#the-default-name-rule) — `Virpil Controls 20220720` becomes `VirpilControls20220720`. [Onboarding](#onboarding--every-controller-gets-a-name-and-a-buttonmap--settled-2026-09-13) shows it to the user before anything is written.
 - **VID/PID:** filled in immediately from the connected hardware, same as any other device entry.
 - **A `.buttonMap` is created once the device has a name** — at [onboarding](#onboarding--every-controller-gets-a-name-and-a-buttonmap--settled-2026-09-13) for a controller with no entry, or at [Elite-Intel startup](#at-elite-intel-startup-a-buttonmap-for-every-connected-named-controller) for a connected controller that already has one. *Changed 2026-09-13: this used to say no `.buttonMap` stub is created until the user labels something — see [why the rule moved](#it-is-the-alias-confirm-gate-moved-earlier).*
-- **Registration itself touches only the working copy.** Detecting a controller writes nothing. The writes that follow it — a confirmed name, a generated `.buttonMap` — are among the few that reach a game installation outside Apply, and each is justified in [What onboarding writes, and when](#what-onboarding-writes-and-when) and in [Overview — writes outside Apply](overview.md#writes-outside-apply--the-complete-list).
+- **Registration is the row appearing, and writes nothing** — ~~touches only the working copy~~ *(reworded
+  2026-10-15, A7: since [the list became the union](#my-devices) of live hardware and file entries, a detected
+  controller is listed without being stored anywhere, draft included).* Detecting a controller writes nothing. The writes that follow it — a confirmed name, a generated `.buttonMap` — are among the few that reach a game installation outside Apply, and each is justified in [What onboarding writes, and when](#what-onboarding-writes-and-when) and in [Overview — writes outside Apply](overview.md#writes-outside-apply--the-complete-list).
 - **Hot-plugging into BindForge is safe; hot-plugging into a running game is not — those are different things.** BindForge can register a newly-connected controller into its own working copy at any time without risk. Physically connecting or disconnecting a controller while Elite Dangerous itself is running is a separate, game-level risk (it can crash the game) that exists independently of BindForge and is outside BindForge's control — automatic registration does not cause or worsen this; it just means BindForge's own device list stays current regardless of when the user plugs something in.
+
+### Built — 2026-10-15 (Alan, A7)
+
+Built as `bindforge.devices.HotPlugOffers` (who is still owed an offer — in memory, tested) and the Device Bus
+subscription in `AliasDesignerController`. Alan approved these as the sources' defaults and answered one question:
+
+- **Once per run per controller** (Alan). A controller offered once — by the automatic offer after activation, by
+  hot-plug, or from NAME — is not offered again when it is plugged back in, whatever the answer: a loose cable or a
+  hub resetting would otherwise put the dialog up again and again. **CHECK AGAIN**, NAME and the next run still ask,
+  as [A6b](#settled-before-building-it--2026-10-14-alan-a6b) set out.
+- **Plugging in or out reads the screen again while the user is looking**, so the row appears or turns `MISSING`
+  straight away. While the screen is hidden it is marked stale and read again when next shown — nothing reads the
+  disk for a plug nobody sees.
+- **The offer follows the automatic offer's rules:** only once activated, once the hardware is listed, while the
+  user is on the screen; never while catch-up is asking or a write is running. **It never opens over another dialog**
+  — the Device Editor included — and waits for a later refresh instead.
+- **Several plugged in together are one dialog**; one unplugged before its offer stops waiting.
+- **Every connect waits; onboarding's own rule decides who needs a name.** A named controller, or a built-in, is
+  offered silently and to no one; its `.buttonMap` is [startup generation's](#at-elite-intel-startup-a-buttonmap-for-every-connected-named-controller),
+  which already acts on every connect.
+- **The controllers present at startup are the automatic offer's.** The screen registers on the Device Bus when it is
+  built, and the offer after activation asks about every attached controller, those plugged in meanwhile included.
+- **Nothing is done on the Device Bus's thread** but recording the plug — no file or database read — since it also
+  carries push-to-talk.
 
 ### Rules automatic registration still needs
 
@@ -795,8 +821,9 @@ Three gaps were found while working the design through. **Two were settled by on
   has Frontier's entry, matched on VID/PID, so it is never onboarded and [never renamed](#built-in-controllers-in-my-devices--settled-2026-09-13). A *different*
   controller reporting a clashing name gets a number — `T-Rudder` from an unrelated device becomes
   `TRudder2`. See [the default-name rule](#the-default-name-rule).
-- **What reaches the game's file.** Registration only touches the draft, so nothing lands in a real install
-  until **Apply** runs. **Settled 2026-09-06: applying pushes only what changed**, never the
+- **What reaches the game's file.** Registration ~~only touches the draft~~ writes nothing *(2026-10-15, A7)*; the
+  name onboarding then gives is written [as onboarding writes it](#what-onboarding-writes-and-when), and anything else
+  lands in a real install only when **Apply** runs. **Settled 2026-09-06: applying pushes only what changed**, never the
   whole set. Pushing everything accumulates entries for hardware plugged in once, years ago, and rewrites
   rows no one touched, and an entry for a device the player never named carries no benefit — no binding
   depends on it. *(This used to say "since both files are purely cosmetic"; the decision stands, but that

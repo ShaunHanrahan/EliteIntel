@@ -150,9 +150,10 @@ final class AliasDesignerReader {
      * the bindings name by hardware id would be named straight away, leaving those bindings on an id that may no
      * longer resolve.
      *
-     * @param only the controller to name, from the gear - or {@code null} for every controller that needs one
+     * @param only the controllers to ask about - one from the gear's NAME, those plugged in later (A7) - or {@code null}
+     *             for every controller that needs a name
      */
-    OnboardingReading readOnboarding(MyDevice only) {
+    OnboardingReading readOnboarding(Set<HardwareId> only) {
         if (!BindForgeActivationManager.getInstance().isActivated()) {
             return new OnboardingReading(List.of(), List.of(), getText("bindings.aliasDesigner.onboarding.notActivated"));
         }
@@ -184,7 +185,7 @@ final class AliasDesignerReader {
 
         List<MyDevice> asked = only == null
                 ? devices
-                : devices.stream().filter(device -> device.hardware().equals(only.hardware())).toList();
+                : devices.stream().filter(device -> only.contains(device.hardware())).toList();
         List<Onboarding.Page> pages = Onboarding.pages(asked, heldByDraft, taken, hardwareIds,
                 AliasDesignerReader::generatedLabels);
         return new OnboardingReading(pages, List.copyOf(taken), null);
