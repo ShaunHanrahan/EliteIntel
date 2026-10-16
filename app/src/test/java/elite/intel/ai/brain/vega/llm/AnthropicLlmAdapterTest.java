@@ -38,11 +38,29 @@ class AnthropicLlmAdapterTest {
 
         assertEquals("claude-haiku-5-5", json.get("model").getAsString());
         assertTrue(json.has("max_tokens"), "Anthropic requires max_tokens");
-        assertEquals("rules", json.get("system").getAsString());
+        JsonArray system = json.getAsJsonArray("system");
+        assertEquals(1, system.size());
+        assertEquals("rules", system.get(0).getAsJsonObject().get("text").getAsString());
 
         JsonArray messages = json.getAsJsonArray("messages");
         assertEquals(1, messages.size(), "the system message must not appear in messages");
         assertEquals("user", messages.get(0).getAsJsonObject().get("role").getAsString());
+    }
+
+    @Test
+    void cachesToolsAndSystemWithOneBreakpointOnTheSystemBlock() {
+        JsonObject json = JsonParser.parseString(adapter.buildRequestBody(request(
+                List.of(LlmMessage.of(LlmMessageRole.SYSTEM, "rules"),
+                        LlmMessage.of(LlmMessageRole.USER, "say hi")),
+                List.of(speakTool())))).getAsJsonObject();
+
+        JsonObject systemBlock = json.getAsJsonArray("system").get(0).getAsJsonObject();
+        assertEquals("ephemeral", systemBlock.getAsJsonObject("cache_control").get("type").getAsString());
+        // A top-level marker would land after the per-request user turn: a write on every call, never a read.
+        assertFalse(json.has("cache_control"));
+        assertFalse(json.getAsJsonArray("tools").get(0).getAsJsonObject().has("cache_control"));
+        assertFalse(json.getAsJsonArray("messages").get(0).getAsJsonObject().get("content").isJsonArray(),
+                "the user turn stays a plain string with no marker");
     }
 
     @Test

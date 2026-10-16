@@ -14,7 +14,8 @@ import java.util.List;
  * Native {@link LlmProviderAdapter} for Anthropic's Messages API ({@code /v1/messages}), which is <em>not</em>
  * OpenAI-compatible. The differences this adapter bridges:
  * <ul>
- *   <li>the system prompt is a top-level {@code system} string, not a {@code system}-role message;</li>
+ *   <li>the system prompt is a top-level {@code system} text block, not a {@code system}-role message; it carries
+ *       the request's only cache breakpoint, so tools + system are cached as one prefix;</li>
  *   <li>{@code max_tokens} is required;</li>
  *   <li>an assistant tool-call is a {@code content} block {@code {type:"tool_use", id, name, input}}, and a
  *       tool result is a {@code {type:"tool_result", tool_use_id, content}} block carried in a <em>user</em>
@@ -30,7 +31,8 @@ import java.util.List;
  * The parameter {@code input_schema} is the same standard JSON-Schema object the OpenAI-compatible adapter
  * uses, so it reuses {@link ToolParameterSchema}.
  * <p>
- * Note: implemented to Anthropic's documented wire shapes; not yet exercised against the live endpoint.
+ * Verified against the live endpoint with {@code claude-haiku-5-5} on 2026-10-16: a forced call returns a
+ * single {@code tool_use} block with no thinking, and a second turn with the same tools reads the cached prefix.
  */
 public final class AnthropicLlmAdapter implements LlmProviderAdapter {
 
@@ -47,7 +49,7 @@ public final class AnthropicLlmAdapter implements LlmProviderAdapter {
         List<LlmMessage> messages = ToolCallIdNormalizer.forWire(request.messages());
         String system = systemPrompt(messages);
         if (!system.isBlank()) {
-            body.addProperty("system", system);
+            body.add("system", cachedSystemBlocks(system));
         }
         body.add("messages", renderMessages(messages));
 
@@ -75,6 +77,24 @@ public final class AnthropicLlmAdapter implements LlmProviderAdapter {
             }
         }
         return system.toString();
+    }
+
+    /**
+     * The system prompt as one text block with a cache breakpoint. Render order is tools, system, messages, so
+     * this caches tools + system and a later turn with the same tool list reads it back. Deliberately not the
+     * top-level {@code cache_control}: that would put the breakpoint after the per-request user turn and pay the
+     * cache-write premium on every one-shot command without ever reading it.
+     */
+    private static JsonArray cachedSystemBlocks(String system) {
+        JsonObject cacheControl = new JsonObject();
+        cacheControl.addProperty("type", "ephemeral");
+        JsonObject block = new JsonObject();
+        block.addProperty("type", "text");
+        block.addProperty("text", system);
+        block.add("cache_control", cacheControl);
+        JsonArray blocks = new JsonArray();
+        blocks.add(block);
+        return blocks;
     }
 
     /**
