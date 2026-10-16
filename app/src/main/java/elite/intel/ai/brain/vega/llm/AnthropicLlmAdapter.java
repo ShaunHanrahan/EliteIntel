@@ -21,7 +21,11 @@ import java.util.List;
  *       turn - so consecutive VEGA {@code TOOL} messages are coalesced into one user turn (the API
  *       forbids two user turns in a row);</li>
  *   <li>tools are {@code {name, description, input_schema}} and a forced call is {@code tool_choice:{type:"any"}};</li>
- *   <li>the response is a top-level {@code content} block array ({@code tool_use} blocks, or {@code text}).</li>
+ *   <li>the response is a top-level {@code content} block array ({@code tool_use} blocks, or {@code text}), which
+ *       can open with a {@code thinking} block that both parsers skip;</li>
+ *   <li>no {@code temperature} is sent (Haiku 5.5 rejects any value but its default) - {@code output_config.effort}
+ *       sets how much the model thinks instead;</li>
+ *   <li>a {@code refusal} or {@code max_tokens} stop is HTTP 200, so its content is treated as unusable here.</li>
  * </ul>
  * The parameter {@code input_schema} is the same standard JSON-Schema object the OpenAI-compatible adapter
  * uses, so it reuses {@link ToolParameterSchema}.
@@ -37,7 +41,8 @@ public final class AnthropicLlmAdapter implements LlmProviderAdapter {
         JsonObject body = new JsonObject();
         body.addProperty("model", AnthropicClient.MODEL_COMMAND_MODEL);
         body.addProperty("max_tokens", MAX_TOKENS);
-        body.addProperty("temperature", request.profile().temperature());
+        // thinking stays unset (adaptive); a forced tool call skips thinking, so 1024 tokens is plenty here.
+        body.add("output_config", AnthropicClient.outputConfig(AnthropicClient.COMMAND_EFFORT));
 
         List<LlmMessage> messages = ToolCallIdNormalizer.forWire(request.messages());
         String system = systemPrompt(messages);
@@ -176,7 +181,10 @@ public final class AnthropicLlmAdapter implements LlmProviderAdapter {
         String droppedText = null;
         try {
             finishReason = stopReasonOf(response);
-            droppedText = parseText(response);
+            droppedText = firstText(response);
+            if (isCutShort(finishReason)) {
+                return invalid(finishReason, droppedText); // a refused or truncated tool call must never execute
+            }
             JsonArray content = contentOf(response);
             if (content == null) {
                 return invalid(finishReason, droppedText);
@@ -214,8 +222,18 @@ public final class AnthropicLlmAdapter implements LlmProviderAdapter {
                 ? response.get("stop_reason").getAsString() : null;
     }
 
+    /** True for a stop whose content is not an answer: a declined request, or output cut off at max_tokens. */
+    private static boolean isCutShort(String stopReason) {
+        return AnthropicClient.STOP_REFUSAL.equals(stopReason) || AnthropicClient.STOP_MAX_TOKENS.equals(stopReason);
+    }
+
     @Override
     public String parseText(JsonObject response) {
+        return isCutShort(stopReasonOf(response)) ? null : firstText(response);
+    }
+
+    /** The first non-blank {@code text} block, stripped; {@code thinking} and {@code tool_use} blocks are skipped. */
+    private String firstText(JsonObject response) {
         try {
             JsonArray content = contentOf(response);
             if (content == null) {

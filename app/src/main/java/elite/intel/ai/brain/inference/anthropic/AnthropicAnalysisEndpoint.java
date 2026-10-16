@@ -18,10 +18,10 @@ import org.apache.logging.log4j.Logger;
  * <p>
  * Mirrors the OpenAI-compatible analysis endpoints, adapting the request body to Claude's shape:
  * - System messages are collected into a single top-level "system" field
- * - Content is read from response.content[0].text
+ * - Content is read from the first "text" block (a Haiku 5.5 reply can open with a "thinking" block)
  * <p>
- * Uses MODEL_OPUS for analysis (higher capability) and a slightly higher
- * temperature than commands to allow more nuanced analytical responses.
+ * Sends no temperature, because Haiku 5.5 rejects any value but its default; how much the model thinks
+ * is set by {@link AnthropicClient#ANALYSIS_EFFORT}.
  */
 public class AnthropicAnalysisEndpoint extends AiEndPoint implements AiAnalysisInterface {
 
@@ -43,65 +43,7 @@ public class AnthropicAnalysisEndpoint extends AiEndPoint implements AiAnalysisI
     public JsonObject analyzeData(String originalUserInput, AiData struct) {
         try {
             AnthropicClient client = AnthropicClient.getInstance();
-            JsonObject prompt = client.createPrompt(AnthropicClient.MODEL_ANALYSIS_MODEL, 0.65f);
-
-            // Check if this is general conversation - use minimal prompt to avoid Anthropic safety refusals
-            boolean isGeneralConversation = struct.getInstructions() != null &&
-                                            struct.getInstructions().contains("General Chat");
-
-            String baseSystemPrompt;
-            if (isGeneralConversation) {
-                // Minimal prompt for general conversation to avoid safety refusals
-                baseSystemPrompt = """
-                        AI assistant.
-                        Provide brief, casual conversational responses.
-                        Output ONLY this exact JSON structure {"text_to_speech_response": "YOUR ANSWER HERE"} - no markdown, no extra text.
-                        Keep responses to one short sentence.
-                        """;
-            } else {
-                baseSystemPrompt = apiFactory.getAiPromptFactory().generateAnalysisPrompt();
-            }
-
-            String instructionsPrompt = "INSTRUCTIONS: " + struct.getInstructions();
-
-            JsonArray systemArray = new JsonArray();
-
-            JsonObject systemBlock1 = new JsonObject();
-            systemBlock1.addProperty("type", "text");
-            systemBlock1.addProperty("text", baseSystemPrompt);
-            systemArray.add(systemBlock1);
-
-            // Cache covers base + instructions together a larger prefix increases odds
-            // of meeting Anthropic's minimum token threshold for cache writes.
-            // Cache hits on consecutive calls of the same query type.
-            JsonObject systemBlock2 = new JsonObject();
-            systemBlock2.addProperty("type", "text");
-            systemBlock2.addProperty("text", instructionsPrompt);
-            JsonObject cacheControl = new JsonObject();
-            cacheControl.addProperty("type", "ephemeral");
-            systemBlock2.add("cache_control", cacheControl);
-            systemArray.add(systemBlock2);
-
-            prompt.add("system", systemArray);
-
-            JsonObject userMsg = new JsonObject();
-            userMsg.addProperty("role", AIConstants.ROLE_USER);
-
-            // Format data section - if it's just empty/minimal chat history, omit the data preamble
-            String dataYaml = struct.getData().toYaml();
-            String content;
-            if (dataYaml == null || dataYaml.trim().isEmpty() || dataYaml.contains("coPilotBrief: \"Connection successful.\"")) {
-                // For general conversation with minimal/no real data
-                content = originalUserInput;
-            } else {
-                // For data queries
-                content = originalUserInput + "\n\nData:\n" + dataYaml;
-            }
-            userMsg.addProperty("content", content);
-
-            JsonArray messages = new JsonArray();
-            messages.add(userMsg);
-            prompt.add("messages", messages);
+            JsonObject prompt = buildRequest(originalUserInput, struct);
 
             log.debug("Anthropic analysis call:\n{}", gson.toJson(prompt));
 
@@ -115,27 +57,114 @@ public class AnthropicAnalysisEndpoint extends AiEndPoint implements AiAnalysisI
 
             log.debug("Anthropic analysis raw response:\n{}", gson.toJson(root));
 
-            // Check for API-level error envelope
-            if ("error".equals(root.has("type") ? root.get("type").getAsString() : null)) {
-                log.error("Anthropic API error during analysis: {}", root);
-                return buildError("Claude API error – check logs");
-            }
-
-            String text = client.extractText(root);
-            if (text == null || text.isBlank()) {
-                log.error("Empty analysis response from Claude:\n{}", root);
-                return buildError("Empty analysis response");
-            }
-
-            // Strip any accidental markdown fences
-            text = stripJsonFences(text);
-
-            return JsonParser.parseString(text).getAsJsonObject();
+            return interpret(root);
 
         } catch (Exception e) {
             log.error("Anthropic analysis failed", e);
             return buildError("Analysis failed – check logs");
         }
+    }
+
+    /**
+     * The request body for one analysis call. Always a single user turn: Haiku 5.5 rejects a request that ends
+     * with an assistant turn (prefill).
+     */
+    JsonObject buildRequest(String originalUserInput, AiData struct) {
+        JsonObject prompt = AnthropicClient.getInstance().createPrompt(AnthropicClient.MODEL_ANALYSIS_MODEL, 0.65f);
+
+        // Check if this is general conversation - use minimal prompt to avoid Anthropic safety refusals
+        boolean isGeneralConversation = struct.getInstructions() != null &&
+                                        struct.getInstructions().contains("General Chat");
+
+        String baseSystemPrompt;
+        if (isGeneralConversation) {
+            // Minimal prompt for general conversation to avoid safety refusals
+            baseSystemPrompt = """
+                    AI assistant.
+                    Provide brief, casual conversational responses.
+                    Output ONLY this exact JSON structure {"text_to_speech_response": "YOUR ANSWER HERE"} - no markdown, no extra text.
+                    Keep responses to one short sentence.
+                    """;
+        } else {
+            baseSystemPrompt = apiFactory.getAiPromptFactory().generateAnalysisPrompt();
+        }
+
+        String instructionsPrompt = "INSTRUCTIONS: " + struct.getInstructions();
+
+        JsonArray systemArray = new JsonArray();
+
+        JsonObject systemBlock1 = new JsonObject();
+        systemBlock1.addProperty("type", "text");
+        systemBlock1.addProperty("text", baseSystemPrompt);
+        systemArray.add(systemBlock1);
+
+        // Cache covers base + instructions together a larger prefix increases odds
+        // of meeting Anthropic's minimum token threshold for cache writes.
+        // Cache hits on consecutive calls of the same query type.
+        JsonObject systemBlock2 = new JsonObject();
+        systemBlock2.addProperty("type", "text");
+        systemBlock2.addProperty("text", instructionsPrompt);
+        JsonObject cacheControl = new JsonObject();
+        cacheControl.addProperty("type", "ephemeral");
+        systemBlock2.add("cache_control", cacheControl);
+        systemArray.add(systemBlock2);
+
+        prompt.add("system", systemArray);
+
+        JsonObject userMsg = new JsonObject();
+        userMsg.addProperty("role", AIConstants.ROLE_USER);
+
+        // Format data section - if it's just empty/minimal chat history, omit the data preamble
+        String dataYaml = struct.getData().toYaml();
+        String content;
+        if (dataYaml == null || dataYaml.trim().isEmpty() || dataYaml.contains("coPilotBrief: \"Connection successful.\"")) {
+            // For general conversation with minimal/no real data
+            content = originalUserInput;
+        } else {
+            // For data queries
+            content = originalUserInput + "\n\nData:\n" + dataYaml;
+        }
+        userMsg.addProperty("content", content);
+
+        JsonArray messages = new JsonArray();
+        messages.add(userMsg);
+        prompt.add("messages", messages);
+        return prompt;
+    }
+
+    /**
+     * Turns a Claude response into the analysis JSON, or into the spoken error JSON when it can't be used.
+     * Throws if the answer text is not JSON; {@link #analyzeData} reports that as a failed analysis.
+     */
+    JsonObject interpret(JsonObject root) {
+        // Check for API-level error envelope
+        if ("error".equals(root.has("type") ? root.get("type").getAsString() : null)) {
+            log.error("Anthropic API error during analysis: {}", root);
+            return buildError("Claude API error – check logs");
+        }
+
+        // A refusal or a reply cut off at max_tokens comes back as HTTP 200; its partial text is not an answer.
+        String stopReason = root.has("stop_reason") && !root.get("stop_reason").isJsonNull()
+                ? root.get("stop_reason").getAsString() : null;
+        if (AnthropicClient.STOP_REFUSAL.equals(stopReason)) {
+            log.warn("Claude declined the analysis request (stop_details: {})", root.get("stop_details"));
+            return buildError("Analysis failed – check logs");
+        }
+        if (AnthropicClient.STOP_MAX_TOKENS.equals(stopReason)) {
+            log.warn("Claude analysis hit max_tokens before it finished:\n{}", root);
+            return buildError("Analysis failed – check logs");
+        }
+
+        String text = AnthropicClient.getInstance().extractText(root);
+        if (text == null || text.isBlank()) {
+            log.error("Empty analysis response from Claude:\n{}", root);
+            return buildError("Empty analysis response");
+        }
+
+        // Strip any accidental markdown fences
+        text = stripJsonFences(text);
+
+        return JsonParser.parseString(text).getAsJsonObject();
     }
 
     // -----------------------------------------------------------------------

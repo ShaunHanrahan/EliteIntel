@@ -36,13 +36,26 @@ class AnthropicLlmAdapterTest {
                         LlmMessage.of(LlmMessageRole.USER, "say hi")),
                 List.of(speakTool())))).getAsJsonObject();
 
-        assertEquals(AnthropicClient.MODEL_COMMAND_MODEL, json.get("model").getAsString());
+        assertEquals("claude-haiku-5-5", json.get("model").getAsString());
         assertTrue(json.has("max_tokens"), "Anthropic requires max_tokens");
         assertEquals("rules", json.get("system").getAsString());
 
         JsonArray messages = json.getAsJsonArray("messages");
         assertEquals(1, messages.size(), "the system message must not appear in messages");
         assertEquals("user", messages.get(0).getAsJsonObject().get("role").getAsString());
+    }
+
+    @Test
+    void sendsEffortAndNoSamplingOrThinkingParameters() {
+        JsonObject json = JsonParser.parseString(adapter.buildRequestBody(request(
+                List.of(LlmMessage.of(LlmMessageRole.USER, "hi")), List.of(speakTool())))).getAsJsonObject();
+
+        assertFalse(json.has("temperature"), "Haiku 5.5 rejects any temperature but its default");
+        assertFalse(json.has("top_p"));
+        assertFalse(json.has("top_k"));
+        assertFalse(json.has("thinking"), "thinking stays unset so the model runs adaptive");
+        assertEquals(AnthropicClient.COMMAND_EFFORT,
+                json.getAsJsonObject("output_config").get("effort").getAsString());
     }
 
     @Test
@@ -109,6 +122,26 @@ class AnthropicLlmAdapterTest {
     }
 
     @Test
+    void historyAndRepairContinuationStillEndOnAUserTurn() {
+        // Haiku 5.5 rejects a request ending in an assistant turn (prefill). Replayed history and the gateway's
+        // repair continuation (rejected tool_use + its tool_result) must both leave a user turn last.
+        JsonObject args = new JsonObject();
+        args.addProperty("text", "hi");
+        LlmRequest req = request(List.of(
+                LlmMessage.of(LlmMessageRole.SYSTEM, "rules"),
+                LlmMessage.of(LlmMessageRole.USER, "where are we"),
+                LlmMessage.of(LlmMessageRole.ASSISTANT, "in Sol"),
+                LlmMessage.of(LlmMessageRole.USER, "say hi"),
+                LlmMessage.assistantToolCalls(List.of(new LlmToolInvocation("repair-1", "speak", args))),
+                LlmMessage.toolResult("repair-1", "{\"error\":\"rejected\"}")), List.of(speakTool()));
+
+        JsonArray messages = JsonParser.parseString(adapter.buildRequestBody(req)).getAsJsonObject()
+                .getAsJsonArray("messages");
+
+        assertEquals("user", messages.get(messages.size() - 1).getAsJsonObject().get("role").getAsString());
+    }
+
+    @Test
     void parsesToolUseBlocksIntoInvocations() {
         JsonObject input = new JsonObject();
         input.addProperty("text", "hi");
@@ -119,6 +152,26 @@ class AnthropicLlmAdapterTest {
         assertEquals("speak", result.toolInvocations().get(0).name());
         assertEquals("tool-1", result.toolInvocations().get(0).id());
         assertEquals("hi", result.toolInvocations().get(0).arguments().get("text").getAsString());
+    }
+
+    @Test
+    void parseSkipsALeadingThinkingBlock() {
+        JsonObject input = new JsonObject();
+        input.addProperty("text", "hi");
+        LlmResult result = adapter.parse(response("tool_use", thinkingBlock(), toolUseBlock("tool-1", "speak", input)));
+
+        assertTrue(result.isValid());
+        assertEquals("speak", result.toolInvocations().get(0).name());
+    }
+
+    @Test
+    void refusedOrTruncatedToolCallIsNeverExecuted() {
+        for (String stop : List.of("refusal", "max_tokens")) {
+            LlmResult result = adapter.parse(response(stop, toolUseBlock("tool-1", "speak", new JsonObject())));
+
+            assertEquals(LlmResult.Status.INVALID_RESPONSE, result.status(), stop);
+            assertEquals(stop, result.finishReason());
+        }
     }
 
     @Test
@@ -145,27 +198,65 @@ class AnthropicLlmAdapterTest {
         assertNull(adapter.parseText(new JsonObject()));
     }
 
+    @Test
+    void parseTextSkipsThinkingAndIgnoresRefusedOrTruncatedText() {
+        assertEquals("OK", adapter.parseText(response("end_turn", thinkingBlock(), textBlock("OK"))));
+        assertNull(adapter.parseText(response("refusal", textBlock("I can't help with that"))));
+        assertNull(adapter.parseText(response("max_tokens", textBlock("half an ans"))));
+    }
+
+    @Test
+    void extractTextSkipsALeadingThinkingBlock() {
+        AnthropicClient client = AnthropicClient.getInstance();
+
+        assertEquals("{\"text_to_speech_response\":\"Docked.\"}", client.extractText(response("end_turn",
+                thinkingBlock(), textBlock("{\"text_to_speech_response\":\"Docked.\"}"))));
+        assertNull(client.extractText(response("max_tokens", thinkingBlock())), "thinking alone carries no answer");
+    }
+
     private static JsonObject responseWithText(String text) {
-        JsonObject block = new JsonObject();
-        block.addProperty("type", "text");
-        block.addProperty("text", text);
-        return wrap(block);
+        return response(null, textBlock(text));
     }
 
     private static JsonObject responseWithToolUse(String id, String name, JsonObject input) {
+        return response(null, toolUseBlock(id, name, input));
+    }
+
+    private static JsonObject textBlock(String text) {
+        JsonObject block = new JsonObject();
+        block.addProperty("type", "text");
+        block.addProperty("text", text);
+        return block;
+    }
+
+    private static JsonObject toolUseBlock(String id, String name, JsonObject input) {
         JsonObject block = new JsonObject();
         block.addProperty("type", "tool_use");
         block.addProperty("id", id);
         block.addProperty("name", name);
         block.add("input", input);
-        return wrap(block);
+        return block;
     }
 
-    private static JsonObject wrap(JsonObject block) {
+    /** A Haiku 5.5 thinking block as it arrives by default: empty text, signature only. */
+    private static JsonObject thinkingBlock() {
+        JsonObject block = new JsonObject();
+        block.addProperty("type", "thinking");
+        block.addProperty("thinking", "");
+        block.addProperty("signature", "sig");
+        return block;
+    }
+
+    private static JsonObject response(String stopReason, JsonObject... blocks) {
         JsonArray content = new JsonArray();
-        content.add(block);
+        for (JsonObject block : blocks) {
+            content.add(block);
+        }
         JsonObject response = new JsonObject();
         response.add("content", content);
+        if (stopReason != null) {
+            response.addProperty("stop_reason", stopReason);
+        }
         return response;
     }
 }

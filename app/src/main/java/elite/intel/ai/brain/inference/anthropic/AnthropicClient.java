@@ -1,5 +1,6 @@
 package elite.intel.ai.brain.inference.anthropic;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import elite.intel.ai.brain.AiTransportResult;
 import elite.intel.ai.brain.BaseAiClient;
@@ -20,12 +21,24 @@ public class AnthropicClient extends BaseAiClient implements Client {
 
     private static final Logger log = LogManager.getLogger(AnthropicClient.class);
 
-    public static final String MODEL_COMMAND_MODEL = "claude-haiku-4-5-20251001";
-    public static final String MODEL_ANALYSIS_MODEL = "claude-haiku-4-5-20251001";
+    public static final String MODEL_COMMAND_MODEL = "claude-haiku-5-5";
+    public static final String MODEL_ANALYSIS_MODEL = "claude-haiku-5-5";
+
+    /**
+     * {@code output_config.effort} per request path. Haiku 5.5 thinks adaptively by default (at "medium"); "low"
+     * keeps voice replies fast. Raise one of these if its answers get too shallow.
+     */
+    public static final String COMMAND_EFFORT = "low";
+    public static final String ANALYSIS_EFFORT = "low";
+
+    /** {@code stop_reason} values whose content must not be used: a declined request, or output cut off at max_tokens. */
+    public static final String STOP_REFUSAL = "refusal";
+    public static final String STOP_MAX_TOKENS = "max_tokens";
 
     private static final String API_URL = "https://api.anthropic.com/v1/messages";
     private static final String API_VERSION = "2023-06-01";
-    private static final int DEFAULT_MAX_TOKENS = 1024;
+    // Thinking tokens count toward max_tokens, so the analysis path leaves room for them ahead of its JSON answer.
+    private static final int ANALYSIS_MAX_TOKENS = 2048;
 
     private static final AnthropicClient INSTANCE = new AnthropicClient();
 
@@ -43,11 +56,22 @@ public class AnthropicClient extends BaseAiClient implements Client {
 
     @Override
     public JsonObject createPrompt(String model, float temp) {
+        // temp is ignored: Haiku 5.5 rejects any temperature other than its default with HTTP 400.
         JsonObject request = new JsonObject();
         request.addProperty("model", model);
-        request.addProperty("max_tokens", DEFAULT_MAX_TOKENS);
-        request.addProperty("temperature", temp);
+        request.addProperty("max_tokens", ANALYSIS_MAX_TOKENS);
+        request.add("output_config", outputConfig(ANALYSIS_EFFORT));
         return request;
+    }
+
+    /**
+     * An {@code output_config} carrying the given effort. {@code thinking} is deliberately left unset, so Haiku 5.5
+     * runs adaptive thinking and the effort decides how much of it there is.
+     */
+    public static JsonObject outputConfig(String effort) {
+        JsonObject config = new JsonObject();
+        config.addProperty("effort", effort);
+        return config;
     }
 
     @Override
@@ -110,12 +134,19 @@ public class AnthropicClient extends BaseAiClient implements Client {
                 .build();
     }
 
+    /**
+     * The text of the first {@code text} block, or null. Read by type, not position: a Haiku 5.5 reply can open
+     * with a {@code thinking} block.
+     */
     public String extractText(JsonObject response) {
         try {
-            return response
-                    .getAsJsonArray("content")
-                    .get(0).getAsJsonObject()
-                    .get("text").getAsString();
+            for (JsonElement element : response.getAsJsonArray("content")) {
+                JsonObject block = element.getAsJsonObject();
+                if (block.has("type") && "text".equals(block.get("type").getAsString()) && block.has("text")) {
+                    return block.get("text").getAsString();
+                }
+            }
+            return null;
         } catch (Exception e) {
             return null;
         }
